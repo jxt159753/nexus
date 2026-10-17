@@ -4,7 +4,7 @@
 
 本文件是唯一架构设计入口，供后续每次开发前完整读取。项目规范见 [AGENTS.md](../AGENTS.md)，阶段批准与任务验收见 [ROADMAP.md](ROADMAP.md)，项目入口见 [README.md](../README.md)。
 
-本文件描述目标架构，不代表所有功能已经实现。当前已存在 S1/P01 工程基础；本轮仅按用户要求复核 P01 并同步文档，不启动正式服务或推进 S2–S7。阶段状态以 [ROADMAP.md](ROADMAP.md) 为准，技术证据见 [P01-VERIFICATION.md](P01-VERIFICATION.md)。设计文档完成不代表后续实现阶段已获批准。
+本文件描述目标架构，不代表所有功能已经实现。当前已有 S1/P01 工程基础及 P02 的 v1 数据契约、严格编解码和规则路由；本轮按用户后续授权修复首次验收问题并通过技术复核，待用户确认验收，不启动服务或推进 P03–P12。阶段状态以 [ROADMAP.md](ROADMAP.md) 为准，技术证据见 [P01-VERIFICATION.md](P01-VERIFICATION.md) 和 [P02-VERIFICATION.md](P02-VERIFICATION.md)。设计文档完成不代表后续实现阶段已获批准。
 
 ## 项目愿景
 
@@ -224,6 +224,8 @@ stateDiagram-v2
 
 ## 8. JARVIS Link v1 协议
 
+P02 已实现本节 25 种消息的数据契约；字段名、严格解析入口、错误映射和字节计算约定见 [protocol-v1.md](protocol-v1.md)。实际连接、授权及执行生命周期仍由后续任务实现。
+
 ### 8.1 端点和消息信封
 
 HTTP：`/api/v1/session` 用于登录/退出；`/api/v1/tasks` 和 `/api/v1/tasks/{id}` 用于分页历史与详情；`/api/v1/memories` 用于显式授权记忆管理。HTTP 与 WS 共用应用层授权。
@@ -288,10 +290,10 @@ Core 的 grant_id 引用已持久授权；它通过已验证的 Core 连接传�
 
 ```json
 {
-  "session_id": "session-uuid",
-  "task_id": "task-uuid",
-  "attempt_id": "attempt-uuid",
-  "command_digest": "sha256-hex",
+  "session_id": "1716eb9e-78c4-4baa-9a9c-49b47fcde962",
+  "task_id": "93e32968-43ba-43dc-9f07-610d672b4884",
+  "attempt_id": "6f74fd13-05d2-48dd-ae79-751a900a7d37",
+  "command_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "tool": "filesystem.list",
   "tool_version": 1,
   "observed_at": "2026-10-17T08:00:02Z",

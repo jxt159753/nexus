@@ -8,9 +8,9 @@ NEXUS 是一个面向个人、长期运行的自主 AI 系统。它希望逐步�
 
 ## 当前状态
 
-当前已有可安装的 Python 工程、环境变量配置校验、依赖锁定和基础测试；安装与配置验证步骤见 [P01 工程验证记录](docs/P01-VERIFICATION.md)。正式 Core、Node、Web 客户端及执行闭环尚未交付。
+当前已有可安装的 Python 工程、环境变量配置校验、依赖锁定、v1 数据契约、严格 JSON 编解码和规则路由。安装与配置证据见 [P01 工程验证记录](docs/P01-VERIFICATION.md)，契约与路由修复后的复核证据见 [P02 验证记录](docs/P02-VERIFICATION.md)。正式 Core、Node、Web 客户端及执行闭环尚未交付。
 
-当前复核范围为 S1/P01 工程准备。阶段授权、进度、用户验收状态及后续批准要求统一见 [ROADMAP.md](docs/ROADMAP.md)；本 README 不授予后续阶段实施权限。
+阶段授权、进度、用户验收状态及后续批准要求统一见 [ROADMAP.md](docs/ROADMAP.md)；本 README 不授予后续阶段实施权限。
 
 仓库中保留了早期实验 API、`start_nexus.bat` 和本地 `nexus.db`。它们未纳入正式 Core、持久化或安全验收，实验启动入口也未接入新的配置校验，不作为正式启动方式。
 
@@ -22,6 +22,8 @@ NEXUS 是一个面向个人、长期运行的自主 AI 系统。它希望逐步�
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | 愿景、架构边界、MVP 技术方案、接口、状态机、协议及预期目录 |
 | [ROADMAP.md](docs/ROADMAP.md) | 唯一的开发阶段、任务编号、批准状态、依赖和验收标准入口 |
 | [P01-VERIFICATION.md](docs/P01-VERIFICATION.md) | 工程安装与配置的复现命令、实测结果和限制 |
+| [P02-VERIFICATION.md](docs/P02-VERIFICATION.md) | 契约与规则路由的复核结果、问题及复现方式 |
+| [protocol-v1.md](docs/protocol-v1.md) | 已实现的消息字段、编解码入口、错误分类和字节限额 |
 
 `ARCHITECTURE.md` 和 `ROADMAP.md` 的规范路径位于 docs/，根目录不维护同名副本。每次开发开始前，完整读取 AGENTS.md 和这两份文档。
 
