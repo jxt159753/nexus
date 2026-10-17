@@ -8,9 +8,11 @@ NEXUS 是一个面向个人、长期运行的自主 AI 系统。它希望逐步�
 
 ## 当前状态
 
-当前只有项目文档，尚无可运行的 Core、Node 或 Web 客户端，尚未安装依赖或运行应用测试。
+当前已有可安装的 Python 工程、环境变量配置校验、依赖锁定和基础测试；安装与配置验证步骤见 [P01 工程验证记录](docs/P01-VERIFICATION.md)。正式 Core、Node、Web 客户端及执行闭环尚未交付。
 
-本次批准范围为 S0 文档与开发规范。后续实现阶段的授权、状态和验收要求以 [ROADMAP.md](docs/ROADMAP.md) 及用户最新明确指令为准；本 README 不授予任何后续阶段实施权限。
+当前复核范围为 S1/P01 工程准备。阶段授权、进度、用户验收状态及后续批准要求统一见 [ROADMAP.md](docs/ROADMAP.md)；本 README 不授予后续阶段实施权限。
+
+仓库中保留了早期实验 API、`start_nexus.bat` 和本地 `nexus.db`。它们未纳入正式 Core、持久化或安全验收，实验启动入口也未接入新的配置校验，不作为正式启动方式。
 
 ## 文档入口
 
@@ -19,6 +21,7 @@ NEXUS 是一个面向个人、长期运行的自主 AI 系统。它希望逐步�
 | [AGENTS.md](AGENTS.md) | 每次开发必读的协作规范、范围约束、质量要求和交付规则 |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | 愿景、架构边界、MVP 技术方案、接口、状态机、协议及预期目录 |
 | [ROADMAP.md](docs/ROADMAP.md) | 唯一的开发阶段、任务编号、批准状态、依赖和验收标准入口 |
+| [P01-VERIFICATION.md](docs/P01-VERIFICATION.md) | 工程安装与配置的复现命令、实测结果和限制 |
 
 `ARCHITECTURE.md` 和 `ROADMAP.md` 的规范路径位于 docs/，根目录不维护同名副本。每次开发开始前，完整读取 AGENTS.md 和这两份文档。
 
@@ -57,7 +60,7 @@ Core SQLite 是权威存储。Node 的本地 SQLite 仅保存执行回执，用�
 
 第一版模型调用数和模型费用均为零，预留统一决策模型与 Provider 接口。未知意图直接返回明确错误，不自动升级模型。
 
-技术方案为 Python 3.12+、FastAPI、Pydantic、SQLite、WebSocket 和原生 HTML/CSS/JavaScript；Windows Node 使用 Python，Android 原生 Node 后续采用 Kotlin。具体依赖版本在对应阶段选择、锁定并验证，当前未完成安装兼容性验证。
+技术方案为 Python 3.12+、FastAPI、Pydantic、SQLite、WebSocket 和原生 HTML/CSS/JavaScript；Windows Node 使用 Python，Android 原生 Node 后续采用 Kotlin。工程依赖已在 Windows / Python 3.13.9 上按 `requirements.lock` 完成独立环境安装与兼容性检查；Python 3.12 和其他系统未实测，构建工具尚未完全锁定。
 
 远程连接采用 HTTPS/WSS、应用身份认证及逐操作授权，Tailscale 由用户配置。默认本机开发模式不开放远程访问。
 
@@ -74,6 +77,6 @@ Core SQLite 是权威存储。Node 的本地 SQLite 仅保存执行回执，用�
 
 先读取必读文档，确认当前批准阶段，再执行其中的任务。每个任务必须交付可检查的改动、实际验证证据、未验证项和已知限制。阶段完成后先汇报，不自动进入未获批准的下一阶段。
 
-完整目录设计见 [ARCHITECTURE.md](docs/ARCHITECTURE.md)。可执行任务清单、逐项验收标准和故障测试矩阵见 [ROADMAP.md](docs/ROADMAP.md)。当前不提供尚未实现的安装或启动命令。
+完整目录设计见 [ARCHITECTURE.md](docs/ARCHITECTURE.md)。可执行任务清单、逐项验收标准和故障测试矩阵见 [ROADMAP.md](docs/ROADMAP.md)。工程安装与测试命令见 [P01 工程验证记录](docs/P01-VERIFICATION.md)；当前不提供正式服务启动命令。
 
 第一版暂不实现 Android 无障碍控制、全天候语音、真实 Jev/LLM、复杂自主规划、任意命令执行或副作用工具。
