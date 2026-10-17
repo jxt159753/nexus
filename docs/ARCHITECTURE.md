@@ -4,7 +4,7 @@
 
 本文件是唯一架构设计入口，供后续每次开发前完整读取。项目规范见 [AGENTS.md](../AGENTS.md)，阶段批准与任务验收见 [ROADMAP.md](ROADMAP.md)，项目入口见 [README.md](../README.md)。
 
-本文件描述目标架构，不代表所有功能已经实现。当前已有 S1/P01 工程基础及 P02 的 v1 数据契约、严格编解码和规则路由；本轮按用户后续授权修复首次验收问题并通过技术复核，待用户确认验收，不启动服务或推进 P03–P12。阶段状态以 [ROADMAP.md](ROADMAP.md) 为准，技术证据见 [P01-VERIFICATION.md](P01-VERIFICATION.md) 和 [P02-VERIFICATION.md](P02-VERIFICATION.md)。设计文档完成不代表后续实现阶段已获批准。
+本文件描述目标架构，不代表所有功能已经实现。当前已有 S1/P01 工程基础和 S2/P02–P04 的契约、规则路由、SQLite 仓储、身份会话、权限与绑定审批；交付与用户验收状态以 [ROADMAP.md](ROADMAP.md) 为准。早期实验文件已删除，没有正式服务启动入口，P05–P12 尚未实施。技术证据见 [P01](P01-VERIFICATION.md)、[P02](P02-VERIFICATION.md) 和 [S2](S2-VERIFICATION.md)，具体存储与安全接口见 [storage-security.md](storage-security.md)。设计文档完成不代表后续实现阶段已获批准。
 
 ## 项目愿景
 
@@ -82,7 +82,7 @@ FastAPI 支持 WebSocket 依赖认证；其内存连接列表示例也明确仅�
 
 ## 4. 模块职责与接口
 
-以下是接口契约，不是本轮要生成的实现代码。对象都使用明确的类型；跨网络契约使用 Pydantic 模型并拒绝未知字段。
+以下是目标接口与职责边界，已实现的 S2 接口和后续接入要求见 [storage-security.md](storage-security.md)。对象都使用明确的类型；跨网络契约使用 Pydantic 模型并拒绝未知字段。
 
 | 模块 | 负责 | 主要接口 | 不负责 |
 | --- | --- | --- | --- |
@@ -149,6 +149,8 @@ Origin、逐消息授权、过期会话关闭和消息限额是参考 OWASP 建�
 MVP 将 `system.info` 设为可配置的预授权只读操作，将 `filesystem.list` 设为需要审批的只读操作。后者用真实只读任务验证审批机制，无需先引入危险工具。
 
 审批记录绑定：`approval_id`、`task_id`、owner、目标 `node_id`、工具名及版本、规范化参数 SHA-256、资源/策略版本和到期时间。单个批准只解锁该任务中完全一致的动作，最多允许预算内的只读重试，不允许复用到新任务。参数、节点或策略变化后必须重新评估，必要时重新审批；已派发任务不原地改写动作。
+
+S2 已实现离线身份/授权管理、随机凭证摘要、8 小时浏览器会话（最多 10 个有效会话）、同源会话路由及 HTTP/WS 认证守卫。`SecurityHTTP.receive_text` 每秒检查空闲连接的撤销/过期，并在返回每条消息前再次检查；正式 Link 必须使用该接口。资源范围摘要绑定 `NodeScope.resource_version`，持久授权或身份变化递增全局策略版本。后续 Link 从认证节点及可信配置构建当前范围，不使用客户端任意自报字段作为授权依据。实际 TLS 与 Node Link 尚未组装。
 
 删除重要文件、发送对外消息、支付和修改安全设置目前都没有工具实现，直接拒绝。以后加入时，必须同时具备精确授权、效果验证、幂等/对账策略，不能只增加一个“同意”按钮。
 
@@ -374,6 +376,8 @@ Node 单独的 `receipts.sqlite3` 仅包含 execution_receipts，不属于长期
 
 使用 SQLite 一致备份接口或完全停机后的备份，不在运行时只复制一个 .sqlite3 文件。迁移前备份并校验；第一版只提供向前迁移，失败恢复使用备份，不自动执行破坏性降级。
 
+S2 已实现的表为 `schema_migrations`、`identities`、`tasks`、`task_events`、`audit_events`、`sessions`、`policy_state`、`grants`、`approvals`，仅创建当前任务使用的表。迁移验证版本连续性和脚本摘要；已有数据库升级前通过 SQLite backup 生成唯一备份并执行 quick_check，拒绝无版本旧库或未知新版本。任务仓储只开放派发前状态，不开放写入成功结果的捷径；attempt、执行证据、结果和全局控制由 P07/P08 增量迁移实现。离线管理审计以空 actor 表示本地管理入口，subject 单独记录被管理身份，不冒充 Node 发起授权。实现选择见 [ADR 0001](decisions/0001-s2-storage-security.md)。
+
 记忆至少区分以下独立字段：
 
 - `kind = fact / inference / plan`：这是何种陈述。
@@ -437,7 +441,7 @@ NEXUS/
 
 目标配置优先级：环境变量 > TOML > 安全默认值；凭证不得进入被跟踪的 TOML。P01 当前只读取环境变量，不自动读取 `.env` 或 TOML：`NEXUS_DATA_DIR` 必填且须为绝对路径，监听地址仅允许 `127.0.0.1`，端口默认为 8000 且限制为 1–65535。配置加载只校验并返回值，不创建目录、不打开数据库。TOML 层及正式服务接入尚未实现，不能把后续启动安全边界视为已验证。
 
-MVP 开发依赖计划以 pytest、pytest-asyncio、httpx 为主，按任务需要引入；P01 已引入 pytest/httpx，尚未引入 pytest-asyncio。现有 `requirements.lock` 固定运行与开发依赖版本，已在 Windows / Python 3.13.9 的独立环境安装验证；构建依赖 `setuptools>=75,<81` 仍为范围约束，Python 3.12 和其他平台尚未实测。
+当前开发依赖为 pytest 与 httpx2；S2 使用标准 `asyncio.run`，未引入 pytest-asyncio。S2 增加架构指定的 aiosqlite 0.22.1；由于现有 Starlette 1.8.0 TestClient 已弃用 httpx，使用 httpx2 2.13.1 替换无代码调用方的旧 httpx 开发依赖，并锁定 httpcore2/truststore；没有升级现有 FastAPI、Starlette、Pydantic。`requirements.lock` 和实际 wheel 已在 Windows / Python 3.13.9 独立环境离线安装验证；构建依赖 `setuptools>=75,<81` 仍为范围约束，Python 3.12 和其他平台尚未实测。
 
 ## 12. 第一版明确不做
 

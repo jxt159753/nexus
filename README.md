@@ -8,11 +8,11 @@ NEXUS 是一个面向个人、长期运行的自主 AI 系统。它希望逐步�
 
 ## 当前状态
 
-当前已有可安装的 Python 工程、环境变量配置校验、依赖锁定、v1 数据契约、严格 JSON 编解码和规则路由。安装与配置证据见 [P01 工程验证记录](docs/P01-VERIFICATION.md)，契约与路由修复后的复核证据见 [P02 验证记录](docs/P02-VERIFICATION.md)。正式 Core、Node、Web 客户端及执行闭环尚未交付。
+当前已有可安装的 Python 工程、环境变量配置校验、依赖锁定、v1 数据契约、严格 JSON 编解码和规则路由，以及 SQLite 任务仓储、离线身份管理、浏览器会话、权限判定和绑定审批。工程与契约的历史证据见 [P01](docs/P01-VERIFICATION.md)、[P02](docs/P02-VERIFICATION.md)，存储与权限接口见 [storage-security.md](docs/storage-security.md)，本轮证据见 [S2 验证记录](docs/S2-VERIFICATION.md)。正式 Core 组装、Node、Web 客户端及设备执行闭环尚未交付。
 
 阶段授权、进度、用户验收状态及后续批准要求统一见 [ROADMAP.md](docs/ROADMAP.md)；本 README 不授予后续阶段实施权限。
 
-仓库中保留了早期实验 API、`start_nexus.bat` 和本地 `nexus.db`。它们未纳入正式 Core、持久化或安全验收，实验启动入口也未接入新的配置校验，不作为正式启动方式。
+早期实验 API、启动脚本及本地实验数据库已按用户要求清理。当前仅提供离线身份管理命令和可供后续应用组装的会话路由/认证守卫，没有服务启动入口；正式服务将在后续获准任务中实现。
 
 ## 文档入口
 
@@ -23,6 +23,8 @@ NEXUS 是一个面向个人、长期运行的自主 AI 系统。它希望逐步�
 | [ROADMAP.md](docs/ROADMAP.md) | 唯一的开发阶段、任务编号、批准状态、依赖和验收标准入口 |
 | [P01-VERIFICATION.md](docs/P01-VERIFICATION.md) | 工程安装与配置的复现命令、实测结果和限制 |
 | [P02-VERIFICATION.md](docs/P02-VERIFICATION.md) | 契约与规则路由的复核结果、问题及复现方式 |
+| [S2-VERIFICATION.md](docs/S2-VERIFICATION.md) | 持久化、身份、会话、权限、审批和独立安装的实测证据 |
+| [storage-security.md](docs/storage-security.md) | 仓储与权限接口、离线管理、事务边界及后续接入要求 |
 | [protocol-v1.md](docs/protocol-v1.md) | 已实现的消息字段、编解码入口、错误分类和字节限额 |
 
 `ARCHITECTURE.md` 和 `ROADMAP.md` 的规范路径位于 docs/，根目录不维护同名副本。每次开发开始前，完整读取 AGENTS.md 和这两份文档。
