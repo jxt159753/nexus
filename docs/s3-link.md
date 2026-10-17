@@ -1,6 +1,6 @@
 # S3 Core / Windows Node 认证通信
 
-本阶段实现 P05 本地工具及 P06 连接层。状态与批准入口以 [ROADMAP](ROADMAP.md) 为准，实测证据见 [S3 验证记录](S3-VERIFICATION.md)。Core 只提供身份与 Node 通信；任务调度、派发与成功结算属于 P07。
+本文保留 S3 交付时 P05/P06 的接口与限制快照。S4 已启用任务派发和结果结算，当前后端操作请见 [S4 Harness](s4-harness.md)。本阶段实现 P05 本地工具及 P06 连接层。状态与批准入口以 [ROADMAP](ROADMAP.md) 为准，实测证据见 [S3 验证记录](S3-VERIFICATION.md)。Core 只提供身份与 Node 通信；任务调度、派发与成功结算属于 P07。
 
 ## 启动与配置
 

@@ -1,4 +1,4 @@
-"""Predispatch task authority. Execution/attempt evidence belongs to P07."""
+"""Task authority and bounded owner history; execution evidence uses attempts."""
 
 import json
 from datetime import datetime, timedelta
@@ -8,8 +8,9 @@ import aiosqlite
 from pydantic import TypeAdapter
 
 from nexus.contracts.base import StrictContract, UTCDateTime
+from nexus.contracts.errors import ErrorPayload
 from nexus.contracts.task import ExecutionOutcome, TaskRequest, TaskStatus
-from nexus.contracts.tools import ToolCall
+from nexus.contracts.tools import ToolCall, ToolResult
 from nexus.core.cognitive.router import route_task
 from nexus.core.storage.database import Database, audit, one, timestamp, utc_now
 
@@ -20,6 +21,12 @@ TRANSITIONS = {
     "queued": {"awaiting_approval", "ready", "failed", "cancelled", "timed_out"},
     "awaiting_approval": {"ready", "failed", "cancelled", "timed_out"},
     "ready": {"awaiting_approval", "failed", "cancelled", "timed_out"},
+}
+EXECUTION_TRANSITIONS = {
+    "ready": {"dispatching"},
+    "dispatching": {"running", "verifying"},
+    "running": {"verifying"},
+    "verifying": {"succeeded", "failed"},
 }
 
 
@@ -38,6 +45,10 @@ class TaskRecord(StrictContract):
     revision: int
     created_at: UTCDateTime
     expires_at: UTCDateTime
+    current_attempt_id: UUID | None = None
+    result: ToolResult | None = None
+    error: ErrorPayload | None = None
+    verification: str | None = None
 
 
 def canonical(value: dict) -> str:
@@ -50,6 +61,10 @@ def task_record(row: aiosqlite.Row) -> TaskRecord:
         request=REQUEST.validate_json(row["request_json"]), action=ACTION.validate_json(row["action_json"]),
         status=row["status"], execution_outcome=row["execution_outcome"], revision=row["revision"],
         created_at=row["created_at"], expires_at=row["expires_at"],
+        current_attempt_id=UUID(row["current_attempt_id"]) if row["current_attempt_id"] else None,
+        result=TypeAdapter(ToolResult).validate_json(row["result_json"]) if row["result_json"] else None,
+        error=ErrorPayload.model_validate_json(row["error_json"]) if row["error_json"] else None,
+        verification=row["verification"],
     )
 
 
@@ -62,11 +77,12 @@ async def load_task(conn: aiosqlite.Connection, task_id: UUID) -> TaskRecord:
 
 async def transition(
     conn: aiosqlite.Connection, task: TaskRecord, status: TaskStatus,
-    actor_id: UUID, now: datetime,
+    actor_id: UUID, now: datetime, *, execution: bool = False,
 ) -> TaskRecord:
-    if status not in TRANSITIONS.get(task.status, set()):
+    allowed = EXECUTION_TRANSITIONS if execution else TRANSITIONS
+    if status not in allowed.get(task.status, set()):
         raise Conflict("illegal task transition")
-    if now >= task.expires_at and status not in {"timed_out", "cancelled"}:
+    if now >= task.expires_at and status not in {"timed_out", "cancelled"} and not execution:
         raise Conflict("task expired")
     async with conn.execute(
         "UPDATE tasks SET status=?, revision=revision+1 WHERE task_id=? AND revision=?",
@@ -87,6 +103,7 @@ class TaskRepository:
 
     async def create(
         self, owner_id: UUID, request: TaskRequest, node_id: UUID, *, now: datetime | None = None,
+        rate_limit: bool = False,
     ) -> TaskRecord:
         now = now or utc_now()
         request = REQUEST.validate_json(REQUEST.dump_json(request))
@@ -105,6 +122,10 @@ class TaskRepository:
                 if existing["request_json"] != encoded or existing["node_id"] != str(node_id):
                     raise Conflict("IDEMPOTENCY_CONFLICT")
                 return task_record(existing)
+            if rate_limit:
+                recent = await one(conn, "SELECT count(*) FROM tasks WHERE owner_id=? AND created_at>?", (str(owner_id), timestamp(now - timedelta(minutes=1))))
+                if recent[0] >= 10:
+                    raise Conflict("BUSY")
             count = await one(conn, "SELECT count(*) AS n FROM tasks WHERE status NOT IN ('succeeded','failed','cancelled','timed_out')")
             if count["n"] >= 100:
                 raise Conflict("BUSY")
@@ -133,6 +154,13 @@ class TaskRepository:
                 (str(owner_id), after_event_id, limit),
             )
             return [dict(row) for row in rows]
+
+    async def list(self, owner_id: UUID, *, after: int = 0, limit: int = 20) -> tuple[list[TaskRecord], int]:
+        if type(after) is not int or after < 0 or type(limit) is not int or not 1 <= limit <= 100:
+            raise ValueError("invalid task page")
+        async with self.database.transaction(write=False) as conn:
+            rows = await conn.execute_fetchall("SELECT rowid AS cursor, * FROM tasks WHERE owner_id=? AND rowid>? ORDER BY rowid LIMIT ?", (str(owner_id), after, limit))
+            return [task_record(row) for row in rows], rows[-1]["cursor"] if rows else after
 
     async def transition(self, task_id: UUID, owner_id: UUID, expected_revision: int, status: TaskStatus) -> TaskRecord:
         """Trusted Core persistence primitive; never expose directly to clients."""

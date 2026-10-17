@@ -1,6 +1,6 @@
 # Windows Node 本地执行接口（P05）
 
-本文描述 P05 的两个固定只读工具、本地策略、执行回执和受管理工具进程。P06 已组装 [Node Link](s3-link.md)，仍无 Core 调度/网络执行派发；调用方必须先认证 Core 并检查当前会话。`grant_id` 和命令摘要不能替代授权。授权与任务进度见 [ROADMAP](ROADMAP.md)，本地技术证据见 [P05 验证记录](P05-VERIFICATION.md)，本轮回归见 [S3](S3-VERIFICATION.md)。
+本文描述 P05 的两个固定只读工具、本地策略、执行回执和受管理工具进程。P06 已组装 [Node Link](s3-link.md)，P07 已接入 [Core 持久调度与网络执行](s4-harness.md)；调用方必须先认证 Core 并检查当前会话。`grant_id` 和命令摘要不能替代授权。授权与任务进度见 [ROADMAP](ROADMAP.md)，本地技术证据见 [P05 验证记录](P05-VERIFICATION.md)，本轮回归见 [S3](S3-VERIFICATION.md)。
 
 ## 配置与固定工具
 
@@ -39,7 +39,7 @@ config = NodeConfig(
 
 共享函数 `nexus.contracts.commands.command_identity(command, node_id)` 将命令字段按键排序，以 `ensure_ascii=False`、紧凑 JSON 编码；排除 session_id 与 command_digest，加入可信目标 node_id。`command_digest()` 为上述 UTF-8 文本的 SHA-256。
 
-摘要覆盖 task_id、attempt_id、目标 Node、工具/版本、参数、grant_id、expires_at 和 execution_timeout_seconds。日期先通过契约归一化；会话变化不影响摘要。P07 发送方必须复用该算法；不能自行计算一套摘要或延长重传命令的期限。
+摘要覆盖 task_id、attempt_id、目标 Node、工具/版本、参数、grant_id、expires_at 和 execution_timeout_seconds。日期先通过契约归一化；会话变化不影响摘要。P07 发送方已复用该算法；不能自行计算一套摘要或延长重传命令的期限。
 
 `NodeRuntime` 是同步本地 API，可由后续异步 Link 在受控工作线程调用。对外 JSON 仍先经过 v1 编解码入口；Runtime 再校验构造后被改坏的命令实例。
 
@@ -53,7 +53,7 @@ config = NodeConfig(
 | `receipts.unacknowledged(after="", limit=100)` | 按 attempt UUID 文本分页读取未确认 completed，limit=1–100；游标使用上一页最后一个 attempt_id 的字符串 |
 | `receipts.acknowledge(attempt_id)` | P06 Link 在收到可信 result.ack 后调用；标记已确认但不删除结果或去重记录；Core 仍须由后续持久消费者决定何时 ACK |
 
-没有 Core 任务终态写入入口。completed 指 Node 已持久化成功结果或结构化失败；不是 Core 已验证成功。目录结果还会检查 root_id、请求条目数及结果字节；Core 的权威验证仍属于 P07。
+没有 Core 任务终态写入入口。completed 指 Node 已持久化成功结果或结构化失败；不是 Core 已验证成功。目录结果还会检查 root_id、请求条目数及结果字节；Core 的权威验证已在 P07 接入，并与 Node 共用 contracts 中的结果约束。
 
 回执库为专用 `receipts.sqlite3`，包含 `execution_receipts` 及模式/Node 身份元数据。只记录有限命令身份、boot_id、局部阶段、Job 名称、停止确认及结果，不记录个人长期记忆。使用版本 SQL 001、摘要校验、FULL 同步及短事务；拒绝无版本库、未知模式、篡改 SQL 摘要或其他 Node 的数据库，不覆盖或重建旧库。当前只有首次建库与同版本重开；未来升级须先添加一致备份和前向迁移。
 

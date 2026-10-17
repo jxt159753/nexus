@@ -62,3 +62,23 @@ TOOL_RESULT_MODELS = {
     "system.info@1": SystemInfoResult,
     "filesystem.list@1": ListDirectoryResult,
 }
+
+
+def validate_result(command: ToolCall, result: ToolResult, max_bytes: int) -> ToolResult:
+    """Shared schema/constraint validation; no platform or authority imports."""
+    model = TOOL_RESULT_MODELS[f"{command.tool}@{command.tool_version}"]
+    checked = model.model_validate_json(result.model_dump_json())
+    if len(checked.model_dump_json().encode("utf-8")) > max_bytes:
+        raise ValueError("result exceeds byte budget")
+    if isinstance(checked, ListDirectoryResult):
+        if (not isinstance(command, ListDirectoryCall)
+                or checked.root_id != command.arguments.root_id
+                or len(checked.entries) > command.arguments.limit):
+            raise ValueError("directory evidence does not match command")
+        names = [entry.name for entry in checked.entries]
+        if (len(set(names)) != len(names) or any(
+            name in {".", ".."} or any(char in name for char in ("/", "\\", "\x00", ":"))
+            for name in names
+        )):
+            raise ValueError("directory entries must be unique direct names")
+    return checked

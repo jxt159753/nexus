@@ -189,7 +189,16 @@ class SecurityService:
 
     async def _eligible(self, conn: aiosqlite.Connection, task: TaskRecord, principal: Principal, scope: NodeScope, now: datetime) -> int:
         await assert_owner(conn, principal, now)
-        if task.owner_id != principal.identity_id or scope.node_id != task.node_id or now >= task.expires_at:
+        if task.owner_id != principal.identity_id:
+            raise AccessDenied()
+        return await self._policy_eligible(conn, task, scope, now)
+
+    async def _policy_eligible(self, conn: aiosqlite.Connection, task: TaskRecord, scope: NodeScope, now: datetime) -> int:
+        """Recheck durable identities and grants independently of browser presence."""
+        owner = await one(conn, "SELECT role, revoked_at FROM identities WHERE identity_id=?", (str(task.owner_id),))
+        if owner is None or owner["role"] != "owner" or owner["revoked_at"] is not None:
+            raise AccessDenied("POLICY_DENIED")
+        if scope.node_id != task.node_id or now >= task.expires_at:
             raise AccessDenied("POLICY_DENIED")
         node = await one(conn, "SELECT role, revoked_at FROM identities WHERE identity_id=?", (str(task.node_id),))
         if node is None or node["role"] != "node" or node["revoked_at"] is not None:
@@ -222,33 +231,46 @@ class SecurityService:
         async with self.database.transaction() as conn:
             task = await load_task(conn, task_id)
             version = await self._eligible(conn, task, principal, scope, now)
-            if task.status not in {"queued", "awaiting_approval", "ready"}:
+            return await self._prepare(conn, task, scope, version, now)
+
+    async def prepare_pending(self, task_id: UUID, node: Principal, scope: NodeScope) -> Authorization:
+        now = utc_now()
+        async with self.database.transaction() as conn:
+            await assert_principal(conn, node, now)
+            task = await load_task(conn, task_id)
+            if node.role != "node" or node.identity_id != task.node_id:
+                raise AccessDenied()
+            version = await self._policy_eligible(conn, task, scope, now)
+            return await self._prepare(conn, task, scope, version, now)
+
+    async def _prepare(self, conn: aiosqlite.Connection, task: TaskRecord, scope: NodeScope, version: int, now: datetime) -> Authorization:
+        if task.status not in {"queued", "awaiting_approval", "ready"}:
+            raise AccessDenied("POLICY_DENIED")
+        if task.action.tool == "system.info":
+            if task.status != "ready":
+                await transition(conn, task, "ready", task.owner_id, now)
+            return Authorization("allow", version)
+        row = await one(conn, "SELECT * FROM approvals WHERE task_id=? AND policy_version=? AND scope_digest=? AND expires_at>? ORDER BY rowid DESC LIMIT 1", (str(task.task_id), version, scope_digest(scope), timestamp(now)))
+        if row is not None and self._matches(row, task, version, scope):
+            if row["decision"] == "reject":
                 raise AccessDenied("POLICY_DENIED")
-            if task.action.tool == "system.info":
-                if task.status != "ready":
-                    await transition(conn, task, "ready", principal.identity_id, now)
-                return Authorization("allow", version)
-            row = await one(conn, "SELECT * FROM approvals WHERE task_id=? AND policy_version=? AND scope_digest=? AND expires_at>? ORDER BY rowid DESC LIMIT 1", (str(task_id), version, scope_digest(scope), timestamp(now)))
-            if row is not None and self._matches(row, task, version, scope):
-                if row["decision"] == "reject":
-                    raise AccessDenied("POLICY_DENIED")
-                wanted = "ready" if row["decision"] == "approve" else "awaiting_approval"
-                if task.status != wanted:
-                    await transition(conn, task, wanted, principal.identity_id, now)
-                return Authorization("allow" if row["decision"] == "approve" else "approval_required", version, UUID(row["approval_id"]), datetime.fromisoformat(row["expires_at"]))
-            approval_id = uuid4()
-            expires = min(task.expires_at, now + timedelta(minutes=2))
-            await conn.execute("INSERT INTO approvals(approval_id, task_id, owner_id, node_id, tool, tool_version, arguments_digest, policy_version, scope_digest, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (
-                str(approval_id), str(task_id), str(task.owner_id), str(task.node_id), task.action.tool,
-                task.action.tool_version, arguments_digest(task), version, scope_digest(scope), timestamp(expires),
-            ))
-            if task.status != "awaiting_approval":
-                await transition(conn, task, "awaiting_approval", principal.identity_id, now)
-            else:
-                await conn.execute("UPDATE tasks SET revision=revision+1 WHERE task_id=?", (str(task_id),))
-                await conn.execute("INSERT INTO task_events(task_id, revision, kind, created_at) VALUES (?, ?, 'approval.required', ?)", (str(task_id), task.revision + 1, timestamp(now)))
-            await audit(conn, str(principal.identity_id), str(task_id), "approval.required", now)
-            return Authorization("approval_required", version, approval_id, expires)
+            wanted = "ready" if row["decision"] == "approve" else "awaiting_approval"
+            if task.status != wanted:
+                await transition(conn, task, wanted, task.owner_id, now)
+            return Authorization("allow" if row["decision"] == "approve" else "approval_required", version, UUID(row["approval_id"]), datetime.fromisoformat(row["expires_at"]))
+        approval_id = uuid4()
+        expires = min(task.expires_at, now + timedelta(minutes=2))
+        await conn.execute("INSERT INTO approvals(approval_id, task_id, owner_id, node_id, tool, tool_version, arguments_digest, policy_version, scope_digest, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (
+            str(approval_id), str(task.task_id), str(task.owner_id), str(task.node_id), task.action.tool,
+            task.action.tool_version, arguments_digest(task), version, scope_digest(scope), timestamp(expires),
+        ))
+        if task.status != "awaiting_approval":
+            await transition(conn, task, "awaiting_approval", task.owner_id, now)
+        else:
+            await conn.execute("UPDATE tasks SET revision=revision+1 WHERE task_id=?", (str(task.task_id),))
+            await conn.execute("INSERT INTO task_events(task_id, revision, kind, created_at) VALUES (?, ?, 'approval.required', ?)", (str(task.task_id), task.revision + 1, timestamp(now)))
+        await audit(conn, str(task.owner_id), str(task.task_id), "approval.required", now)
+        return Authorization("approval_required", version, approval_id, expires)
 
     async def decide(self, approval_id: UUID, principal: Principal, decision: Literal["approve", "reject"], scope: NodeScope, *, now: datetime | None = None) -> TaskRecord:
         if decision not in {"approve", "reject"}:
@@ -277,18 +299,29 @@ class SecurityService:
             return task
 
     async def require_authorized(self, task_id: UUID, principal: Principal, scope: NodeScope, *, now: datetime | None = None) -> Authorization:
-        """A check, not a transferable execution token. P07 must recheck in dispatch transaction."""
+        """A check, not a transferable execution token."""
         now = now or utc_now()
         async with self.database.transaction(write=False) as conn:
             task = await load_task(conn, task_id)
             version = await self._eligible(conn, task, principal, scope, now)
-            if task.status != "ready":
-                raise AccessDenied("POLICY_DENIED")
-            if task.action.tool == "system.info":
-                return Authorization("allow", version)
-            row = await one(conn, "SELECT * FROM approvals WHERE task_id=? AND policy_version=? AND scope_digest=? AND decision='approve' ORDER BY rowid DESC LIMIT 1", (str(task_id), version, scope_digest(scope)))
-            if row is None or not self._matches(row, task, version, scope):
-                raise AccessDenied("POLICY_DENIED")
-            if row["expires_at"] <= timestamp(now):
-                raise AccessDenied("APPROVAL_EXPIRED")
-            return Authorization("allow", version, UUID(row["approval_id"]), datetime.fromisoformat(row["expires_at"]))
+            return await self._authorized(conn, task, scope, version, now)
+
+    async def authorize_dispatch(self, conn: aiosqlite.Connection, task: TaskRecord, node: Principal, scope: NodeScope, now: datetime) -> Authorization:
+        """Harness only: call inside the transaction that creates grant/attempt."""
+        await assert_principal(conn, node, now)
+        if node.role != "node" or node.identity_id != task.node_id:
+            raise AccessDenied()
+        version = await self._policy_eligible(conn, task, scope, now)
+        return await self._authorized(conn, task, scope, version, now)
+
+    async def _authorized(self, conn: aiosqlite.Connection, task: TaskRecord, scope: NodeScope, version: int, now: datetime) -> Authorization:
+        if task.status != "ready":
+            raise AccessDenied("POLICY_DENIED")
+        if task.action.tool == "system.info":
+            return Authorization("allow", version)
+        row = await one(conn, "SELECT * FROM approvals WHERE task_id=? AND policy_version=? AND scope_digest=? AND decision='approve' ORDER BY rowid DESC LIMIT 1", (str(task.task_id), version, scope_digest(scope)))
+        if row is None or not self._matches(row, task, version, scope):
+            raise AccessDenied("POLICY_DENIED")
+        if row["expires_at"] <= timestamp(now):
+            raise AccessDenied("APPROVAL_EXPIRED")
+        return Authorization("allow", version, UUID(row["approval_id"]), datetime.fromisoformat(row["expires_at"]))

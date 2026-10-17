@@ -1,10 +1,11 @@
 import asyncio
 import hashlib
+import json
 import sqlite3
 from contextlib import closing
 from importlib.resources import files
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import aiosqlite
 import pytest
@@ -161,7 +162,7 @@ def test_forward_migration_makes_verified_backup(tmp_path):
         assert conn.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 1
     with closing(sqlite3.connect(path)) as conn:
         assert conn.execute("SELECT count(*) FROM identities").fetchone()[0] == 1
-        assert conn.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 2
+        assert conn.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 3
 
 
 @pytest.mark.parametrize("kind", ["unversioned", "newer", "checksum"])
@@ -173,7 +174,7 @@ def test_incompatible_database_is_rejected_without_rebuild(tmp_path, kind):
         conn.execute("CREATE TABLE precious (value TEXT)")
         conn.execute("INSERT INTO precious VALUES ('preserve')")
         if kind == "newer":
-            conn.execute("INSERT INTO schema_migrations VALUES (3, 'unknown', 'unknown')")
+            conn.execute("INSERT INTO schema_migrations VALUES (4, 'unknown', 'unknown')")
         elif kind == "checksum":
             conn.execute("UPDATE schema_migrations SET checksum='changed' WHERE version=1")
     with pytest.raises(RuntimeError):
@@ -199,3 +200,39 @@ def test_failed_migration_rolls_back_ddl_and_version(tmp_path, monkeypatch):
 def test_local_absolute_database_required(path):
     with pytest.raises(ValueError):
         Database(Path(path))
+
+
+def test_s3_database_upgrade_preserves_task_events_approvals_and_backup(tmp_path):
+    path = tmp_path / "s3.sqlite3"
+    owner_id, node_id, task_id, approval_id = (str(uuid4()) for _ in range(4))
+    request_id = str(uuid4())
+    now = timestamp(utc_now())
+    with closing(sqlite3.connect(path)) as conn, conn:
+        for name in ("001_tasks.sql", "002_security.sql"):
+            script = files("nexus.core.storage").joinpath("migrations/" + name).read_text(encoding="utf-8")
+            conn.executescript(script)
+            if name.startswith("001"):
+                conn.execute("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, checksum TEXT NOT NULL, applied_at TEXT NOT NULL)")
+            conn.execute("INSERT INTO schema_migrations VALUES (?, ?, ?)", (int(name[:3]), hashlib.sha256(script.encode()).hexdigest(), now))
+        for identity, role in ((owner_id, "owner"), (node_id, "node")):
+            conn.execute("INSERT INTO identities VALUES (?, ?, ?, NULL, ?)", (identity, role, identity + "-digest", now))
+        conn.execute("INSERT INTO tasks(task_id,owner_id,request_id,request_json,node_id,action_json,status,created_at,expires_at) VALUES (?,?,?,?,?,?,'awaiting_approval',?,?)", (
+            task_id, owner_id, request_id, json.dumps({"request_id": request_id, "intent": "list_directory", "arguments": {"root_id": "workspace", "limit": 2}}),
+            node_id, json.dumps({"tool": "filesystem.list", "tool_version": 1, "arguments": {"root_id": "workspace", "limit": 2}}), now, now))
+        conn.execute("INSERT INTO task_events(task_id,revision,kind,created_at) VALUES (?,0,'awaiting_approval',?)", (task_id, now))
+        conn.execute("INSERT INTO approvals(approval_id,task_id,owner_id,node_id,tool,tool_version,arguments_digest,policy_version,scope_digest,expires_at) VALUES (?,?,?,?, 'filesystem.list',1,?,1,?,?)", (approval_id,task_id,owner_id,node_id,"a"*64,"b"*64,now))
+        before = {table: conn.execute(f"SELECT * FROM {table}").fetchall() for table in ("identities", "task_events", "approvals")}
+    asyncio.run(Database(path).initialize())
+    restored = asyncio.run(TaskRepository(Database(path)).get(UUID(task_id), UUID(owner_id)))
+    assert restored.status == "awaiting_approval" and restored.action.tool == "filesystem.list"
+    backups = list(tmp_path.glob("*.before-v3-*.sqlite3"))
+    assert len(backups) == 1
+    with closing(sqlite3.connect(path)) as conn, closing(sqlite3.connect(backups[0])) as backup:
+        assert backup.execute("PRAGMA quick_check").fetchone()[0] == "ok"
+        assert backup.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 2
+        assert conn.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 3
+        for table, rows in before.items():
+            assert conn.execute(f"SELECT * FROM {table}").fetchall() == rows
+            assert backup.execute(f"SELECT * FROM {table}").fetchall() == rows
+        assert conn.execute("SELECT status,current_attempt_id,result_json,error_json,verification FROM tasks").fetchone() == ("awaiting_approval", None, None, None, None)
+        assert conn.execute("PRAGMA foreign_key_check").fetchall() == []

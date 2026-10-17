@@ -8,13 +8,13 @@ NEXUS 是一个面向个人、长期运行的自主 AI 系统。它希望逐步�
 
 ## 当前状态
 
-当前已有可安装的 Python 工程、严格 v1 契约、规则路由、SQLite 任务仓储、身份会话、权限和审批，以及 Windows Node 的两个固定只读工具、本地回执和受管理工具进程。Core/Node 已有独立启动入口，支持认证 WebSocket、能力交集、心跳、会话替换与重连；接口及启动说明见 [S3 Link](docs/s3-link.md)，实测证据见 [S3 验证记录](docs/S3-VERIFICATION.md)。任务派发/成功结算、Web 客户端和完整设备执行闭环仍待后续任务。
+当前已有可安装的 Python 工程、严格 v1 契约、规则路由、身份权限/审批、认证 Link，以及 Windows Node 的两个固定只读工具、本地回执和受管理进程。Core 的 Harness 已接通持久派发、工具结果验证与 SQLite 历史：支持系统信息预授权和目录逐任务审批，Core/Node 可独立启动。后端操作见 [S4 Harness](docs/s4-harness.md)，实测与限制见 [S4 验证](docs/S4-VERIFICATION.md)，身份及启动配置见 [S3 Link](docs/s3-link.md)。Web 客户端、网络恢复、重试及全局控制仍待后续阶段。
 
 此前工程与契约证据见 [P01](docs/P01-VERIFICATION.md)、[P02](docs/P02-VERIFICATION.md)，存储与权限见 [接口](docs/storage-security.md)及 [S2 验证](docs/S2-VERIFICATION.md)，本地工具见 [Node Runtime](docs/node-runtime.md)及 [P05 验证](docs/P05-VERIFICATION.md)。
 
 阶段授权、进度、用户验收状态及后续批准要求统一见 [ROADMAP.md](docs/ROADMAP.md)；本 README 不授予后续阶段实施权限。
 
-早期实验 API、启动脚本及本地实验数据库已按用户要求清理。当前 Core 服务只提供身份与节点通信，尚无任务提交或任意工具派发 API，不将连接成功视为任务闭环完成。
+早期实验文件已清理。当前后端仅执行两个固定只读动作，不接受任意工具或自报任务终态；未知执行不会自动重跑。S4 完成不代表整个 MVP 完成。
 
 ## 启动入口
 
@@ -42,6 +42,8 @@ NEXUS 是一个面向个人、长期运行的自主 AI 系统。它希望逐步�
 | [P05-VERIFICATION.md](docs/P05-VERIFICATION.md) | 真实 Windows 路径、junction、进程清理、去重及重启恢复证据 |
 | [s3-link.md](docs/s3-link.md) | Core/Node 配置、独立启动、认证通信及后续派发边界 |
 | [S3-VERIFICATION.md](docs/S3-VERIFICATION.md) | 真实 WebSocket、独立进程重连、凭证轮换和全新离线安装证据 |
+| [s4-harness.md](docs/s4-harness.md) | 任务提交、审批、持久派发、证据验证与历史接口 |
+| [S4-VERIFICATION.md](docs/S4-VERIFICATION.md) | S4 权威事务、真实工具闭环和独立进程重启证据 |
 | [protocol-v1.md](docs/protocol-v1.md) | 已实现的消息字段、编解码入口、错误分类和字节限额 |
 
 `ARCHITECTURE.md` 和 `ROADMAP.md` 的规范路径位于 docs/，根目录不维护同名副本。每次开发开始前，完整读取 AGENTS.md 和这两份文档。

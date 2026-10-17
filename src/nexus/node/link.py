@@ -4,6 +4,7 @@ import asyncio
 import logging
 import random
 import ssl
+import sqlite3
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -12,7 +13,7 @@ from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed, InvalidHandshake
 
 from nexus.contracts.errors import ErrorCode, ProtocolError
-from nexus.contracts.messages import NodeHeartbeat, NodeHello, ToolCapability, WireError
+from nexus.contracts.messages import CommandReceipt, NodeHeartbeat, NodeHello, ToolCapability, WireError
 from nexus.contracts.protocol import parse_message
 from nexus.link import MessageRate, session_matches, wire_message
 from nexus.node.runtime import NodeRuntime
@@ -40,6 +41,7 @@ class NodeClient:
             raise ValueError("runtime identity differs")
         self.runtime, self._token = runtime, token
         self.state = LinkState("offline")
+        self._active_attempt_id: UUID | None = None
 
     async def _send(self, ws, kind, payload, *, correlation=None, limit=65536) -> None:
         text = wire_message(kind, payload, correlation)
@@ -61,10 +63,55 @@ class NodeClient:
         welcome = message.payload
         self.state = LinkState("online", welcome.session_id, self.state.reconnect_count)
         rate = MessageRate()
+        execution = None
+
+        async def send_status(status, correlation):
+            if status.result is not None:
+                if status.result.result is not None and len(status.result.result.model_dump_json().encode("utf-8")) > welcome.limits.max_result_bytes:
+                    raise ProtocolError(ErrorCode.RESULT_INVALID, "Negotiated result limit exceeded")
+                await self._send(ws, "command.result", status.result, correlation=correlation, limit=welcome.limits.max_message_bytes)
+            else:
+                await self._send(ws, "command.status_result", status, correlation=correlation, limit=welcome.limits.max_message_bytes)
+
+        async def execute(command, correlation):
+            phases = asyncio.Queue(2)
+            loop = asyncio.get_running_loop()
+            self._active_attempt_id = command.attempt_id
+            worker = asyncio.create_task(asyncio.to_thread(self.runtime.execute, command,
+                lambda phase: loop.call_soon_threadsafe(phases.put_nowait, phase)))
+            waiting = None
+            try:
+                while not worker.done() or not phases.empty():
+                    waiting = asyncio.create_task(phases.get())
+                    done, _ = await asyncio.wait([worker, waiting], return_when=asyncio.FIRST_COMPLETED)
+                    if waiting in done:
+                        receipt = CommandReceipt(session_id=welcome.session_id, task_id=command.task_id,
+                            attempt_id=command.attempt_id, command_digest=command.command_digest, boot_id=self.runtime.boot_id)
+                        await self._send(ws, waiting.result(), receipt, correlation=correlation, limit=welcome.limits.max_message_bytes)
+                    else:
+                        waiting.cancel()
+                        await asyncio.gather(waiting, return_exceptions=True)
+                status = worker.result()
+                self._active_attempt_id = None
+                await send_status(status, correlation)
+            except ProtocolError as exc:
+                await self._send(ws, "error", WireError(**exc.error.model_dump(), session_id=welcome.session_id),
+                                 correlation=correlation, limit=welcome.limits.max_message_bytes)
+            except (OSError, sqlite3.Error, ValueError):
+                await ws.close(code=1011, reason="node execution unavailable")
+            finally:
+                if waiting is not None:
+                    waiting.cancel()
+                    await asyncio.gather(waiting, return_exceptions=True)
+                # Disconnecting the transport must not abandon the managed worker.
+                try:
+                    await asyncio.shield(asyncio.gather(worker, return_exceptions=True))
+                finally:
+                    self._active_attempt_id = None
 
         async def heartbeat():
             while True:
-                await self._send(ws, "node.heartbeat", NodeHeartbeat(session_id=welcome.session_id, active_attempt_id=None),
+                await self._send(ws, "node.heartbeat", NodeHeartbeat(session_id=welcome.session_id, active_attempt_id=self._active_attempt_id),
                                  limit=welcome.limits.max_message_bytes)
                 # A protocol ping proves this connection is still responsive;
                 # application heartbeat remains the Core's online authority.
@@ -74,6 +121,7 @@ class NodeClient:
                 await asyncio.sleep(welcome.heartbeat_interval_seconds)
 
         async def receive():
+            nonlocal execution
             while True:
                 text = await ws.recv()
                 rate.check()
@@ -92,10 +140,25 @@ class NodeClient:
                 elif incoming.type == "result.ack":
                     await asyncio.to_thread(self.runtime.receipts.acknowledge, incoming.payload.attempt_id)
                 elif incoming.type == "command.execute":
-                    # S3 does not authorize a substitute for P07's durable dispatcher.
-                    error = WireError(code=ErrorCode.POLICY_DENIED, message="Execution dispatch is not enabled", retryable=False,
-                                      session_id=welcome.session_id)
-                    await self._send(ws, "error", error, correlation=incoming.message_id, limit=welcome.limits.max_message_bytes)
+                    if execution is not None and not execution.done() and self._active_attempt_id is not None:
+                        old = await asyncio.to_thread(self.runtime.status, incoming.payload.attempt_id, welcome.session_id)
+                        if self._active_attempt_id == incoming.payload.attempt_id and old.phase != "not_found":
+                            try:
+                                # Runtime checks the complete immutable identity, then
+                                # returns the durable receipt without a second worker.
+                                status = await asyncio.to_thread(self.runtime.execute, incoming.payload)
+                                await send_status(status, incoming.message_id)
+                            except ProtocolError as exc:
+                                await self._send(ws, "error", WireError(**exc.error.model_dump(), session_id=welcome.session_id),
+                                                 correlation=incoming.message_id, limit=welcome.limits.max_message_bytes)
+                        else:
+                            error = WireError(code=ErrorCode.BUSY, message="Node execution slot occupied", retryable=False, session_id=welcome.session_id)
+                            await self._send(ws, "error", error, correlation=incoming.message_id, limit=welcome.limits.max_message_bytes)
+                    else:
+                        if execution is not None:
+                            await execution  # finish prior result send before starting the next worker
+                        self._active_attempt_id = incoming.payload.attempt_id
+                        execution = asyncio.create_task(execute(incoming.payload, incoming.message_id))
                 else:
                     raise ProtocolError(ErrorCode.FORBIDDEN, "Message is not allowed in this direction")
 
@@ -108,6 +171,9 @@ class NodeClient:
             for task in tasks:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
+            if execution is not None:
+                execution.cancel()
+                await asyncio.gather(execution, return_exceptions=True)
 
     async def run(self, stop: asyncio.Event) -> None:
         context = ssl.create_default_context(cafile=None if self.config.ca_file is None else str(self.config.ca_file)) if self.config.core_url.startswith("wss:") else None

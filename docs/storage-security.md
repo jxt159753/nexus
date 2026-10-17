@@ -9,10 +9,10 @@ S2 / P03–P04 的实现说明；阶段状态与验收证据分别见 [ROADMAP](
 - 每次仓储操作使用一个短生命周期 aiosqlite 连接，显式外键、FULL 同步、3 秒 busy_timeout；初始化启用 WAL。写事务使用 BEGIN IMMEDIATE，异常或取消时回滚；返回值只在 commit 成功后交给调用方。
 - `TaskRepository.create(owner_id, request, node_id)` 验证活动身份角色，规则生成不可变单步动作；按 `(owner_id, request_id)` 去重，相同请求和节点返回原任务，变更内容或节点报 `Conflict("IDEMPOTENCY_CONFLICT")`。最多保留 100 个非终态任务作为待处理队列；期限为创建后 5 分钟。
 - `get(task_id, owner_id)` 检查归属；`history(owner_id, after_event_id=0, limit=100)` 按身份过滤并分页，limit 为 1–200。网络调用方仍必须先认证并校验角色，不能把用户提交的 owner_id 直接传入。
-- 任务创建、revision 状态更新、事件和审计同事务提交。当前只实现 queued / awaiting_approval / ready 到派发前合法状态或失败、取消、超时的转移，终态不可覆盖；过期任务不能转 ready。没有执行工具或记录 succeeded 的接口。
-- `TaskRepository.transition` 是可信 Core 持久化原语，不能直接暴露为客户端状态修改接口。权限层调用它完成审批与状态的原子更新；P07/P08 才实现带有效 attempt/工具证据的执行状态和真实取消。
+- 任务创建、revision 状态更新、事件和审计同事务提交。当前只实现 queued / awaiting_approval / ready 到派发前合法状态或失败、取消、超时的转移，终态不可覆盖；过期任务不能转 ready。执行状态和 succeeded 只能经 S4 的有效 attempt 与工具证据验证写入，见 [S4 Harness](s4-harness.md)。
+- `TaskRepository.transition` 是可信 Core 持久化原语，不能直接暴露为客户端状态修改接口。权限层调用它完成审批与状态的原子更新；P07 已提供带有效 attempt/工具证据的专用执行仓储；真实取消仍待 P08。
 
-网络、模型和工具调用不得放在数据库事务内。数据库写入失败会向调用方抛错，不返回“已接受”或“已授权”。当前没有自动定时器、清理历史、任务调度、工具派发或执行恢复。
+网络、模型和工具调用不得放在数据库事务内。数据库写入失败会向调用方抛错，不返回“已接受”或“已授权”。当前 Harness 已接入任务调度、首次派发和 verifying 恢复；不清理历史，网络对账与重试尚未实施。
 
 ## 身份和离线管理
 
@@ -53,13 +53,13 @@ P06 已接入守卫和接收接口，并校验消息方向、当前连接/会话
 
 ## 权限和审批
 
-`SecurityService.prepare(task_id, principal, scope)` 在事务内重查身份和 owner 归属，并计算已知工具、owner 授权、Node 身份许可、注册能力和本地范围的交集。P06 的 `connection_scope` 从认证身份、Core 可信配置及节点自报范围构建并收紧交集，绑定目标 node_id、工具/root 别名和 resource_version，不授予新权限。配置或资源映射变更必须递增版本；本地路径检查由 P05 [Node Runtime](node-runtime.md) 执行，P06 Link 已组装，但不提供网络执行派发。
+`SecurityService.prepare(task_id, principal, scope)` 在事务内重查身份和 owner 归属，并计算已知工具、owner 授权、Node 身份许可、注册能力和本地范围的交集。P06 的 `connection_scope` 从认证身份、Core 可信配置及节点自报范围构建并收紧交集，绑定目标 node_id、工具/root 别名和 resource_version，不授予新权限。配置或资源映射变更必须递增版本；本地路径检查由 P05 [Node Runtime](node-runtime.md) 执行，P06 Link 已组装，P07 在专用 Harness 路径提供网络执行派发。
 
 - system.info 需双方显式授权，成功转 ready；filesystem.list 需允许的 workspace 资源并逐任务审批，先转 awaiting_approval。
 - 审批绑定 task/owner/node、工具与版本、规范化参数 SHA-256、全局策略版本、当前范围摘要（含资源版本）及期限。有效期最多 2 分钟且不晚于任务期限。
 - `decide(approval_id, principal, "approve"|"reject", scope)` 只允许活动 owner，重新检查所有绑定；决定、任务状态、事件和审计同事务提交。同决定重传幂等，反向决定失败。拒绝进入 failed，不能再批准。
 - 审批过期可通过 prepare 重新申请；参数、节点、资源范围、策略或身份变化后的旧批准不可复用。取消或终态不能重新解锁。
 - 硬性禁止/未实现工具没有配置与审批升级路径。目录审批无法转成任意路径、shell 或写文件权限。
-- `require_authorized` 只证明检查时刻有效，不是可转交的执行令牌；P07 必须在同一派发事务中重新检查当前策略、审批期限、任务状态与执行预算，再创建 attempt/grant。S2 没有派发入口。
+- `require_authorized` 只证明检查时刻有效，不是可转交的执行令牌；S4 的 authorize_dispatch 在同一派发事务中重查当前策略、审批期限、任务状态与执行预算，再创建 attempt/execution_grant；原 TaskRepository.transition 仍不能直接写成功。
 
 审计区分 actor 和 subject；本地离线管理的 actor 为空、subject 为被管理身份，认证会话和任务操作记录真实 owner。审计不保存原始凭证或任意工具输出。

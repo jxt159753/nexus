@@ -10,7 +10,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from nexus.contracts.base import StrictContract
 from nexus.contracts.errors import ErrorCode, ProtocolError
-from nexus.contracts.messages import LinkLimits, NodeHello, NodeWelcome
+from nexus.contracts.messages import CommandExecute, LinkLimits, NodeHello, NodeWelcome
 from nexus.contracts.protocol import Message, parse_message
 from nexus.core.config import CoreConfig
 from nexus.core.security.http import SecurityHTTP
@@ -28,6 +28,7 @@ class NodeConnection:
     session_id: UUID = field(default_factory=uuid4)
     last_heartbeat: float = field(default_factory=time.monotonic)
     active_attempt_id: UUID | None = None
+    ready: bool = False
     outgoing: asyncio.Queue[str] = field(default_factory=lambda: asyncio.Queue(32))
     incoming: asyncio.Queue[Message] = field(default_factory=lambda: asyncio.Queue(32))
 
@@ -83,16 +84,24 @@ class NodeLink:
             text = await connection.outgoing.get()
             self._current(connection)
             await self.guards.service.validate_principal(connection.principal)
+            self._current(connection)
             async with asyncio.timeout(2):
                 await connection.websocket.send_text(text)
 
     async def send(self, node_id: UUID, kind: str, payload: StrictContract) -> None:
-        """Trusted control transport only. P07 must implement durable dispatch."""
+        """Control transport; execution uses Harness's persisted dispatch path."""
         if kind not in {"command.status", "result.ack"}:
             raise ProtocolError(ErrorCode.POLICY_DENIED, "Execution dispatch is not enabled")
         connection = self.connections.get(node_id)
         if connection is None:
             raise ProtocolError(ErrorCode.NODE_OFFLINE, "Node is offline")
+        await self._enqueue(connection, kind, payload)
+
+    async def dispatch(self, connection: NodeConnection, command: CommandExecute) -> None:
+        """Trusted Harness only; its grant/attempt transaction has committed."""
+        await self._enqueue(connection, "command.execute", command)
+
+    async def _enqueue(self, connection: NodeConnection, kind: str, payload: StrictContract) -> None:
         await self.guards.service.validate_principal(connection.principal)
         text = wire_message(kind, payload)
         message = parse_message(text)
@@ -142,13 +151,15 @@ class NodeLink:
                 if message.type == "node.heartbeat":
                     connection.last_heartbeat = time.monotonic()
                     connection.active_attempt_id = message.payload.active_attempt_id
-                elif message.type in {"command.status_result", "error"}:
+                elif message.type in {"command.accepted", "command.started", "command.result", "command.status_result", "error"}:
                     if message.type == "command.status_result" and message.payload.result is not None:
                         result = message.payload.result.result
                         if result is not None and len(result.model_dump_json().encode("utf-8")) > self.config.max_result_bytes:
                             raise ProtocolError(ErrorCode.RESULT_INVALID, "Negotiated result limit exceeded")
-                    # Evidence stays bounded and unacknowledged until a future
-                    # durable Harness consumer processes it. No task transitions.
+                    if message.type == "command.result" and message.payload.result is not None:
+                        if len(message.payload.result.model_dump_json().encode("utf-8")) > self.config.max_result_bytes:
+                            raise ProtocolError(ErrorCode.RESULT_INVALID, "Negotiated result limit exceeded")
+                    # Harness validates and commits evidence before acknowledgement.
                     try:
                         connection.incoming.put_nowait(message)
                     except asyncio.QueueFull:
@@ -187,6 +198,7 @@ class NodeLink:
                                   execution_timeout_seconds=self.config.execution_timeout_seconds,
                                   max_concurrent_attempts=1))
             connection.outgoing.put_nowait(wire_message("node.welcome", welcome, first.message_id))
+            connection.ready = True
             tasks = [asyncio.create_task(self._sender(connection)), asyncio.create_task(self._receive(connection))]
             done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
             for task in done:

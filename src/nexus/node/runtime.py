@@ -4,6 +4,7 @@ import json
 import secrets
 import threading
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
@@ -81,7 +82,7 @@ class NodeRuntime:
                 return True  # Request only; status confirms actual stop.
         return False
 
-    def execute(self, command: CommandExecute) -> CommandStatusResult:
+    def execute(self, command: CommandExecute, on_phase: Callable[[str], None] | None = None) -> CommandStatusResult:
         command = COMMAND.validate_json(command.model_dump_json(warnings="error"))
         old = self.receipts.get(command.attempt_id)
         if old is not None and (old.identity_json != command_identity(command, self.config.node_id)
@@ -96,7 +97,7 @@ class NodeRuntime:
                 return self.status(command.attempt_id, command.session_id)
             raise ProtocolError(ErrorCode.BUSY, "Node execution slot occupied")
         try:
-            return self._execute_locked(command)
+            return self._execute_locked(command, on_phase)
         except BaseException as exc:
             # Storage failure is never converted into an in-memory accepted result.
             if not isinstance(exc, ProtocolError):
@@ -107,7 +108,7 @@ class NodeRuntime:
                 self._active = None
             self._slot.release()
 
-    def _execute_locked(self, command: CommandExecute) -> CommandStatusResult:
+    def _execute_locked(self, command: CommandExecute, on_phase: Callable[[str], None] | None = None) -> CommandStatusResult:
         with self._state:
             if self._closed or self._unhealthy:
                 raise ProtocolError(ErrorCode.BUSY, "Node unavailable")
@@ -133,10 +134,14 @@ class NodeRuntime:
             raise ProtocolError(ErrorCode.TOOL_TIMEOUT, "Command has expired")
         deadline = time.monotonic() + min(remaining, command.execution_timeout_seconds, self.config.execution_timeout_seconds)
         receipt = self.receipts.accept(command, self.boot_id)
+        if on_phase is not None:
+            on_phase("command.accepted")
         if receipt.phase != "received":
             return receipt.status(command.session_id)
         job_name = f"Local\\NEXUS-{uuid4().hex}"
         self.receipts.start(command.attempt_id, job_name)
+        if on_phase is not None:
+            on_phase("command.started")
         try:
             budget = min(deadline - time.monotonic(), (command.expires_at - datetime.now(UTC)).total_seconds())
             if budget <= 0:

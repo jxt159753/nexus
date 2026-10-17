@@ -65,4 +65,4 @@
 
 P02 只定义上述数据和无 I/O 的编解码。消息方向权限、当前认证会话、资源范围、动作摘要的计算与绑定、实际期限、状态转移、重试、持久化和工具验证分别由后续任务落实；模型解析通过不代表获得执行权限或任务已经成功。
 
-P05 已实现 Node 本地执行，并在 `nexus.contracts.commands` 定义共享摘要：对命令排除 session_id / command_digest、加入可信 node_id 后按键排序，以紧凑且不转义非 ASCII 字符的 JSON 的 UTF-8 字节取 SHA-256；覆盖动作、task/attempt、grant 和期限。会话变化允许重传，动作或期限变化不得复用 attempt。具体算法与回执重传接口见 [Node Runtime](node-runtime.md)。P06 已接入认证会话、Node welcome 限额及有界控制传输，见 [S3 Link](s3-link.md)；Core 派发与权威验证仍待 P07。本轮不修改 25 种消息形状。
+P05 已实现 Node 本地执行，并在 `nexus.contracts.commands` 定义共享摘要：对命令排除 session_id / command_digest、加入可信 node_id 后按键排序，以紧凑且不转义非 ASCII 字符的 JSON 的 UTF-8 字节取 SHA-256；覆盖动作、task/attempt、grant 和期限。会话变化允许重传，动作或期限变化不得复用 attempt。具体算法与回执重传接口见 [Node Runtime](node-runtime.md)。P06 已接入认证会话、Node welcome 限额及有界控制传输，见 [S3 Link](s3-link.md)；Core 派发与权威验证已在 [S4](s4-harness.md) 接入。本轮不修改 25 种消息形状。

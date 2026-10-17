@@ -4,7 +4,7 @@
 
 本文件是唯一架构设计入口，供后续每次开发前完整读取。项目规范见 [AGENTS.md](../AGENTS.md)，阶段批准与任务验收见 [ROADMAP.md](ROADMAP.md)，项目入口见 [README.md](../README.md)。
 
-本文件描述目标架构，不代表所有功能已经实现。当前已有 S1/P01 工程基础、S2/P02–P04 契约/仓储/权限，以及 S3/P05–P06 的 Windows 本地工具、持久回执、受管理进程和认证 Node Link。Core/Node 可独立启动，P07–P12 尚未实施；交付与用户验收状态以 [ROADMAP.md](ROADMAP.md) 为准。历史技术证据见 [P01](P01-VERIFICATION.md)、[P02](P02-VERIFICATION.md)、[S2](S2-VERIFICATION.md)、[P05](P05-VERIFICATION.md)，本轮见 [S3](S3-VERIFICATION.md)。接口见 [存储与安全](storage-security.md)、[Node Runtime](node-runtime.md) 和 [S3 Link](s3-link.md)。设计文档完成不代表后续实施授权。
+本文件描述目标架构，不代表所有功能已经实现。当前已交付 S1 工程基础、S2 契约/仓储/权限、S3 独立 Windows Node 与认证 Link，以及 S4/P07 的持久派发、结果验证和历史查询。Core/Node 可独立运行两个固定只读任务；P08–P12 尚未实施，交付和用户验收状态以 [ROADMAP](ROADMAP.md) 为准。当前接口与证据见 [S4 Harness](s4-harness.md)、[S4 验证](S4-VERIFICATION.md)；历史接口见 [存储与安全](storage-security.md)、[Node Runtime](node-runtime.md) 和 [S3 Link](s3-link.md)。设计文档完成不代表后续实施授权。
 
 ## 项目愿景
 
@@ -226,7 +226,7 @@ stateDiagram-v2
 
 ## 8. JARVIS Link v1 协议
 
-P02 已实现本节 25 种消息的数据契约；字段名、严格解析入口、错误映射和字节计算约定见 [protocol-v1.md](protocol-v1.md)。P06 已实现认证连接、心跳、会话替换和重连，详见 [S3 Link](s3-link.md)；持久派发与执行结算仍由 P07/P08 实现。
+P02 已实现本节 25 种消息的数据契约；字段名、严格解析入口、错误映射和字节计算约定见 [protocol-v1.md](protocol-v1.md)。P06 已实现认证连接、心跳、会话替换和重连，详见 [S3 Link](s3-link.md)；P07 已接入持久派发和执行结算，见 [S4 Harness](s4-harness.md)；P08 的网络对账与全局控制尚未实施。
 
 ### 8.1 端点和消息信封
 
@@ -376,7 +376,7 @@ Node 单独的 `receipts.sqlite3` 保存 execution_receipts，以及必要的 sc
 
 使用 SQLite 一致备份接口或完全停机后的备份，不在运行时只复制一个 .sqlite3 文件。迁移前备份并校验；第一版只提供向前迁移，失败恢复使用备份，不自动执行破坏性降级。
 
-S2 已实现的表为 `schema_migrations`、`identities`、`tasks`、`task_events`、`audit_events`、`sessions`、`policy_state`、`grants`、`approvals`，仅创建当前任务使用的表。迁移验证版本连续性和脚本摘要；已有数据库升级前通过 SQLite backup 生成唯一备份并执行 quick_check，拒绝无版本旧库或未知新版本。任务仓储只开放派发前状态，不开放写入成功结果的捷径；attempt、执行证据、结果和全局控制由 P07/P08 增量迁移实现。离线管理审计以空 actor 表示本地管理入口，subject 单独记录被管理身份，不冒充 Node 发起授权。实现选择见 [ADR 0001](decisions/0001-s2-storage-security.md)。
+S2 已实现的表为 `schema_migrations`、`identities`、`tasks`、`task_events`、`audit_events`、`sessions`、`policy_state`、`grants`、`approvals`，仅创建当前任务使用的表。迁移验证版本连续性和脚本摘要；已有数据库升级前通过 SQLite backup 生成唯一备份并执行 quick_check，拒绝无版本旧库或未知新版本。任务仓储只开放派发前状态，不开放写入成功结果的捷径；S4 已通过迁移 003 增加 execution_grants、task_attempts 和任务结果字段，由 Harness 负责执行状态及验证；全局控制留待 P08。离线管理审计以空 actor 表示本地管理入口，subject 单独记录被管理身份，不冒充 Node 发起授权。实现选择见 [ADR 0001](decisions/0001-s2-storage-security.md)。
 
 记忆至少区分以下独立字段：
 
@@ -443,7 +443,7 @@ NEXUS/
 
 当前开发依赖为 pytest 与 httpx2；S2 使用标准 `asyncio.run`，未引入 pytest-asyncio。S2 增加架构指定的 aiosqlite 0.22.1；由于现有 Starlette 1.8.0 TestClient 已弃用 httpx，使用 httpx2 2.13.1 替换无代码调用方的旧 httpx 开发依赖，并锁定 httpcore2/truststore；没有升级现有 FastAPI、Starlette、Pydantic。`requirements.lock` 和实际 wheel 已在 Windows / Python 3.13.9 独立环境离线安装验证；构建依赖 `setuptools>=75,<81` 仍为范围约束，Python 3.12 和其他平台尚未实测。
 
-S3 唯一新增安装包为锁定的 websockets 17.1，用作 Node 客户端与 Uvicorn Sans-I/O 后端；其他 24 个包版本不变。Core/Node 共用可移植数据目录锁和有界消息辅助函数，互不导入对方业务模块。连接观测仅保存在可重建内存中，接入/断开写入现有审计；没有为 P06 创建 devices 或 attempt 新表。执行网络派发当前拒绝，避免绕过 P07 持久授权与尝试事务；选择见 [ADR 0003](decisions/0003-s3-authenticated-link.md)。
+S3 唯一新增安装包为锁定的 websockets 17.1，用作 Node 客户端与 Uvicorn Sans-I/O 后端；其他 24 个包版本不变。Core/Node 共用可移植数据目录锁和有界消息辅助函数，互不导入对方业务模块。连接观测仅保存在可重建内存中，接入/断开写入现有审计；没有为 P06 创建 devices 或 attempt 新表。S3 交付时拒绝网络执行派发，见 [ADR 0003](decisions/0003-s3-authenticated-link.md)。S4 已通过专用 Harness 路径启用持久派发与结果验证；普通 send 控制接口仍禁止执行命令，见 [ADR 0004](decisions/0004-s4-durable-execution.md)。本轮无新依赖。
 
 ## 12. 第一版明确不做
 

@@ -3,8 +3,7 @@ from types import MappingProxyType
 
 from nexus.contracts.messages import CommandExecute
 from nexus.contracts.tools import (
-    ListDirectoryCall, ListDirectoryResult, ToolResult,
-    TOOL_ARGUMENT_MODELS, TOOL_RESULT_MODELS,
+    ListDirectoryCall, ToolResult, TOOL_ARGUMENT_MODELS, validate_result,
 )
 from nexus.node.config import NodeConfig
 from nexus.node.tools.list_directory import list_directory
@@ -20,19 +19,6 @@ class ToolSpec:
 
 
 REGISTRY = MappingProxyType({key: ToolSpec(key) for key in TOOL_ARGUMENT_MODELS})
-
-
-def validate_result(command: CommandExecute, result: ToolResult, max_bytes: int) -> ToolResult:
-    model = TOOL_RESULT_MODELS[f"{command.tool}@{command.tool_version}"]
-    checked = model.model_validate_json(result.model_dump_json())
-    if len(checked.model_dump_json().encode("utf-8")) > max_bytes:
-        raise ValueError("result exceeds local byte budget")
-    if isinstance(checked, ListDirectoryResult):
-        if (not isinstance(command, ListDirectoryCall)
-                or checked.root_id != command.arguments.root_id
-                or len(checked.entries) > command.arguments.limit):
-            raise ValueError("directory evidence does not match command")
-    return checked
 
 
 def execute_tool(command: CommandExecute, config: NodeConfig) -> ToolResult:
