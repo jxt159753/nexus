@@ -14,6 +14,7 @@ dependencies = [
     "fastapi>=0.115,<1.0",
     "uvicorn>=0.34,<1.0",
     "pydantic>=2.10,<3.0",
+    "websockets==17.1",
 ]
 
 [project.optional-dependencies]
@@ -28,6 +29,7 @@ include = ["nexus*"]
 
 [tool.setuptools.package-data]
 "nexus.core.storage" = ["migrations/*.sql"]
+"nexus.node" = ["migrations/*.sql"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

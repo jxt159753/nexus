@@ -1,0 +1,13 @@
+# Create this data directory and enroll the owner/Node before starting.
+data_dir = 'E:\NEXUS\var\core'
+owner_id = '33552837-d424-4d3e-a8e3-cda3d3b54c59'
+host = '127.0.0.1'
+port = 8000
+# Explicit loopback development. Remote access requires local_http=false and TLS.
+local_http = true
+origins = ['http://127.0.0.1:8000']
+
+[nodes.'6909ccbe-2f7c-42ec-ab97-9fe1b03c425d']
+tools = ['system.info@1', 'filesystem.list@1']
+roots = ['workspace']
+resource_version = 1

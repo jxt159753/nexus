@@ -1,0 +1,9 @@
+# Paths must already exist. This example config contains no credential.
+node_id = '6909ccbe-2f7c-42ec-ab97-9fe1b03c425d'
+data_dir = 'E:\NEXUS\var\node'
+core_url = 'ws://127.0.0.1:8000/ws/v1/node'
+local_http = true
+allowed_tools = ['system.info@1', 'filesystem.list@1']
+
+[roots]
+workspace = 'E:\NEXUS'

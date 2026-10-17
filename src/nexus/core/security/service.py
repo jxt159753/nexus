@@ -108,6 +108,28 @@ class SecurityService:
         async with self.database.transaction(write=False) as conn:
             await assert_principal(conn, principal, now or utc_now())
 
+    async def connection_scope(self, principal: Principal, owner_id: UUID, scope: NodeScope) -> NodeScope:
+        """Intersect trusted registration with both persisted identities' grants."""
+        async with self.database.transaction(write=False) as conn:
+            await assert_principal(conn, principal, utc_now())
+            if principal.role != "node" or scope.node_id != principal.identity_id:
+                raise AccessDenied()
+            owner = await one(conn, "SELECT role, revoked_at FROM identities WHERE identity_id=?", (str(owner_id),))
+            if owner is None or owner["role"] != "owner" or owner["revoked_at"] is not None:
+                raise AccessDenied()
+            granted = []
+            for identity in (owner_id, principal.identity_id):
+                rows = await conn.execute_fetchall("SELECT tool, tool_version, root_id FROM grants WHERE identity_id=?", (str(identity),))
+                granted.append({(f"{row['tool']}@{row['tool_version']}", row['root_id']) for row in rows})
+            shared = granted[0] & granted[1]
+            tools = frozenset(key for key in scope.tools & scope.local_tools if (
+                key == "system.info@1" and (key, "") in shared
+                or key == "filesystem.list@1" and (key, "workspace") in shared
+                and "workspace" in scope.roots & scope.local_roots
+            ))
+            roots = frozenset({"workspace"}) if "filesystem.list@1" in tools else frozenset()
+            return NodeScope(scope.node_id, tools, roots, scope.local_tools, scope.local_roots, scope.resource_version)
+
     async def login(self, token: SecretStr, *, now: datetime | None = None) -> BrowserSession:
         now = now or utc_now()
         principal = await self.authenticate_token(token, "owner")

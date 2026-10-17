@@ -70,3 +70,5 @@ typing-inspection==0.4.4
     #   pydantic
 uvicorn==0.54.0
     # via nexus (pyproject.toml)
+websockets==17.1
+    # via nexus (pyproject.toml), S3 Node client and Uvicorn Sans-I/O server

@@ -4,7 +4,7 @@
 
 本文件是唯一架构设计入口，供后续每次开发前完整读取。项目规范见 [AGENTS.md](../AGENTS.md)，阶段批准与任务验收见 [ROADMAP.md](ROADMAP.md)，项目入口见 [README.md](../README.md)。
 
-本文件描述目标架构，不代表所有功能已经实现。当前已有 S1/P01 工程基础和 S2/P02–P04 的契约、规则路由、SQLite 仓储、身份会话、权限与绑定审批；交付与用户验收状态以 [ROADMAP.md](ROADMAP.md) 为准。早期实验文件已删除，没有正式服务启动入口，P05–P12 尚未实施。技术证据见 [P01](P01-VERIFICATION.md)、[P02](P02-VERIFICATION.md) 和 [S2](S2-VERIFICATION.md)，具体存储与安全接口见 [storage-security.md](storage-security.md)。设计文档完成不代表后续实现阶段已获批准。
+本文件描述目标架构，不代表所有功能已经实现。当前已有 S1/P01 工程基础、S2/P02–P04 契约/仓储/权限，以及 S3/P05–P06 的 Windows 本地工具、持久回执、受管理进程和认证 Node Link。Core/Node 可独立启动，P07–P12 尚未实施；交付与用户验收状态以 [ROADMAP.md](ROADMAP.md) 为准。历史技术证据见 [P01](P01-VERIFICATION.md)、[P02](P02-VERIFICATION.md)、[S2](S2-VERIFICATION.md)、[P05](P05-VERIFICATION.md)，本轮见 [S3](S3-VERIFICATION.md)。接口见 [存储与安全](storage-security.md)、[Node Runtime](node-runtime.md) 和 [S3 Link](s3-link.md)。设计文档完成不代表后续实施授权。
 
 ## 项目愿景
 
@@ -150,7 +150,7 @@ MVP 将 `system.info` 设为可配置的预授权只读操作，将 `filesystem.
 
 审批记录绑定：`approval_id`、`task_id`、owner、目标 `node_id`、工具名及版本、规范化参数 SHA-256、资源/策略版本和到期时间。单个批准只解锁该任务中完全一致的动作，最多允许预算内的只读重试，不允许复用到新任务。参数、节点或策略变化后必须重新评估，必要时重新审批；已派发任务不原地改写动作。
 
-S2 已实现离线身份/授权管理、随机凭证摘要、8 小时浏览器会话（最多 10 个有效会话）、同源会话路由及 HTTP/WS 认证守卫。`SecurityHTTP.receive_text` 每秒检查空闲连接的撤销/过期，并在返回每条消息前再次检查；正式 Link 必须使用该接口。资源范围摘要绑定 `NodeScope.resource_version`，持久授权或身份变化递增全局策略版本。后续 Link 从认证节点及可信配置构建当前范围，不使用客户端任意自报字段作为授权依据。实际 TLS 与 Node Link 尚未组装。
+S2 已实现离线身份/授权管理、随机凭证摘要、8 小时浏览器会话（最多 10 个有效会话）、同源会话路由及 HTTP/WS 认证守卫。P06 的 Node Link 已接入 `SecurityHTTP.receive_text`，每秒检查空闲连接的撤销/过期，并在返回每条消息前再次检查。资源范围摘要绑定 `NodeScope.resource_version`，持久授权或身份变化递增全局策略版本。Link 从认证节点、可信工具/资源配置与持久授权交集构建范围；自报能力不能扩大授权。实际 loopback WS 已验证，远程 TLS 尚未实测。
 
 删除重要文件、发送对外消息、支付和修改安全设置目前都没有工具实现，直接拒绝。以后加入时，必须同时具备精确授权、效果验证、幂等/对账策略，不能只增加一个“同意”按钮。
 
@@ -226,7 +226,7 @@ stateDiagram-v2
 
 ## 8. JARVIS Link v1 协议
 
-P02 已实现本节 25 种消息的数据契约；字段名、严格解析入口、错误映射和字节计算约定见 [protocol-v1.md](protocol-v1.md)。实际连接、授权及执行生命周期仍由后续任务实现。
+P02 已实现本节 25 种消息的数据契约；字段名、严格解析入口、错误映射和字节计算约定见 [protocol-v1.md](protocol-v1.md)。P06 已实现认证连接、心跳、会话替换和重连，详见 [S3 Link](s3-link.md)；持久派发与执行结算仍由 P07/P08 实现。
 
 ### 8.1 端点和消息信封
 
@@ -366,7 +366,7 @@ Core 概念表：
 | system_state | 全局 pause 状态和配置版本 |
 | schema_migrations | 已执行迁移版本 |
 
-Node 单独的 `receipts.sqlite3` 仅包含 execution_receipts，不属于长期认知存储。
+Node 单独的 `receipts.sqlite3` 保存 execution_receipts，以及必要的 schema_migrations / node_identity 元数据，不属于长期认知存储。P05 使用专用 Node 身份、模式摘要与 FULL 同步，提供 received/started/结果先落盘、重复 attempt 去重、重启 unknown 和结果恢复；默认容量 10000 条，满后拒绝新执行并保留旧证据。当前只支持初建和同版本重开；后续模式升级须先实现一致备份和前向迁移。Windows Job 的输入门和进程归属双重检查、真实停止确认、独占 Node 数据目录锁及本地限额已在 Windows 11 上验证，详见 [Node Runtime](node-runtime.md) 和 [ADR 0002](decisions/0002-p05-node-execution.md)。
 
 模型调用记录与最终工具验证结果关联，以后分别计算调用可用率和任务验证通过率，不能把模型正常返回等同于任务成功。MVP 仅产生规则路由记录，模型成功率显示“不适用”，不填造零成本调用记录。
 
@@ -439,9 +439,11 @@ NEXUS/
 
 `contracts` 只共享通信/数据契约，不共享认知逻辑。Node 不导入 Core 的 Harness、记忆或模型模块。协议以 JSON 及工具版本定义，使后续 Kotlin Node 无需重写 Core。
 
-目标配置优先级：环境变量 > TOML > 安全默认值；凭证不得进入被跟踪的 TOML。P01 当前只读取环境变量，不自动读取 `.env` 或 TOML：`NEXUS_DATA_DIR` 必填且须为绝对路径，监听地址仅允许 `127.0.0.1`，端口默认为 8000 且限制为 1–65535。配置加载只校验并返回值，不创建目录、不打开数据库。TOML 层及正式服务接入尚未实现，不能把后续启动安全边界视为已验证。
+配置优先级：指定环境变量 > 指定 TOML > 安全默认值；凭证不得进入 TOML。S3 服务使用严格 CoreConfig / NodeServiceConfig 和有界 TOML 加载器；Core 可覆盖 NEXUS_DATA_DIR/HOST/PORT，Node 可覆盖 NEXUS_NODE_DATA_DIR/CORE_URL，Node 凭证仅由 NEXUS_NODE_TOKEN 环境变量提供。显式 loopback 模式允许 HTTP/WS，远程 Core 必须配置证书和私钥，Node WSS 保留默认 CA 与主机名验证。配置加载不创建目录或数据库；单活 Core 在生命周期中持锁后才初始化存储。P01 的 load_settings 保留给离线身份命令及原有接口，只读取环境变量且只允许 localhost；不自动读取 .env。实际启动及未验证 TLS 边界见 [S3 Link](s3-link.md)。
 
 当前开发依赖为 pytest 与 httpx2；S2 使用标准 `asyncio.run`，未引入 pytest-asyncio。S2 增加架构指定的 aiosqlite 0.22.1；由于现有 Starlette 1.8.0 TestClient 已弃用 httpx，使用 httpx2 2.13.1 替换无代码调用方的旧 httpx 开发依赖，并锁定 httpcore2/truststore；没有升级现有 FastAPI、Starlette、Pydantic。`requirements.lock` 和实际 wheel 已在 Windows / Python 3.13.9 独立环境离线安装验证；构建依赖 `setuptools>=75,<81` 仍为范围约束，Python 3.12 和其他平台尚未实测。
+
+S3 唯一新增安装包为锁定的 websockets 17.1，用作 Node 客户端与 Uvicorn Sans-I/O 后端；其他 24 个包版本不变。Core/Node 共用可移植数据目录锁和有界消息辅助函数，互不导入对方业务模块。连接观测仅保存在可重建内存中，接入/断开写入现有审计；没有为 P06 创建 devices 或 attempt 新表。执行网络派发当前拒绝，避免绕过 P07 持久授权与尝试事务；选择见 [ADR 0003](decisions/0003-s3-authenticated-link.md)。
 
 ## 12. 第一版明确不做
 

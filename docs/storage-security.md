@@ -36,7 +36,7 @@ rotate 替换凭证并重新启用身份；旧凭证失效。owner 撤销或轮�
 
 ## 会话、HTTP 与 WebSocket
 
-`SecurityHTTP(SecurityService(db), TransportPolicy(origins=...))` 提供可组装的 APIRouter，目前没有生产 app 或服务启动命令：
+`SecurityHTTP(SecurityService(db), TransportPolicy(origins=...))` 提供可组装的 APIRouter；现已由 S3 Core app 接入，启动说明见 [S3 Link](s3-link.md)：
 
 | 接口 | 行为 |
 | --- | --- |
@@ -49,11 +49,11 @@ rotate 替换凭证并重新启用身份；旧凭证失效。owner 撤销或轮�
 
 会话有效期 8 小时，最多 10 个有效会话；会话和 CSRF 均使用随机令牌摘要。Cookie 为 HttpOnly / Secure / SameSite=strict，响应 no-store。仅显式 `local_http=True` 且仅 loopback 的 HTTP/WS 可关闭 Secure；默认 HTTPS/WSS。远程模式没有证书配置时不能启动后续服务，不关闭 TLS 校验或调整系统安全配置。
 
-P06 必须接入守卫和接收接口，并校验消息方向、当前连接/会话与 JSON 中的节点标识，实施帧/速率/连接/队列限制；本轮只以临时 ASGI 应用证明安全边界，没有 Node 协议生命周期、心跳或重连。后续前端须管理登录响应中的 CSRF 值；当前不提供会话恢复页面或续期 API。
+P06 已接入守卫和接收接口，并校验消息方向、当前连接/会话与 JSON 中的节点标识，实施帧/速率/连接/队列限制及心跳、重连。S2 的临时 ASGI 证据保留，本轮真实进程通信证据见 [S3 验证](S3-VERIFICATION.md)。后续前端须管理登录响应中的 CSRF 值；当前不提供会话恢复页面或续期 API。
 
 ## 权限和审批
 
-`SecurityService.prepare(task_id, principal, scope)` 在事务内重查身份和 owner 归属，并计算已知工具、owner 授权、Node 身份许可、注册能力和本地范围的交集。`NodeScope` 来自后续认证 Link/可信配置，绑定目标 node_id、工具和 root 别名的允许集合、resource_version；它只能收紧持久授权。配置或资源映射变更必须递增版本；本地路径的实际安全检查仍属于 P05。
+`SecurityService.prepare(task_id, principal, scope)` 在事务内重查身份和 owner 归属，并计算已知工具、owner 授权、Node 身份许可、注册能力和本地范围的交集。P06 的 `connection_scope` 从认证身份、Core 可信配置及节点自报范围构建并收紧交集，绑定目标 node_id、工具/root 别名和 resource_version，不授予新权限。配置或资源映射变更必须递增版本；本地路径检查由 P05 [Node Runtime](node-runtime.md) 执行，P06 Link 已组装，但不提供网络执行派发。
 
 - system.info 需双方显式授权，成功转 ready；filesystem.list 需允许的 workspace 资源并逐任务审批，先转 awaiting_approval。
 - 审批绑定 task/owner/node、工具与版本、规范化参数 SHA-256、全局策略版本、当前范围摘要（含资源版本）及期限。有效期最多 2 分钟且不晚于任务期限。
