@@ -88,7 +88,7 @@ def test_memory_project_evidence_supersession_expiry_retraction_and_reopen(world
         assert routes[0]["origin"] == "live" and routes[0]["elapsed_ms"] >= 0
         assert routes[0]["project_id"] == project_id
         usage = client.get("/api/v1/models/usage").json()
-        assert usage == {"enabled":False,"calls":0,"cost_microunits":0,"unknown_cost_calls":0,"model_success_rate":None}
+        assert usage == {"enabled":False,"chat_enabled":False,"calls":0,"cost_microunits":0,"unknown_cost_calls":0,"model_success_rate":None}
     # Reconstruct the app/database rather than retaining in-memory repositories.
     with TestClient(create_app(core_config(world)), base_url=ORIGIN) as client:
         login(client, world)

@@ -1,0 +1,107 @@
+{
+  "date": "2026-10-18",
+  "status": "cloud_deployed_pending_android_and_user_acceptance",
+  "platform": "Windows / Python 3.13.9",
+  "installed_wheel_tests": {
+    "passed": 559,
+    "seconds": 154.49,
+    "warnings_as_errors": true,
+    "source_pythonpath_disabled": true,
+    "skipped": 0
+  },
+  "wheel_sha256": "82b4afebe20af3f5cb12ed5a7f00a4a6048c9fe3a960eb69680bbd3f725f9c52",
+  "source_resource_files_matched": 80,
+  "dependencies": {
+    "locked_packages": 25,
+    "offline_install": true,
+    "pip_check": "passed",
+    "new_runtime_dependencies": 0
+  },
+  "browser_evidence": "m3-browser-evidence.json",
+  "model_provider_in_tests": "simulated DeepSeek SSE over real HTTP response parser",
+  "independent_core_process": {
+    "multi_turn": true,
+    "stop_partial": true,
+    "crash_restart_history": true,
+    "no_replay_after_restart": true
+  },
+  "migration_v6_to_v7": {
+    "nonempty_ledger_preserved": true,
+    "consistent_backup_checked": true
+  },
+  "actual_deepseek_calls_this_delivery": 2,
+  "cloud_deployed": true,
+  "linux_candidate_tests_run": true,
+  "android_device_acceptance": false,
+  "self_extension_enabled": false,
+  "linux_candidate_tests": {
+    "platform": "Ubuntu 24.04 / Python 3.12.3",
+    "passed": 460,
+    "seconds": 33.75,
+    "core_test_modules": 18,
+    "skipped": 0,
+    "warnings_as_errors": true,
+    "source_pythonpath_disabled": true,
+    "locked_dependencies_reused": 25,
+    "pip_check": "passed",
+    "non_login_user": true
+  },
+  "cloud_upgrade": {
+    "schema": 7,
+    "unique_core": true,
+    "all_old_tables_original_columns_preserved": true,
+    "old_task_details_preserved": 11,
+    "pre_upgrade_backup_sha256": "c69375b32b87f6f94fdb4a1d32671b17571c69598b7998c99e6b166e58ccabbe",
+    "after_real_calls_backup_sha256": "4d69549fed7861041a7c1cfefa2c352548e9be9f7e91275cf15756b635ea62fb",
+    "api_key_downloaded": false,
+    "trusted_https": true,
+    "service_active": true,
+    "dispatch_paused": false,
+    "node_authenticated_online": true
+  },
+  "real_chat": {
+    "conversation_id": "5d1a9eaf-760a-4933-949c-3e1c2cc437d9",
+    "turns": [
+      {
+        "turn_id": "1be1e526-9136-40c2-a048-ec9a35658193",
+        "context_count": 0,
+        "cost_microunits": 132,
+        "characters": 118,
+        "incremental_observed": true,
+        "response_sha256": "51736da783db23dfbf97042168446374beb440a3364186815c0f8ace56bb99c4",
+        "model": "deepseek-flash",
+        "input_tokens": 126,
+        "output_tokens": 78,
+        "cost_status": "calculated",
+        "outcome": "completed"
+      },
+      {
+        "turn_id": "b05d3c42-fb4f-4b4e-b935-e14b834c8357",
+        "context_count": 1,
+        "cost_microunits": 185,
+        "characters": 135,
+        "incremental_observed": true,
+        "response_sha256": "310a774bc9a9f788c721ebf932cd598387e22075327fbf7966b2bd1f241315c3",
+        "model": "deepseek-flash",
+        "input_tokens": 239,
+        "output_tokens": 94,
+        "cost_status": "calculated",
+        "outcome": "completed"
+      }
+    ],
+    "prior_turn_reference_verified": true,
+    "new_cost_upper_bound_microunits": 317,
+    "total_calls_including_m2": 4,
+    "total_cost_upper_bound_microunits": 458,
+    "unknown_cost_calls": 0,
+    "automatic_retries": 0,
+    "real_provider_stop_tested": false
+  },
+  "cloud_restart": {
+    "old_task_details_preserved": 11,
+    "chat_turns_preserved": 2,
+    "new_model_calls": 0,
+    "ledger_unchanged": true,
+    "node_reauthenticated": true
+  }
+}

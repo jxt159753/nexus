@@ -8,9 +8,13 @@ NEXUS 是一个面向个人、长期运行的自主 AI 系统。它希望逐步�
 
 ## 当前状态
 
-当前已有可安装的 Core、独立 Windows Node 和同源 Web 控制台。浏览器支持提交只读任务、审批、结果与历史、取消和全局暂停/恢复，并能在断线后同步持久事件。Core 保留权限、持久派发、工具验证、有界恢复及真实取消；个人记忆必须明确同意，支持项目关联、信息类型、时效与撤销。路由原因和零模型调用可查询。浏览器操作见 [S6 说明](docs/s6-browser-records.md)，实测及限制见 [S6 验证](docs/S6-VERIFICATION.md)，身份与启动配置见 [S3 Link](docs/s3-link.md)。后端任务及恢复细节保留在 [S4](docs/s4-harness.md)和 [S5](docs/s5-recovery.md)。
+当前已有可安装的 Core、独立 Windows Node 和同源 Web 控制台。浏览器支持提交只读任务、审批、结果与历史、取消和全局暂停/恢复，并能在断线后同步持久事件。Core 保留权限、持久派发、工具验证、有界恢复及真实取消；个人记忆必须明确同意，支持项目关联、信息类型、时效与撤销。路由原因与模型用量可查询；M1 零模型证据保留。浏览器操作见 [S6 说明](docs/s6-browser-records.md)，实测及限制见 [S6 验证](docs/S6-VERIFICATION.md)，身份与启动配置见 [S3 Link](docs/s3-link.md)。后端任务及恢复细节保留在 [S4](docs/s4-harness.md)和 [S5](docs/s5-recovery.md)。
 
 首次配置、可信 TLS、停机备份和恢复流程见 [部署与恢复](docs/s7-deployment.md)，本机及实际设备证据见 [S7 记录](docs/S7-VERIFICATION.md)。实际部署已按用户批准改为自有 Ubuntu 云端唯一 Core、IP 直连 HTTPS/WSS 和独立 Windows Node；证书自动续期及单活迁移的结果见 ROADMAP。此前工程与契约证据见 [P01](docs/P01-VERIFICATION.md)、[P02](docs/P02-VERIFICATION.md)，存储与权限见 [接口](docs/storage-security.md)及 [S2 验证](docs/S2-VERIFICATION.md)，本地工具见 [Node Runtime](docs/node-runtime.md)及 [P05 验证](docs/P05-VERIFICATION.md)。
+
+M2 已支持 DeepSeek 与受约束自然语言任务：先解释、展示动作并确认，再进入既有授权执行；默认禁用模型。使用与安全配置见 [M2 说明](docs/m2-language.md)。
+
+自由聊天已增加多轮上下文、历史、实际增量回复、停止、首轮自动命名、重命名和归档；会话内可建议已有只读工具，确认及审批后展示真实结果，默认需在 Core 显式启用。使用见 [聊天说明](docs/m3-chat.md)；本地与生产版本及验证状态仍以 ROADMAP 为准。
 
 阶段授权、进度、用户验收状态及后续批准要求统一见 [ROADMAP.md](docs/ROADMAP.md)；本 README 不授予后续阶段实施权限。
 
@@ -27,7 +31,7 @@ NEXUS 是一个面向个人、长期运行的自主 AI 系统。它希望逐步�
 
 示例仅启用显式 loopback HTTP/WS 开发模式。远程运行必须配置可信 TLS；不关闭证书校验或自动修改系统设置。
 
-默认配置启动后，在浏览器打开 `http://127.0.0.1:8000/`，用离线登记的 owner 凭证登录。无需前端构建或模型密钥；工具授权及 workspace 根仍须按配置明确登记。
+默认配置启动后，在浏览器打开 `http://127.0.0.1:8000/`，用离线登记的 owner 凭证登录。只读按钮无需前端构建或模型密钥；DeepSeek 自然语言入口另需安全配置模型。工具授权及 workspace 根仍须按配置明确登记。
 
 ## 文档入口
 

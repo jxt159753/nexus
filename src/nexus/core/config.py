@@ -5,6 +5,7 @@ from typing import Literal, Self
 from uuid import UUID
 from pydantic import Field, StrictBool, StrictInt, model_validator
 from nexus.contracts.base import MAX_MESSAGE_BYTES, MAX_RESULT_BYTES, StrictContract
+from nexus.core.models.config import ModelConfig
 
 ToolKey = Literal["system.info@1", "filesystem.list@1"]
 
@@ -30,6 +31,7 @@ class CoreConfig(StrictContract):
     max_message_bytes: StrictInt = Field(default=MAX_MESSAGE_BYTES, ge=1024, le=MAX_MESSAGE_BYTES)
     max_result_bytes: StrictInt = Field(default=MAX_RESULT_BYTES, ge=128, le=MAX_RESULT_BYTES)
     execution_timeout_seconds: StrictInt = Field(default=10, ge=1, le=10)
+    models: ModelConfig = Field(default_factory=ModelConfig)
 
     @model_validator(mode="after")
     def check_service(self) -> Self:

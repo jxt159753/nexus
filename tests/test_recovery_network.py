@@ -191,7 +191,19 @@ process_module.subprocess.Popen = worker
             auth = {"origin": origin, "x-csrf-token": response.json()["csrf_token"]}
             node = injected_process("nexus.node", node_config_path, log, world.node_token.get_secret_value(), node_patch)
             wait_for(lambda: browser.get("/api/v1/nodes").json()["nodes"][0]["online"])
-            task = browser.post("/api/v1/tasks", json=submission(world), headers=auth).json()["task"]
+            submitted = submission(world)
+            try:
+                task = browser.post("/api/v1/tasks", json=submitted, headers=auth).json()["task"]
+            except httpx2.TransportError:
+                # The intentional Core crash can precede the HTTP response.
+                # Resolve the durable business ID instead of resubmitting.
+                if fault not in {"before_send", "before_ack"}:
+                    raise
+                wait_for(marker.exists)
+                with closing(sqlite3.connect(world.db.path)) as persisted:
+                    record = persisted.execute("SELECT task_id FROM tasks WHERE owner_id=? AND request_id=?", (str(world.owner_id), submitted["request"]["request_id"])).fetchone()
+                assert record is not None
+                task = {"task_id":record[0]}
             task_id = task["task_id"]
             worker_pid = None
             if fault in {"node_crash", "cancel", "timeout"}:

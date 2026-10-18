@@ -1,0 +1,69 @@
+{
+  "date": "2026-10-18",
+  "status": "local_verified_pending_user_acceptance",
+  "features": {
+    "first_turn_model_title_same_call": true,
+    "manual_titles_preserved": true,
+    "existing_tools_only": [
+      "system.info@1",
+      "filesystem.list@1"
+    ],
+    "explicit_confirmation": true,
+    "directory_approval": true,
+    "chat_task_evidence": true,
+    "atomic_task_association": true
+  },
+  "windows_source_tests": {
+    "passed": 582,
+    "seconds": 139.7,
+    "skipped": 0,
+    "warnings_as_errors": true
+  },
+  "windows_installed_wheel_tests": {
+    "passed": 582,
+    "seconds": 138.96,
+    "skipped": 0,
+    "warnings_as_errors": true,
+    "source_pythonpath_disabled": true
+  },
+  "package": {
+    "wheel_sha256": "90bdf42cc3489de6f95a2163afd7e5719fb511ef1f8a9dfa556cc836667b107a",
+    "source_resource_files_matched": 82,
+    "syntax": "passed",
+    "new_dependencies": 0,
+    "actual_model_calls": 0,
+    "production_changed": false,
+    "full_regression_wheel_sha256": "ea9c2a7fe791001dcf137f46437260fee649ceb714b0836f3480a3d178534ab1",
+    "final_package_tests": {
+      "passed": 45,
+      "seconds": 12.32,
+      "source_pythonpath_disabled": true
+    },
+    "full_regression_to_final_changes": "module docstring and README metadata only; runtime AST unchanged"
+  },
+  "locked_dependencies": 25,
+  "pip_check": "passed",
+  "migration": {
+    "version": 8,
+    "v7_history_title_and_ledger_preserved": true,
+    "consistent_backup_checked": true
+  },
+  "browser_evidence": "chat-tools-browser-evidence.json",
+  "independent_core_windows_node": {
+    "system_tool": true,
+    "directory_approval_and_tool": true,
+    "one_attempt_each": true,
+    "restart_no_replay": true
+  },
+  "documentation_checks": {
+    "local_links": 126,
+    "json_examples": 4,
+    "private_key_and_token_pattern_findings": 0
+  },
+  "actual_model_calls_this_delivery": 0,
+  "cloud_deployed_this_delivery": false,
+  "linux_new_version_tested": false,
+  "real_deepseek_function_calls_tested": false,
+  "android_device_acceptance": false,
+  "self_extension_enabled": false
+}

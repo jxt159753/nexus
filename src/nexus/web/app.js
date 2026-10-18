@@ -9,6 +9,9 @@ const statuses = {queued:"排队中", awaiting_approval:"等待审批", ready:"�
 const terminal = new Set(["succeeded", "failed", "cancelled", "timed_out"]);
 const kinds = {fact:"事实", inference:"推测", plan:"计划"};
 let memoryRetry = null;
+let languageRetry = null;
+let languageBefore = null;
+let languagePolling = true;
 function el(tag, text, className) {
   const node = document.createElement(tag);
   if (text !== undefined) node.textContent = text;
@@ -33,6 +36,9 @@ function loggedOut() {
   if (state.socket) state.socket.close();
   state.socket = null; state.pending.clear(); state.tasks.clear(); state.projects = [];
   memoryRetry = null;
+  languageRetry = null; languageBefore = null;
+  chatReset();
+  $("language-form").reset(); $("language-requests").replaceChildren();
   state.controlRevision = -1;
   ["tasks", "memories", "routes", "projects", "capabilities"].forEach(id => $(id).replaceChildren());
   ["task-project", "memory-project"].forEach(id => $(id).replaceChildren(new Option("不关联项目", "")));
@@ -86,6 +92,7 @@ async function nodes() {
   const node = value.nodes.find(n => n.node_id === $("node").value);
   $("node-status").textContent = node ? (node.online ? "在线 · 已认证" : "离线 · 任务会等待节点") : "请先在 Core 配置节点";
   $("capabilities").replaceChildren(...(node ? node.tools : []).map(t => el("span", t)));
+  chatNodes(value.nodes);
 }
 function putTask(task, detail) {
   const previous = state.tasks.get(task.task_id);
@@ -96,9 +103,9 @@ function putTask(task, detail) {
     state.tasks.delete(oldest.task.task_id);
   }
   renderTasks();
+  chatRender();
 }
-function renderTasks() {
-  const cards = [...state.tasks.values()].sort((a,b) => b.task.created_at.localeCompare(a.task.created_at)).map(({task, detail}) => {
+function taskCard({task, detail}) {
     const card = el("article", undefined, "task"); card.dataset.taskId = task.task_id;
     const heading = el("div", undefined, "section-heading");
     heading.append(el("h3", task.request.intent === "get_system_info" ? "读取系统信息" : "列出 workspace 目录"));
@@ -138,7 +145,9 @@ function renderTasks() {
       card.append(block);
     });
     buttons.append(more); card.append(buttons); return card;
-  });
+}
+function renderTasks() {
+  const cards = [...state.tasks.values()].sort((a,b) => b.task.created_at.localeCompare(a.task.created_at)).map(taskCard);
   $("tasks").replaceChildren(...cards); $("empty-tasks").hidden = cards.length > 0;
 }
 async function updateTask(id) {
@@ -261,12 +270,47 @@ async function usage() {
   const value = await api("/api/v1/models/usage");
   if (!state.logged) return;
   $("model-calls").replaceChildren(document.createTextNode(value.calls + " "), el("small", "次调用"));
-  $("model-cost").textContent = `费用 ${value.cost_microunits === null ? "未知" : value.cost_microunits / 1000000} · 模型成功率不适用`;
+  $("model-cost").textContent = `费用 ${value.cost_microunits === null ? "未知（保留预留额度）" : "$" + value.cost_microunits / 1000000 + "（公开峰值单价上界）"} · 模型成功不等于任务成功`;
+  document.querySelector(".model-badge").textContent = value.enabled ? "规则优先 · DeepSeek 按次同意" : "规则路由 · 模型已禁用";
+  chatAvailability(value.chat_enabled);
+}
+async function languagePage(older = false) {
+  const value = await api("/api/v1/language" + (older && languageBefore ? "?before=" + languageBefore : ""));
+  if (!state.logged) return;
+  languagePolling = !older;
+  if (!older) $("language-requests").replaceChildren();
+  const labels = {queued:"等待解释", interpreting:"模型解释中", proposed:"请确认动作", submitted:"已创建执行任务", rejected:"不支持的任务", failed:"解释失败", cancelled:"已取消", expired:"已过期"};
+  for (const item of value.requests) {
+    const card = el("article", undefined, "record"); card.dataset.languageId = item.language_id;
+    card.append(el("h3", labels[item.status] || item.status), el("p", item.text), el("p", `${item.mode || "等待路由"} · ${item.language_id}`, "meta"));
+    if (item.error_code) card.append(el("p", item.error_code, "hint"));
+    if (item.proposal) card.append(el("pre", JSON.stringify({node_id:item.node_id, action:item.proposal, expires_at:item.expires_at}, null, 2)));
+    const buttons = el("div", undefined, "button-row");
+    if (item.status === "proposed") {
+      const confirm = el("button", "确认此动作并创建任务", "primary");
+      confirm.onclick = action(async () => {confirm.disabled = true; try {const result = await api(`/api/v1/language/${item.language_id}/confirm`, {method:"POST", body:"{}"}); await updateTask(result.task.task_id); await languagePage();} finally {confirm.disabled = false;}});
+      buttons.append(confirm);
+    }
+    if (["queued", "interpreting", "proposed"].includes(item.status)) {
+      const cancel = el("button", "取消解释请求", "quiet");
+      cancel.onclick = action(async () => {await api(`/api/v1/language/${item.language_id}/cancel`, {method:"POST", body:"{}"}); await languagePage();});
+      buttons.append(cancel);
+    }
+    if (item.task_id) {
+      const task = el("button", "查看执行任务", "quiet");
+      task.onclick = action(async () => {await updateTask(item.task_id); document.querySelector(`[data-task-id="${item.task_id}"]`)?.scrollIntoView({block:"center"});});
+      buttons.append(task);
+    }
+    card.append(buttons); $("language-requests").append(card);
+  }
+  while ($("language-requests").children.length > 100) $("language-requests").firstChild.remove();
+  languageBefore = value.requests.at(-1)?.cursor || null;
+  $("older-language").hidden = value.requests.length < 20;
 }
 async function enter(session) {
   state.csrf = session.csrf_token; state.logged = true;
   $("login-panel").hidden = true; $("console").hidden = false; $("logout").hidden = false;
-  try {await Promise.all([nodes(), loadProjects(), usage()]);}
+  try {await Promise.all([nodes(), loadProjects(), usage(), languagePage(), chatList()]);}
   catch (error) {loggedOut(); throw error;}
   connect();
 }
@@ -279,6 +323,18 @@ $("logout").onclick = action(async () => {await api("/api/v1/session", {method:"
 $("node").onchange = action(async () => {await nodes(); connect();});
 $("system-info").onclick = action(async () => submit("get_system_info"));
 $("list-directory").onclick = action(async () => submit("list_directory"));
+$("language-form").onsubmit = action(async () => {
+  if (!$("node").value) throw new Error("请先选择节点");
+  const value = {request_id:crypto.randomUUID(), node_id:$("node").value, project_id:$("task-project").value || null, text:$("language-text").value, allow_model:$("language-consent").checked};
+  const signature = JSON.stringify({...value, request_id:null});
+  if (languageRetry?.signature === signature) value.request_id = languageRetry.request_id;
+  languageRetry = {signature, request_id:value.request_id};
+  await api("/api/v1/language", {method:"POST", body:JSON.stringify(value)});
+  languageRetry = null; $("language-consent").checked = false; await languagePage(); notify("解释请求已保存，请检查动作后确认");
+});
+$("language-text").oninput = () => {$("language-consent").checked = false;};
+$("refresh-language").onclick = action(async () => {await languagePage(); await usage();});
+$("older-language").onclick = action(async () => languagePage(true));
 for (const kind of ["pause", "resume", "cancel_all"]) $(kind.replace("_", "-")).onclick = action(async () => {send("control." + kind, {request_id:crypto.randomUUID()}); notify("控制请求已发送，等待 Core 更新");});
 $("refresh-tasks").onclick = action(async () => taskPage(true));
 $("older-tasks").onclick = action(async () => taskPage());
@@ -298,11 +354,15 @@ $("more-memories").onclick = action(async () => records("memories", false));
 $("more-routes").onclick = action(async () => records("routes", false));
 $("refresh-routes").onclick = action(async () => {await Promise.all([records("routes"), usage()]);});
 document.querySelectorAll("[data-tab]").forEach(button => {button.onclick = action(async () => {
-  for (const tab of ["tasks", "memories", "routes"]) $(tab + "-view").hidden = tab !== button.dataset.tab;
+  for (const tab of ["chat", "tasks", "memories", "routes"]) $(tab + "-view").hidden = tab !== button.dataset.tab;
+  document.querySelector(".workspace").classList.toggle("chat-mode",button.dataset.tab==="chat");
   document.querySelectorAll("[data-tab]").forEach(b => {b.classList.toggle("active", b === button); b.setAttribute("aria-pressed", String(b === button));});
-  if (button.dataset.tab !== "tasks") await records(button.dataset.tab);
+  if (button.dataset.tab === "chat") await Promise.all([chatList(),usage()]);
+  else if (button.dataset.tab !== "tasks") await records(button.dataset.tab);
 });});
 setInterval(() => {if (state.logged) nodes().catch(error => notify(error.message, true));}, 5000);
+setInterval(() => {if (state.logged && languagePolling && !$("tasks-view").hidden) Promise.all([languagePage(), usage()]).catch(error => notify(error.message, true));}, 3000);
 window.addEventListener("pagehide", () => {state.generation++; clearTimeout(state.timer); if (state.socket) state.socket.close();});
 window.addEventListener("pageshow", event => {if (event.persisted && state.logged) connect();});
+initChat();
 api("/api/v1/session").then(enter).catch(error => {loggedOut(); if (error.message !== "AUTH_REQUIRED") notify(error.message, true);});

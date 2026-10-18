@@ -7,6 +7,20 @@ port = 8000
 local_http = true
 origins = ['http://127.0.0.1:8000']
 
+# Optional M2. Keep disabled until DEEPSEEK_API_KEY is safely set on Core.
+[models]
+chat_enabled = false # M3: explicitly enable after configuring Core's existing DeepSeek key
+enabled = false
+daily_cost_microunits = 1000000 # USD 1/day, UTC; outstanding unknowns remain charged
+task_cost_microunits = 50000   # USD 0.05/request; reserved before sending
+daily_calls = 100
+max_output_tokens = 512
+timeout_seconds = 30
+# Peak cache-miss USD microunits per 1M tokens, reviewed 2026-10-18.
+input_price = 300000
+output_price = 1200000
+price_valid_until = '2026-10-25'
+
 [nodes.'6909ccbe-2f7c-42ec-ab97-9fe1b03c425d']
 tools = ['system.info@1', 'filesystem.list@1']
 roots = ['workspace']

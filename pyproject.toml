@@ -15,12 +15,12 @@ dependencies = [
     "uvicorn>=0.34,<1.0",
     "pydantic>=2.10,<3.0",
     "websockets==17.1",
+    "httpx2==2.13.1",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8,<10",
-    "httpx2==2.13.1",
 ]
 
 [tool.setuptools.packages.find]

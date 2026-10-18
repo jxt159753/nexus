@@ -1,4 +1,4 @@
-"""No network clients, keys or fallback. Every model entry fails closed."""
+"""Provider boundary and network-free disabled implementations."""
 
 from dataclasses import dataclass
 from typing import Protocol
@@ -14,20 +14,32 @@ class ModelLimits:
     timeout_seconds: float = 0
 
 
+@dataclass(frozen=True)
+class ModelReply:
+    content: str
+    input_tokens: int
+    output_tokens: int
+    complete: bool
+    model: str = "deepseek-flash"
+    finish_reason: str = "stop"
+    title: str | None = None
+    proposal: dict | None = None
+
+
 class DecisionModel(Protocol):
     async def decide(self, context: str, budget: ModelLimits) -> object: ...
 
 
 class ModelProvider(Protocol):
-    def estimate(self, request: str) -> object: ...
-    async def invoke(self, request: str, limits: ModelLimits) -> object: ...
+    def estimate(self, request: str) -> int: ...
+    async def invoke(self, request: str, limits: ModelLimits | None = None) -> ModelReply: ...
 
 
 class DisabledProvider:
-    def estimate(self, request: str) -> object:
+    def estimate(self, request: str) -> int:
         raise ProtocolError(ErrorCode.MODEL_DISABLED, "Models are disabled")
 
-    async def invoke(self, request: str, limits: ModelLimits) -> object:
+    async def invoke(self, request: str, limits: ModelLimits | None = None) -> ModelReply:
         raise ProtocolError(ErrorCode.MODEL_DISABLED, "Models are disabled")
 
 

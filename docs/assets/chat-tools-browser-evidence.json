@@ -1,0 +1,18 @@
+{
+  "browser": "real headless Edge",
+  "desktop": "1280x960",
+  "mobile_viewport": "390x844",
+  "model": "mock DeepSeek native tool SSE",
+  "real_windows_tools": true,
+  "auto_title": true,
+  "manual_title_preserved": true,
+  "system_confirmed": true,
+  "directory_approved": true,
+  "chat_results": true,
+  "refresh_history": true,
+  "model_calls": 2,
+  "actual_deepseek_calls": 0,
+  "page_errors": [],
+  "horizontal_overflow": false,
+  "android_device": false
+}

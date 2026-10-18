@@ -110,6 +110,8 @@ class TaskRepository:
     async def create(
         self, owner_id: UUID, request: TaskRequest, node_id: UUID, *, now: datetime | None = None,
         rate_limit: bool = False,
+        language_id: UUID | None = None,
+        chat_turn_id: UUID | None = None,
     ) -> TaskRecord:
         now = now or utc_now()
         request = REQUEST.validate_json(REQUEST.dump_json(request))
@@ -132,6 +134,12 @@ class TaskRepository:
                 return task_record(existing)
             if request.project_id is not None and not await one(conn, "SELECT 1 FROM projects WHERE project_id=? AND owner_id=?", (str(request.project_id), str(owner_id))):
                 raise LookupError("project not found")
+            if chat_turn_id is not None:
+                chat=await one(conn,"SELECT * FROM chat_turns WHERE turn_id=? AND owner_id=?",(str(chat_turn_id),str(owner_id)))
+                version=(await one(conn,"SELECT version FROM policy_state WHERE singleton=1"))[0]
+                expected={"intent":request.intent,"arguments":request.arguments.model_dump(mode="json")}
+                if chat is None or chat["status"]!="completed" or chat["action_status"]!="proposed" or chat["proposal_json"]!=canonical(expected) or json.loads(chat["request_json"]).get("node_id")!=str(node_id) or chat["proposal_policy_version"]!=version:
+                    raise Conflict("chat proposal binding changed")
             if rate_limit:
                 recent = await one(conn, "SELECT count(*) FROM tasks WHERE owner_id=? AND created_at>?", (str(owner_id), timestamp(now - timedelta(minutes=1))))
                 if recent[0] >= 10:
@@ -149,6 +157,18 @@ class TaskRepository:
                 routing.tool_version, elapsed_ms, timestamp(now),
             ))
             await conn.execute("INSERT INTO task_events(task_id, revision, kind, created_at) VALUES (?, 0, 'queued', ?)", (str(task_id), timestamp(now)))
+            if language_id is not None:
+                linked = await conn.execute("UPDATE language_requests SET status='submitted',task_id=? WHERE language_id=? AND owner_id=? AND node_id=? AND status='proposed' AND task_id IS NULL AND expires_at>?", (
+                    str(task_id), str(language_id), str(owner_id), str(node_id), timestamp(now)))
+                if linked.rowcount != 1:
+                    raise Conflict("language proposal no longer valid")
+                await conn.execute("UPDATE model_calls SET task_id=? WHERE language_id=?", (str(task_id), str(language_id)))
+                await audit(conn, str(owner_id), str(task_id), "language.confirmed", now)
+            if chat_turn_id is not None:
+                linked=await conn.execute("UPDATE chat_turns SET task_id=?,action_status='submitted',revision=revision+1 WHERE turn_id=? AND owner_id=? AND action_status='proposed' AND task_id IS NULL AND expires_at>?",(str(task_id),str(chat_turn_id),str(owner_id),timestamp(now)))
+                if linked.rowcount!=1:raise Conflict("chat proposal no longer valid")
+                await conn.execute("UPDATE model_calls SET task_id=? WHERE chat_turn_id=?",(str(task_id),str(chat_turn_id)))
+                await audit(conn,str(owner_id),str(task_id),"chat.action_confirmed",now)
             await audit(conn, str(owner_id), str(task_id), "task.created", now)
             return await load_task(conn, task_id)
 

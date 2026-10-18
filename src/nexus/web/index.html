@@ -6,6 +6,7 @@
   <meta name="color-scheme" content="dark">
   <title>NEXUS · 控制台</title>
   <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/chat.js" defer></script>
   <script src="/static/app.js" defer></script>
 </head>
 <body>
@@ -17,17 +18,28 @@
       <p class="hint">凭证仅用于换取当前 Core 的会话。</p>
     </section>
     <div id="console" hidden>
-      <div class="page-heading"><div><p class="eyebrow">YOUR PERSONAL SYSTEM</p><h1>执行与记忆</h1><p class="muted">每一次执行，都有可查看的状态与证据。</p></div><div class="model-badge">规则路由 <span>·</span> 模型已禁用</div></div>
-      <div class="workspace">
+      <div class="page-heading"><div><p class="eyebrow">YOUR PERSONAL SYSTEM</p><h1>对话与执行</h1><p class="muted">从讨论想法开始，执行有状态与证据。</p></div><div class="model-badge">规则路由 <span>·</span> 模型已禁用</div></div>
+      <div class="workspace chat-mode">
         <aside>
           <section class="panel"><h2>执行节点</h2><label for="node">目标设备</label><select id="node"><option value="">暂无配置节点</option></select><p id="node-status" class="hint">等待连接</p><div id="capabilities" class="tags"></div></section>
           <section class="panel"><div class="section-heading"><h2>全局控制</h2><span id="control-state" class="badge">读取中</span></div><p class="hint">暂停会停止新派发，正在执行的任务可以完成。</p><div class="button-row"><button id="pause">暂停派发</button><button id="resume">恢复派发</button></div><button id="cancel-all" class="danger full">取消所有未完成任务</button><p class="hint">取消需等待节点确认实际停止。</p></section>
           <section class="panel usage"><p class="eyebrow">MODEL USAGE</p><div class="usage-value" id="model-calls">0 <small>次调用</small></div><p id="model-cost" class="hint">费用 0 · 模型成功率不适用</p></section>
         </aside>
         <div class="content">
-          <nav class="tabs" aria-label="控制台视图"><button class="active" data-tab="tasks" aria-pressed="true">任务</button><button data-tab="memories" aria-pressed="false">记忆与项目</button><button data-tab="routes" aria-pressed="false">路由记录</button></nav>
-          <section id="tasks-view">
+          <nav class="tabs" aria-label="控制台视图"><button class="active" data-tab="chat" aria-pressed="true">聊天</button><button data-tab="tasks" aria-pressed="false">任务</button><button data-tab="memories" aria-pressed="false">记忆与项目</button><button data-tab="routes" aria-pressed="false">路由记录</button></nav>
+          <section id="chat-view" class="panel">
+            <div class="section-heading"><h2>和 NEXUS 聊聊</h2><button id="chat-new">新建会话</button></div>
+            <p id="chat-availability" class="hint">正在读取聊天配置</p>
+            <label for="chat-conversation">会话</label><select id="chat-conversation"><option value="">新建一个会话开始</option></select>
+            <div class="button-row chat-toolbar"><label class="checkbox"><input id="chat-archived" type="checkbox">查看归档</label><button id="chat-more-conversations" class="quiet" hidden>更多会话</button><button id="chat-archive" class="quiet" disabled>归档</button></div>
+            <form id="chat-title-form" class="button-row"><input id="chat-title" maxlength="80" aria-label="会话名称" placeholder="会话名称"><button type="submit">重命名</button></form>
+            <button id="chat-older" class="quiet full" hidden>加载更早消息</button><button id="chat-latest" class="quiet full" hidden>回到最近消息</button>
+            <div id="chat-messages" class="chat-messages" role="log" aria-label="聊天记录" aria-live="polite"></div>
+            <form id="chat-form"><label for="chat-text">消息</label><textarea id="chat-text" rows="3" maxlength="2000" required placeholder="讨论想法、提问，或继续追问上一条回答…"></textarea><label class="checkbox"><input id="chat-context" type="checkbox" checked>附带本会话近期已完成的对话</label><label class="checkbox"><input id="chat-tools" type="checkbox" checked>允许建议系统信息与目录工具（执行前需确认）</label><label for="chat-node">工具目标设备</label><select id="chat-node"><option value="">暂无配置节点；可继续普通聊天</option></select><p id="chat-context-info" class="hint">最多最近 10 轮，超出上下文上限会提示裁剪。</p><p class="hint">点击“发送给 DeepSeek”即同意外发本次输入及所选上下文；不自动发送其他会话、记忆或工具结果。每天 $1、每轮 $0.05，每轮最多 1 次调用。</p><div class="button-row"><button id="chat-send" type="submit" class="primary" disabled>发送给 DeepSeek</button><button id="chat-stop" type="button" class="danger" disabled>停止回复</button></div><p class="hint">停止会关闭正在进行的模型交换；已发送的数据和费用不能撤回。可在会话中确认只读动作，或使用“任务”视图。</p></form>
+          </section>
+          <section id="tasks-view" hidden>
             <section class="panel"><div class="section-heading"><h2>新建只读任务</h2><span class="hint">单步 · 有界执行</span></div><label for="task-project">关联项目</label><select id="task-project"><option value="">不关联项目</option></select><div class="task-actions"><button id="system-info" class="action-card"><span class="action-icon" aria-hidden="true">◎</span><strong>读取系统信息</strong><span>操作系统、架构与 Python 版本</span></button><div class="action-card directory"><span class="action-icon" aria-hidden="true">▤</span><strong>列出 workspace 目录</strong><label for="limit">最多条目数</label><div class="button-row"><input id="limit" type="number" value="100" min="1" max="200" aria-label="目录最多条目数"><button id="list-directory">提交审批</button></div></div></div></section>
+            <section class="panel"><h2>用自然语言创建任务</h2><p class="hint">目前支持系统信息或 workspace 目录。先解释并展示动作，确认后进入权限检查；目录仍需审批。</p><form id="language-form"><label for="language-text">你希望执行什么？</label><textarea id="language-text" rows="3" maxlength="2000" required placeholder="例如：请帮我看看这台电脑的系统信息"></textarea><label class="checkbox"><input id="language-consent" type="checkbox">允许将本次输入与可用动作说明发送给 DeepSeek（每次最多 1 次调用，每天 $1、每任务 $0.05）</label><p class="hint">不上传历史、记忆或工具结果。费用未知时保留预留额度，取消不能撤回已发送的数据或费用。</p><button type="submit" class="primary">解释任务</button></form><div class="section-heading history-heading"><h3>解释与确认</h3><button id="refresh-language" class="quiet">刷新</button></div><div id="language-requests" class="record-list"></div><button id="older-language" class="quiet full" hidden>加载更早请求</button></section>
             <section><div class="section-heading history-heading"><h2>任务历史</h2><button id="refresh-tasks" class="quiet">刷新</button></div><p class="hint">页面最多保留 100 条，可继续加载更早任务；刷新回到最近任务。</p><p id="empty-tasks" class="empty">还没有任务。选择上方操作开始。</p><div id="tasks" class="task-list"></div><button id="older-tasks" class="quiet full" hidden>加载更早任务</button></section>
           </section>
           <section id="memories-view" hidden>

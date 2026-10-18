@@ -88,6 +88,12 @@ class ControlRepository:
             event = await conn.execute("INSERT INTO control_events(owner_id,kind,paused,revision,created_at) VALUES(?,?,?,?,?)", (str(principal.identity_id), kind, int(paused), revision, timestamp(now)))
             affected = 0
             if kind == "cancel_all":
+                await conn.execute("UPDATE chat_turns SET action_status='rejected',revision=revision+1 WHERE owner_id=? AND action_status='proposed'",(str(principal.identity_id),))
+                await conn.execute("UPDATE conversations SET revision=revision+1 WHERE owner_id=? AND conversation_id IN (SELECT conversation_id FROM chat_turns WHERE status IN ('queued','generating'))", (str(principal.identity_id),))
+                chats = await conn.execute("UPDATE chat_turns SET status=CASE WHEN status='queued' THEN 'stopped' ELSE 'stopping' END,revision=revision+1 WHERE owner_id=? AND status IN ('queued','generating')", (str(principal.identity_id),))
+                affected += chats.rowcount
+                language = await conn.execute("UPDATE language_requests SET status='cancelled' WHERE owner_id=? AND status IN ('queued','interpreting','proposed')", (str(principal.identity_id),))
+                affected += language.rowcount
                 rows = await conn.execute_fetchall("SELECT task_id FROM tasks WHERE owner_id=? AND status NOT IN ('succeeded','failed','cancelled','timed_out') LIMIT 100", (str(principal.identity_id),))
                 for row in rows:
                     task = await expire_task(conn, await load_task(conn, UUID(row[0])), now)

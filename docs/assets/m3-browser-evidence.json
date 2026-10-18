@@ -1,0 +1,22 @@
+{
+  "desktop": [
+    1280,
+    960
+  ],
+  "mobile": [
+    390,
+    844
+  ],
+  "actualIncrementalReply": true,
+  "followup": true,
+  "stoppedWithPartial": true,
+  "reloadHistory": true,
+  "rename": true,
+  "archiveRestore": true,
+  "newConversationIsolated": true,
+  "htmlAsText": true,
+  "codeBlocks": true,
+  "horizontalOverflow": false,
+  "pageErrors": [],
+  "provider": "simulated DeepSeek SSE; independent real Core process"
+}

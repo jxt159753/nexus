@@ -1,6 +1,7 @@
 """Single Core: authenticated transport, durable Harness and owner API."""
 
 import asyncio
+import os
 import sqlite3
 from contextlib import asynccontextmanager
 from importlib.resources import files
@@ -9,6 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import SecretStr
 
 from nexus.core.config import CoreConfig
 from nexus.core.harness.http import HarnessHTTP
@@ -17,6 +19,12 @@ from nexus.core.link.nodes import NodeLink
 from nexus.core.link.clients import ClientLink
 from nexus.core.memory.http import RecordsHTTP
 from nexus.core.models.providers import DisabledDecisionModel, DisabledProvider
+from nexus.core.models.deepseek import DeepSeekProvider
+from nexus.core.models.chat import DeepSeekChatProvider
+from nexus.core.cognitive.language import LanguageService
+from nexus.core.cognitive.http import LanguageHTTP
+from nexus.core.cognitive.chat import ChatService
+from nexus.core.cognitive.chat_http import ChatHTTP
 from nexus.core.security.http import SecurityHTTP, TransportPolicy
 from nexus.core.security.service import SecurityService
 from nexus.core.security.types import AccessDenied
@@ -32,19 +40,42 @@ def create_app(config: CoreConfig) -> FastAPI:
     link = NodeLink(guards, config)
     harness = Harness(link)
     clients = ClientLink(harness, guards)
+    provider = None
+    chat_provider = None
+    if config.models.enabled:
+        key = os.environ.get("DEEPSEEK_API_KEY", "")
+        if not key or len(key) > 256 or any(c.isspace() for c in key):
+            raise ValueError("DEEPSEEK_API_KEY must be configured securely")
+        provider = DeepSeekProvider(SecretStr(key), config.models)
+        if config.models.chat_enabled:
+            chat_provider = DeepSeekChatProvider(SecretStr(key), config.models)
+    language = LanguageService(harness, provider)
+    chat = ChatService(harness, chat_provider, language.owner)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         database.path.parent.mkdir(parents=True, exist_ok=True)
         lock = DataDirectoryLock(database.path.parent / "core.lock")
         scheduler = None
+        interpreter = None
+        chatter = None
         try:
             await database.initialize()
             await harness.executions.resume_verification()
+            await language.recover()
+            await chat.recover()
             scheduler = asyncio.create_task(harness.run())
+            interpreter = asyncio.create_task(language.run())
+            chatter = asyncio.create_task(chat.run())
             yield
         finally:
             try:
+                if chatter is not None:
+                    chatter.cancel()
+                    await asyncio.gather(chatter, return_exceptions=True)
+                if interpreter is not None:
+                    interpreter.cancel()
+                    await asyncio.gather(interpreter, return_exceptions=True)
                 if scheduler is not None:
                     scheduler.cancel()
                     await asyncio.gather(scheduler, return_exceptions=True)
@@ -59,10 +90,14 @@ def create_app(config: CoreConfig) -> FastAPI:
     app.include_router(HarnessHTTP(harness, guards).router)
     app.include_router(clients.router)
     app.include_router(RecordsHTTP(guards).router)
+    app.include_router(LanguageHTTP(language, guards).router)
+    app.include_router(ChatHTTP(chat, guards).router)
     app.state.node_link = link
     app.state.harness = harness
     app.state.client_link = clients
-    app.state.model_provider = DisabledProvider()
+    app.state.model_provider = provider or DisabledProvider()
+    app.state.language = language
+    app.state.chat = chat
     app.state.decision_model = DisabledDecisionModel()
     web = files("nexus.web")
     app.mount("/static", StaticFiles(directory=str(web)), name="static")

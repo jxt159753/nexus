@@ -113,5 +113,5 @@ class Records:
     async def model_usage(self, principal: Principal) -> dict:
         async with self.database.transaction(write=False) as conn:
             await assert_owner(conn, principal, utc_now())
-            row = await one(conn, "SELECT count(*),coalesce(sum(cost_microunits),0),coalesce(sum(cost_status='unknown' OR cost_microunits IS NULL),0) FROM model_calls")
+            row = await one(conn, "SELECT count(*),coalesce(sum(cost_microunits),0),coalesce(sum(cost_status IN ('reserved','unknown') OR cost_microunits IS NULL),0) FROM model_calls")
             return {"enabled": False, "calls": row[0], "cost_microunits": row[1] if not row[2] else None, "unknown_cost_calls": row[2], "model_success_rate": None}

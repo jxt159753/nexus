@@ -1,0 +1,130 @@
+{
+  "date": "2026-10-18",
+  "milestone": "M2",
+  "m1_user_accepted": true,
+  "authorization": {
+    "direction": "真实模型接入与自然语言任务",
+    "provider": "deepseek",
+    "daily_usd_limit": 1,
+    "per_request_usd_limit": 0.05,
+    "cloud_upgrade": "用户明确批准停机升级并进行真实验收"
+  },
+  "windows": {
+    "python": "3.13.9",
+    "final_isolated_wheel_tests": 536,
+    "failures": 0,
+    "skips": 0,
+    "wheel_sha256": "d2d30b212e071e516411ad616ddac69e6b4ae390c416c8965fa8bbdf21195eeb",
+    "source_resource_files_matched": 73,
+    "pip_check": true,
+    "js_syntax_and_recovery": true
+  },
+  "linux": {
+    "python": "3.12.3",
+    "core_tests": 438,
+    "failures": 0,
+    "skips": 0,
+    "pip_check": true,
+    "key_owner_uid": 0,
+    "key_mode": "0600"
+  },
+  "browser": {
+    "desktop": [
+      1280,
+      960
+    ],
+    "mobile": [
+      390,
+      844
+    ],
+    "horizontalOverflow": false,
+    "successfulTasks": 2,
+    "approval": true,
+    "reload": true,
+    "pageErrors": [],
+    "provider": "simulated DeepSeek HTTP; real Windows Node tools"
+  },
+  "cloud": {
+    "historical_tasks_preserved": 9,
+    "backup_sha256": "a1c22de0664282a8473849b9ae433fd07a1aba0627a8fe7087d05544e1e8a295",
+    "model_calls": [
+      {
+        "call_id": "24ae43bb-e862-4bb2-8728-5b8e92f5f0a8",
+        "task_id": "f09ec524-be14-4211-b755-24c424fe987a",
+        "language_id": "a14b9e39-730f-43b8-8206-556815d9576c",
+        "provider": "deepseek",
+        "model": "deepseek-flash",
+        "cost_microunits": 72,
+        "cost_status": "calculated",
+        "input_tokens": 185,
+        "output_tokens": 13,
+        "created_at": "2026-10-18T10:34:35.941504+00:00",
+        "finished_at": "2026-10-18T10:34:36.589866+00:00",
+        "outcome": "completed"
+      },
+      {
+        "call_id": "ed22080b-25df-46da-a343-0b733dce4c34",
+        "task_id": "446dddf9-170c-4933-a0c3-b82e2a1e6dc1",
+        "language_id": "13f1728b-f247-4d11-9531-9913c33ec5cf",
+        "provider": "deepseek",
+        "model": "deepseek-flash",
+        "cost_microunits": 69,
+        "cost_status": "calculated",
+        "input_tokens": 177,
+        "output_tokens": 13,
+        "created_at": "2026-10-18T10:39:48.734724+00:00",
+        "finished_at": "2026-10-18T10:39:49.646344+00:00",
+        "outcome": "completed"
+      }
+    ],
+    "real_deepseek": true,
+    "real_windows_node": true,
+    "verification": "node_report_schema_checked",
+    "tool_attempts": 1,
+    "restart": {
+      "history_preserved": 10,
+      "model_calls": 1,
+      "node_online": true,
+      "new_calls": 0
+    },
+    "database_quick_check": "ok",
+    "foreign_key_errors": 0,
+    "service_active": "active",
+    "paused": false,
+    "tasks_after_test": 11,
+    "total_cost_upper_microunits": 141,
+    "final_backup_sha256": "a67ae0c3f169207cafab95d7a3697c861d84776e0ca59daabf27ed810cd91c18",
+    "final_release_verified": true,
+    "final_history_comparison_count": 11,
+    "android": {
+      "user_reported_prefix": "446dddf9",
+      "task_id": "446dddf9-170c-4933-a0c3-b82e2a1e6dc1",
+      "status": "succeeded",
+      "verification": "node_report_schema_checked",
+      "attempts": 1,
+      "usage": {
+        "enabled": true,
+        "calls": 2,
+        "cost_microunits": 141,
+        "unknown_cost_calls": 0,
+        "model_success_rate": null
+      },
+      "confirmed_by_user": true
+    },
+    "closing_http_cancel_test": true
+  },
+  "limits": {
+    "single_call_per_request": true,
+    "daily_calls": 100,
+    "output_tokens": 512,
+    "timeout_seconds": 30,
+    "price_valid_until_utc_inclusive": "2026-10-25",
+    "cost_is_public_peak_price_upper_bound": true
+  },
+  "not_verified": [
+    "Android/Chrome 版本未采集；仅证明本次实际手机操作",
+    "长期价格变更/续期/容量增长",
+    "供应商精确扣款金额；账本按公开峰值费率计算上界"
+  ],
+  "user_acceptance": "M2 技术交付与手机操作完成，待用户最终确认验收"
+}

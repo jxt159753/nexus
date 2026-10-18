@@ -54,4 +54,8 @@ class RecordsHTTP:
         return await self.page("memories", request, after, limit, history, project_id)
 
     async def usage(self, request: Request) -> dict:
-        return await self.records.model_usage(await self.guards.owner_http(request))
+        value = await self.records.model_usage(await self.guards.owner_http(request))
+        language = request.app.state.language
+        value["enabled"] = language.config.enabled and not language.failed and not language.harness.failed
+        value["chat_enabled"] = value["enabled"] and language.config.chat_enabled and not request.app.state.chat.failed
+        return value
