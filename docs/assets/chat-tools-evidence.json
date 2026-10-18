@@ -1,6 +1,6 @@
 {
   "date": "2026-10-18",
-  "status": "local_verified_pending_user_acceptance",
+  "status": "cloud_deployed_pending_user_acceptance",
   "features": {
     "first_turn_model_title_same_call": true,
     "manual_titles_preserved": true,
@@ -39,7 +39,8 @@
       "seconds": 12.32,
       "source_pythonpath_disabled": true
     },
-    "full_regression_to_final_changes": "module docstring and README metadata only; runtime AST unchanged"
+    "full_regression_to_final_changes": "module docstring and README metadata only; runtime AST unchanged",
+    "packaging_stage_snapshot": true
   },
   "locked_dependencies": 25,
   "pip_check": "passed",
@@ -60,10 +61,82 @@
     "json_examples": 4,
     "private_key_and_token_pattern_findings": 0
   },
-  "actual_model_calls_this_delivery": 0,
-  "cloud_deployed_this_delivery": false,
-  "linux_new_version_tested": false,
-  "real_deepseek_function_calls_tested": false,
+  "actual_model_calls_this_delivery": 1,
+  "cloud_deployed_this_delivery": true,
+  "linux_new_version_tested": true,
+  "real_deepseek_function_calls_tested": true,
   "android_device_acceptance": false,
-  "self_extension_enabled": false
+  "self_extension_enabled": false,
+  "linux_installed_wheel_tests": {
+    "platform": "Ubuntu 24.04 / Python 3.12.3",
+    "passed": 482,
+    "seconds": 37.25,
+    "modules": 19,
+    "skipped": 0,
+    "warnings_as_errors": true,
+    "source_pythonpath_disabled": true,
+    "non_login_user": true,
+    "locked_dependencies_reused": 25,
+    "pip_check": "passed"
+  },
+  "cloud_deployment": {
+    "source_commit": "03514b9e1b28f5a673f3f1ce8732a94dbe82488b",
+    "schema": 8,
+    "old_tables_original_columns_preserved": true,
+    "old_tasks_preserved": 11,
+    "old_conversations_preserved": 3,
+    "old_chat_turns_preserved": 6,
+    "old_model_calls_preserved": 8,
+    "before_backup_sha256": "d5cc27eeb6c14ee3cbfea614a0106249cb4032cf7e9ba1b493a14310e8847cc8",
+    "after_real_backup_sha256": "ee0e8c9add36c853346e83f7cf87cede9d371f02833f34e641baf8fce584d104",
+    "model_config_unchanged": true,
+    "single_core": true,
+    "service_active": true,
+    "dispatch_paused": false,
+    "node_authenticated_online": true,
+    "tls_verification": true
+  },
+  "real_function_acceptance": {
+    "conversation_id": "149f01b6-a787-4413-8866-65fed90915d4",
+    "turn_id": "f5f59af6-6c5f-4ba5-9f7b-5a18ff40e60b",
+    "task_id": "306ee3f4-5e23-43b0-bf4d-110bd1a20664",
+    "title": "读取设备系统信息",
+    "model_generated_title": true,
+    "real_native_tool_call": true,
+    "tool": "system.info@1",
+    "confirmation_required": true,
+    "repeat_confirmation_same_task": true,
+    "tool_attempts": 1,
+    "verification": "node_report_schema_checked",
+    "new_cost_upper_microunits": 253,
+    "input_tokens": 610,
+    "output_tokens": 58,
+    "model": "deepseek-flash",
+    "cost_status": "calculated",
+    "total_model_calls": 9,
+    "total_cost_upper_microunits": 1841,
+    "unknown_cost_calls": 0,
+    "automatic_retries": 0,
+    "tool_result_sent_to_model": false
+  },
+  "cloud_restart": {
+    "old_and_new_tasks_preserved": 12,
+    "all_chats_and_ledger_unchanged": true,
+    "new_model_calls": 0,
+    "node_reauthenticated": true
+  },
+  "cloud_browser": {
+    "browser": "real headless Edge",
+    "trusted_https": true,
+    "viewport": "390x844",
+    "deployed_tool_controls": true,
+    "authenticated_node_selected": true,
+    "generated_title_visible": true,
+    "real_tool_result_visible": true,
+    "live_connection": true,
+    "additional_model_calls": 0,
+    "page_errors": [],
+    "android_device": false
+  },
+  "operational_note": "Windows verification helper initially used the system codec for UTF-8 evidence; the restart guard stopped before service shutdown. Explicit UTF-8 fixed it; rerun passed without new model calls."
 }
