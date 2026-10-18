@@ -217,11 +217,12 @@ class CommandStatusResult(SessionPayload):
     phase: Literal["not_found", "received", "started", "completed", "cancelled", "unknown"]
     command_digest: CommandDigest | None = None
     result: CommandResult | None = None
+    execution_stopped: StrictBool = False
 
     @model_validator(mode="after")
     def check_receipt(self) -> Self:
         if self.phase == "not_found":
-            if self.command_digest is not None or self.result is not None:
+            if self.command_digest is not None or self.result is not None or self.execution_stopped:
                 raise ValueError("not_found cannot contain command evidence")
         elif self.command_digest is None:
             raise ValueError("known receipt requires command digest")

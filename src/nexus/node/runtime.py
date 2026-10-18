@@ -76,6 +76,7 @@ class NodeRuntime:
         return receipt.status(session_id)
 
     def cancel(self, attempt_id: UUID) -> bool:
+        self.receipts.cancel_pending(attempt_id)
         with self._state:
             if self._active is not None and self._active[0] == attempt_id:
                 self._active[1].set()
@@ -139,7 +140,8 @@ class NodeRuntime:
         if receipt.phase != "received":
             return receipt.status(command.session_id)
         job_name = f"Local\\NEXUS-{uuid4().hex}"
-        self.receipts.start(command.attempt_id, job_name)
+        if not self.receipts.start(command.attempt_id, job_name):
+            return self.status(command.attempt_id, command.session_id)
         if on_phase is not None:
             on_phase("command.started")
         try:

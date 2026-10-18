@@ -43,6 +43,15 @@ class SecurityHTTP:
         self.router = APIRouter()
         self.router.add_api_route("/api/v1/session", self.login, methods=["POST"])
         self.router.add_api_route("/api/v1/session", self.logout, methods=["DELETE"])
+        self.router.add_api_route("/api/v1/session", self.session_info, methods=["GET"])
+
+    async def session_info(self, request: Request, response: Response) -> dict:
+        await self.owner_http(request)
+        response.headers["Cache-Control"] = "no-store"
+        try:
+            return await self.service.session_info(SecretStr(request.cookies.get(COOKIE, "")))
+        except AccessDenied as exc:
+            raise self._http_error(exc) from None
 
     def _transport(self, connection: Request | WebSocket, *, origin: bool) -> None:
         scheme = connection.scope["scheme"]

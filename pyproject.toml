@@ -30,6 +30,7 @@ include = ["nexus*"]
 [tool.setuptools.package-data]
 "nexus.core.storage" = ["migrations/*.sql"]
 "nexus.node" = ["migrations/*.sql"]
+"nexus.web" = ["*.html", "*.css", "*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

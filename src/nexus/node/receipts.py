@@ -2,12 +2,12 @@
 
 import hashlib
 import sqlite3
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
 from typing import Iterator
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import TypeAdapter
 
@@ -38,6 +38,7 @@ class Receipt:
         return CommandStatusResult(
             session_id=session_id, attempt_id=self.attempt_id, phase=self.phase,
             command_digest=self.command_digest, result=result,
+            execution_stopped=self.execution_stopped,
         )
 
 
@@ -68,31 +69,64 @@ class ReceiptStore:
             conn.close()
 
     def initialize(self) -> None:
-        script = files("nexus.node").joinpath("migrations/001_receipts.sql").read_text(encoding="utf-8")
-        checksum = hashlib.sha256(script.encode()).hexdigest()
+        scripts = [p.read_text(encoding="utf-8") for p in sorted(files("nexus.node").joinpath("migrations").iterdir(), key=lambda p: p.name) if p.name.endswith(".sql")]
+        checksums = [hashlib.sha256(script.encode()).hexdigest() for script in scripts]
+        # Upgrade offline while holding the Node data-directory lock.
+        with closing(sqlite3.connect(self.path)) as check:
+            tables = {r[0] for r in check.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            if tables:
+                if "schema_migrations" not in tables:
+                    raise RuntimeError("unversioned receipt database")
+                applied = list(check.execute("SELECT version,checksum FROM schema_migrations ORDER BY version"))
+                if not applied or applied != list(enumerate(checksums[:len(applied)], 1)):
+                    raise RuntimeError("unknown receipt schema or checksum")
+                if [r[0] for r in check.execute("SELECT node_id FROM node_identity")] != [str(self.node_id)]:
+                    raise RuntimeError("receipt database belongs to another node")
+                if len(applied) < len(scripts):
+                    backup_path = self.path.with_name(f"{self.path.name}.before-v{len(applied)+1}-{uuid4().hex}.sqlite3")
+                    with closing(sqlite3.connect(backup_path)) as backup:
+                        check.backup(backup)
+                        if backup.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+                            raise RuntimeError("receipt backup integrity failure")
         with self.transaction() as conn:
             names = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             if names:
-                if names != {"schema_migrations", "node_identity", "execution_receipts"}:
+                applied = [tuple(r) for r in conn.execute("SELECT version,checksum FROM schema_migrations ORDER BY version")]
+                expected = {"schema_migrations", "node_identity", "execution_receipts"}
+                if len(applied) >= 2:
+                    expected.add("cancellation_tombstones")
+                if names != expected:
                     raise RuntimeError("unversioned or unknown receipt database")
-                if [tuple(r) for r in conn.execute("SELECT version, checksum FROM schema_migrations")] != [(1, checksum)]:
+                if applied != list(enumerate(checksums[:len(applied)], 1)):
                     raise RuntimeError("unknown receipt schema or checksum")
                 if [r[0] for r in conn.execute("SELECT node_id FROM node_identity")] != [str(self.node_id)]:
                     raise RuntimeError("receipt database belongs to another node")
                 if conn.execute("PRAGMA quick_check").fetchone()[0] != "ok":
                     raise RuntimeError("receipt database integrity failure")
-                return
-            conn.execute("CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY, checksum TEXT NOT NULL)")
-            statement = ""
-            for line in script.splitlines(keepends=True):
-                statement += line
-                if sqlite3.complete_statement(statement):
-                    conn.execute(statement)
-                    statement = ""
-            if statement.strip():
-                raise RuntimeError("incomplete receipt migration")
-            conn.execute("INSERT INTO schema_migrations VALUES(1, ?)", (checksum,))
-            conn.execute("INSERT INTO node_identity VALUES(?)", (str(self.node_id),))
+            else:
+                applied = []
+                conn.execute("CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY, checksum TEXT NOT NULL)")
+            for index in range(len(applied), len(scripts)):
+                statement = ""
+                for line in scripts[index].splitlines(keepends=True):
+                    statement += line
+                    if sqlite3.complete_statement(statement):
+                        conn.execute(statement)
+                        statement = ""
+                if statement.strip():
+                    raise RuntimeError("incomplete receipt migration")
+                conn.execute("INSERT INTO schema_migrations VALUES(?, ?)", (index + 1, checksums[index]))
+            if not names:
+                conn.execute("INSERT INTO node_identity VALUES(?)", (str(self.node_id),))
+
+    def cancel_pending(self, attempt_id: UUID) -> None:
+        """Fence both absent and received commands before acknowledging a stop."""
+        with self.transaction() as conn:
+            old = conn.execute("SELECT 1 FROM cancellation_tombstones WHERE attempt_id=?", (str(attempt_id),)).fetchone()
+            if old is None and conn.execute("SELECT count(*) FROM cancellation_tombstones").fetchone()[0] >= self.max_receipts:
+                raise ProtocolError(ErrorCode.BUSY, "Cancellation receipt capacity reached")
+            conn.execute("INSERT OR IGNORE INTO cancellation_tombstones VALUES(?)", (str(attempt_id),))
+            conn.execute("UPDATE execution_receipts SET phase='cancelled',execution_stopped=1 WHERE attempt_id=? AND phase='received'", (str(attempt_id),))
 
     @staticmethod
     def _receipt(row: sqlite3.Row | None) -> Receipt | None:
@@ -121,14 +155,19 @@ class ReceiptStore:
             conn.execute("INSERT INTO execution_receipts(attempt_id, task_id, command_digest, identity_json, boot_id, phase) VALUES(?, ?, ?, ?, ?, 'received')", (
                 str(command.attempt_id), str(command.task_id), command.command_digest, identity, str(boot_id),
             ))
+            if conn.execute("SELECT 1 FROM cancellation_tombstones WHERE attempt_id=?", (str(command.attempt_id),)).fetchone():
+                conn.execute("UPDATE execution_receipts SET phase='cancelled' WHERE attempt_id=?", (str(command.attempt_id),))
             row = conn.execute("SELECT * FROM execution_receipts WHERE attempt_id=?", (str(command.attempt_id),)).fetchone()
             return self._receipt(row)
 
-    def start(self, attempt_id: UUID, job_name: str) -> None:
+    def start(self, attempt_id: UUID, job_name: str) -> bool:
         with self.transaction() as conn:
+            if conn.execute("SELECT phase FROM execution_receipts WHERE attempt_id=?", (str(attempt_id),)).fetchone()[0] == "cancelled":
+                return False
             cursor = conn.execute("UPDATE execution_receipts SET phase='started', job_name=?, execution_stopped=0 WHERE attempt_id=? AND phase='received'", (job_name, str(attempt_id)))
             if cursor.rowcount != 1:
                 raise RuntimeError("attempt cannot start")
+            return True
 
     def finish(self, attempt_id: UUID, phase: str, result: CommandResult | None = None, *, stopped: bool = True) -> None:
         if phase not in {"completed", "cancelled", "unknown"} or (phase == "completed") != (result is not None):

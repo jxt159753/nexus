@@ -1,5 +1,6 @@
 """Versioned SQLite, short isolated transactions and verified migration backups."""
 
+import asyncio
 import hashlib
 import sqlite3
 from contextlib import asynccontextmanager, closing
@@ -46,12 +47,31 @@ class Database:
 
     @asynccontextmanager
     async def connection(self) -> AsyncIterator[aiosqlite.Connection]:
-        async with aiosqlite.connect(self.path, isolation_level=None, timeout=3) as conn:
+        # A scheduler/transport may be cancelled while the worker thread opens
+        # SQLite. Keep that result owned until it can be explicitly closed.
+        conn = aiosqlite.connect(self.path, isolation_level=None, timeout=3)
+        opening = asyncio.ensure_future(conn)
+        try:
+            await asyncio.shield(opening)
+        except asyncio.CancelledError:
+            try:
+                await opening
+            finally:
+                await conn.close()
+            raise
+        try:
             conn.row_factory = aiosqlite.Row
             await conn.execute("PRAGMA foreign_keys = ON")
             await conn.execute("PRAGMA busy_timeout = 3000")
             await conn.execute("PRAGMA synchronous = FULL")
             yield conn
+        finally:
+            closing_task = asyncio.create_task(conn.close())
+            try:
+                await asyncio.shield(closing_task)
+            except asyncio.CancelledError:
+                await closing_task
+                raise
 
     @asynccontextmanager
     async def transaction(self, *, write: bool = True) -> AsyncIterator[aiosqlite.Connection]:

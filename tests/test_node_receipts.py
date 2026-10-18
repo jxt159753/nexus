@@ -76,7 +76,7 @@ def test_receipt_database_incompatibility_preserves_records(tmp_path, kind):
         if kind == "unversioned":
             conn.execute("DROP TABLE schema_migrations")
         elif kind == "version":
-            conn.execute("UPDATE schema_migrations SET version=2")
+            conn.execute("UPDATE schema_migrations SET version=99 WHERE version=2")
         elif kind == "checksum":
             conn.execute("UPDATE schema_migrations SET checksum='tampered'")
         else:
@@ -99,8 +99,7 @@ def test_invalid_finish_and_identity_are_rejected(tmp_path):
         store.acknowledge(item.attempt_id)
     assert store.get(item.attempt_id).phase == "received"
     store.finish(item.attempt_id, "cancelled")
-    with pytest.raises(RuntimeError):
-        store.start(item.attempt_id, "no")
+    assert store.start(item.attempt_id, "no") is False
     for limit in (0, 101, True):
         with pytest.raises(ValueError):
             store.unacknowledged(limit=limit)

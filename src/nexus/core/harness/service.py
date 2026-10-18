@@ -1,16 +1,18 @@
-"""Bounded single-step scheduler. Recovery/retry and global controls are S5."""
+"""Bounded single-step scheduler, recovery and durable user controls."""
 
 import asyncio
 import logging
+import time
 from uuid import UUID
 
 from nexus.contracts.errors import ErrorCode, ProtocolError, create_error
-from nexus.contracts.messages import ResultAck
+from nexus.contracts.messages import CommandCancel, CommandExecute, CommandStatus, ResultAck
 from nexus.contracts.task import TaskRequest
 from nexus.core.link.nodes import NodeConnection, NodeLink
 from nexus.core.security.types import AccessDenied, NodeScope, Principal
-from nexus.core.storage.database import utc_now
+from nexus.core.storage.database import one, utc_now
 from nexus.core.storage.execution import ExecutionRepository
+from nexus.core.storage.control import ControlRepository
 from nexus.core.storage.tasks import TaskRepository, load_task, transition
 
 LOGGER = logging.getLogger(__name__)
@@ -22,8 +24,42 @@ class Harness:
         self.security = link.guards.service
         self.tasks = TaskRepository(self.security.database)
         self.executions = ExecutionRepository(self.security.database, self.security, link.config.max_result_bytes)
+        self.controls = ControlRepository(self.security.database)
+        self.operation = link.execution_lock
+        self.probes: dict[UUID, tuple[UUID, UUID, bool, float]] = {}
+        link.execution_permitted = self.permitted
         self.failed = False
         self.wake = asyncio.Event()
+
+    async def permitted(self, connection: NodeConnection, command: CommandExecute) -> bool:
+        return not self.failed and await self.executions.may_send(connection.principal, connection.scope, command)
+
+    async def cancel(self, principal: Principal, task_id: UUID) -> dict:
+        if self.failed:
+            raise AccessDenied("BUSY")
+        async with self.operation:
+            result = await self.controls.cancel(principal, task_id)
+        self.wake.set()
+        return result
+
+    async def control(self, principal: Principal, kind: str, request_id: UUID) -> dict:
+        if self.failed:
+            raise AccessDenied("BUSY")
+        async with self.operation:
+            result = await self.controls.apply(principal, kind, request_id)
+        self.wake.set()
+        return result
+
+    async def decide(self, principal: Principal, approval_id: UUID, decision: str):
+        if self.failed:
+            raise AccessDenied("BUSY")
+        async with self.security.database.transaction(write=False) as conn:
+            row = await one(conn, "SELECT node_id FROM approvals WHERE approval_id=? AND owner_id=?", (str(approval_id), str(principal.identity_id)))
+            if row is None:
+                raise LookupError("approval not found")
+        task = await self.security.decide(approval_id, principal, decision, self.scope(UUID(row[0])))
+        self.wake.set()
+        return task
 
     def scope(self, node_id: UUID) -> NodeScope:
         if node_id not in self.link.config.nodes:
@@ -59,6 +95,7 @@ class Harness:
 
     async def consume(self, connection: NodeConnection, message) -> None:
         ack = None
+        followup = "none"
         async with self.link._changed:
             self.link._current(connection)
             if message.type in {"command.accepted", "command.started"}:
@@ -68,11 +105,29 @@ class Harness:
                 status = await self.executions.store_result(connection.principal, result)
                 await self.executions.verify(result.attempt_id)
                 ack = ResultAck(session_id=connection.session_id, attempt_id=result.attempt_id, status=status)
-            # Status without a result and transport errors never imply an outcome.
+            elif message.type == "command.status_result":
+                followup = await self.executions.status(connection.principal, message.payload)
+            elif message.type == "command.cancelled":
+                await self.executions.cancelled(connection.principal, message.payload.attempt_id)
+            # Transport errors alone never prove an execution stopped.
         if ack is not None:
             await self.link.send(connection.principal.identity_id, "result.ack", ack)
+        if followup == "resend":
+            command = await self.executions.resend(connection.principal, connection.scope, message.payload.attempt_id, connection.session_id)
+            if command is not None:
+                await self.link.dispatch(connection, command)
+
+    async def stop_attempt(self, connection: NodeConnection, attempt_id: UUID) -> None:
+        await self.link.send(connection.principal.identity_id, "command.cancel", CommandCancel(
+            session_id=connection.session_id, attempt_id=attempt_id, reason="Core requested execution stop"))
 
     async def tick(self) -> None:
+        async with self.operation:
+            await self._tick()
+
+    async def _tick(self) -> None:
+        await self.controls.expire()
+        self.probes = {node: probe for node, probe in self.probes.items() if node in self.link.connections}
         for connection in list(self.link.connections.values()):
             if not connection.ready:
                 continue
@@ -83,6 +138,27 @@ class Harness:
                     except asyncio.QueueEmpty:
                         break
                     await self.consume(connection, incoming)
+                active = await self.executions.active(connection.principal.identity_id)
+                if active:
+                    row = active[0]
+                    attempt_id = UUID(row["attempt_id"])
+                    prior = self.probes.get(connection.principal.identity_id)
+                    now = time.monotonic()
+                    stopping = bool(row["stop_reason"] or row["cancel_requested"] or row["task_status"] in {"failed", "timed_out", "cancelled"})
+                    # Cancellation is immediate; repeated stop/status traffic is bounded.
+                    signature = (connection.session_id, attempt_id, stopping)
+                    if prior is None or prior[:3] != signature or now - prior[3] >= 5:
+                        if await self.executions.reserve_probe(attempt_id):
+                            if stopping:
+                                await self.stop_attempt(connection, attempt_id)
+                            else:
+                                await self.executions.recovering(attempt_id)
+                                await self.link.send(connection.principal.identity_id, "command.status", CommandStatus(session_id=connection.session_id, attempt_id=attempt_id))
+                        self.probes[connection.principal.identity_id] = (*signature, now)
+                    continue
+                self.probes.pop(connection.principal.identity_id, None)
+                if (await self.controls.state())["paused"]:
+                    continue
                 for task_id in await self.executions.pending(connection.principal.identity_id):
                     async with self.link._changed:
                         self.link._current(connection)
@@ -96,6 +172,7 @@ class Harness:
                             connection.session_id, connection.hello.boot_id, self.link.config.execution_timeout_seconds)
                     if command is not None:
                         await self.link.dispatch(connection, command)
+                        self.probes[connection.principal.identity_id] = (connection.session_id, command.attempt_id, False, time.monotonic())
                     break  # one active execution per node
             except AccessDenied:
                 continue  # Revoked permission never drives a new execution.

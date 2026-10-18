@@ -1,6 +1,7 @@
 import asyncio
 import sqlite3
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
@@ -40,6 +41,8 @@ class NodeLink:
         self._pending = 0
         self._handshakes = MessageRate()
         self._changed = asyncio.Lock()
+        self.execution_lock = asyncio.Lock()
+        self.execution_permitted: Callable[[NodeConnection, CommandExecute], Awaitable[bool]] | None = None
         self.router = APIRouter()
         self.router.add_api_websocket_route("/ws/v1/node", self.endpoint)
         self.router.add_api_route("/api/v1/nodes", self.list_nodes, methods=["GET"])
@@ -85,12 +88,21 @@ class NodeLink:
             self._current(connection)
             await self.guards.service.validate_principal(connection.principal)
             self._current(connection)
-            async with asyncio.timeout(2):
-                await connection.websocket.send_text(text)
+            message = parse_message(text)
+            if message.type == "command.execute":
+                async with self.execution_lock:
+                    self._current(connection)
+                    if self.execution_permitted is None or not await self.execution_permitted(connection, message.payload):
+                        continue
+                    async with asyncio.timeout(2):
+                        await connection.websocket.send_text(text)
+            else:
+                async with asyncio.timeout(2):
+                    await connection.websocket.send_text(text)
 
     async def send(self, node_id: UUID, kind: str, payload: StrictContract) -> None:
         """Control transport; execution uses Harness's persisted dispatch path."""
-        if kind not in {"command.status", "result.ack"}:
+        if kind not in {"command.status", "command.cancel", "result.ack"}:
             raise ProtocolError(ErrorCode.POLICY_DENIED, "Execution dispatch is not enabled")
         connection = self.connections.get(node_id)
         if connection is None:
@@ -151,7 +163,7 @@ class NodeLink:
                 if message.type == "node.heartbeat":
                     connection.last_heartbeat = time.monotonic()
                     connection.active_attempt_id = message.payload.active_attempt_id
-                elif message.type in {"command.accepted", "command.started", "command.result", "command.status_result", "error"}:
+                elif message.type in {"command.accepted", "command.started", "command.result", "command.status_result", "command.cancelled", "error"}:
                     if message.type == "command.status_result" and message.payload.result is not None:
                         result = message.payload.result.result
                         if result is not None and len(result.model_dump_json().encode("utf-8")) > self.config.max_result_bytes:

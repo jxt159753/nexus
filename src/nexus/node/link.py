@@ -13,7 +13,7 @@ from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed, InvalidHandshake
 
 from nexus.contracts.errors import ErrorCode, ProtocolError
-from nexus.contracts.messages import CommandReceipt, NodeHeartbeat, NodeHello, ToolCapability, WireError
+from nexus.contracts.messages import CommandCancelled, CommandReceipt, NodeHeartbeat, NodeHello, ToolCapability, WireError
 from nexus.contracts.protocol import parse_message
 from nexus.link import MessageRate, session_matches, wire_message
 from nexus.node.runtime import NodeRuntime
@@ -139,6 +139,14 @@ class NodeClient:
                                      limit=welcome.limits.max_message_bytes)
                 elif incoming.type == "result.ack":
                     await asyncio.to_thread(self.runtime.receipts.acknowledge, incoming.payload.attempt_id)
+                elif incoming.type == "command.cancel":
+                    await asyncio.to_thread(self.runtime.cancel, incoming.payload.attempt_id)
+                    status = await asyncio.to_thread(self.runtime.status, incoming.payload.attempt_id, welcome.session_id)
+                    if status.phase == "not_found":
+                        await self._send(ws, "command.cancelled", CommandCancelled(session_id=welcome.session_id,
+                            attempt_id=incoming.payload.attempt_id, stopped_phase="received"), limit=welcome.limits.max_message_bytes)
+                    else:
+                        await send_status(status, incoming.message_id)
                 elif incoming.type == "command.execute":
                     if execution is not None and not execution.done() and self._active_attempt_id is not None:
                         old = await asyncio.to_thread(self.runtime.status, incoming.payload.attempt_id, welcome.session_id)
@@ -162,7 +170,19 @@ class NodeClient:
                 else:
                     raise ProtocolError(ErrorCode.FORBIDDEN, "Message is not allowed in this direction")
 
-        tasks = [asyncio.create_task(heartbeat()), asyncio.create_task(receive())]
+        async def replay():
+            cursor = ""
+            counts: dict[UUID, int] = {}
+            while True:
+                await asyncio.sleep(5)
+                receipts = await asyncio.to_thread(self.runtime.receipts.unacknowledged, after=cursor, limit=4)
+                for receipt in receipts:
+                    if counts.get(receipt.attempt_id, 0) < 3:
+                        await send_status(receipt.status(welcome.session_id), None)
+                        counts[receipt.attempt_id] = counts.get(receipt.attempt_id, 0) + 1
+                cursor = str(receipts[-1].attempt_id) if len(receipts) == 4 else ""
+
+        tasks = [asyncio.create_task(heartbeat()), asyncio.create_task(receive()), asyncio.create_task(replay())]
         try:
             done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
             for task in done:

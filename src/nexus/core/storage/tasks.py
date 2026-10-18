@@ -1,6 +1,7 @@
 """Task authority and bounded owner history; execution evidence uses attempts."""
 
 import json
+import time
 from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 
@@ -24,9 +25,10 @@ TRANSITIONS = {
 }
 EXECUTION_TRANSITIONS = {
     "ready": {"dispatching"},
-    "dispatching": {"running", "verifying"},
-    "running": {"verifying"},
-    "verifying": {"succeeded", "failed"},
+    "dispatching": {"running", "verifying", "recovering", "cancelled", "timed_out", "failed"},
+    "running": {"verifying", "recovering", "cancelled", "timed_out", "failed"},
+    "recovering": {"ready", "awaiting_approval", "running", "verifying", "cancelled", "timed_out", "failed"},
+    "verifying": {"succeeded", "failed", "recovering", "timed_out"},
 }
 
 
@@ -49,6 +51,8 @@ class TaskRecord(StrictContract):
     result: ToolResult | None = None
     error: ErrorPayload | None = None
     verification: str | None = None
+    cancel_requested: bool = False
+    project_id: UUID | None = None
 
 
 def canonical(value: dict) -> str:
@@ -65,6 +69,8 @@ def task_record(row: aiosqlite.Row) -> TaskRecord:
         result=TypeAdapter(ToolResult).validate_json(row["result_json"]) if row["result_json"] else None,
         error=ErrorPayload.model_validate_json(row["error_json"]) if row["error_json"] else None,
         verification=row["verification"],
+        cancel_requested=bool(row["cancel_requested"]),
+        project_id=UUID(row["project_id"]) if row["project_id"] else None,
     )
 
 
@@ -107,7 +113,9 @@ class TaskRepository:
     ) -> TaskRecord:
         now = now or utc_now()
         request = REQUEST.validate_json(REQUEST.dump_json(request))
+        started = time.perf_counter()
         routing = route_task(request)
+        elapsed_ms = (time.perf_counter() - started) * 1000
         action = ACTION.validate_json(canonical({
             "tool": routing.tool_name, "tool_version": routing.tool_version, "arguments": routing.arguments,
         }))
@@ -119,9 +127,11 @@ class TaskRepository:
                     raise PermissionError("inactive or incorrect identity role")
             existing = await one(conn, "SELECT * FROM tasks WHERE owner_id=? AND request_id=?", (str(owner_id), str(request.request_id)))
             if existing:
-                if existing["request_json"] != encoded or existing["node_id"] != str(node_id):
+                if canonical(REQUEST.validate_json(existing["request_json"]).model_dump(mode="json")) != encoded or existing["node_id"] != str(node_id):
                     raise Conflict("IDEMPOTENCY_CONFLICT")
                 return task_record(existing)
+            if request.project_id is not None and not await one(conn, "SELECT 1 FROM projects WHERE project_id=? AND owner_id=?", (str(request.project_id), str(owner_id))):
+                raise LookupError("project not found")
             if rate_limit:
                 recent = await one(conn, "SELECT count(*) FROM tasks WHERE owner_id=? AND created_at>?", (str(owner_id), timestamp(now - timedelta(minutes=1))))
                 if recent[0] >= 10:
@@ -131,9 +141,13 @@ class TaskRepository:
                 raise Conflict("BUSY")
             task_id = uuid4()
             await conn.execute(
-                "INSERT INTO tasks(task_id, owner_id, request_id, request_json, node_id, action_json, status, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, 'queued', ?, ?)",
-                (str(task_id), str(owner_id), str(request.request_id), encoded, str(node_id), canonical(action.model_dump(mode="json")), timestamp(now), timestamp(now + timedelta(minutes=5))),
+                "INSERT INTO tasks(task_id, owner_id, request_id, request_json, node_id, action_json, status, created_at, expires_at, project_id) VALUES (?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?)",
+                (str(task_id), str(owner_id), str(request.request_id), encoded, str(node_id), canonical(action.model_dump(mode="json")), timestamp(now), timestamp(now + timedelta(minutes=5)), str(request.project_id) if request.project_id else None),
             )
+            await conn.execute("INSERT INTO routing_decisions VALUES(?,?,?,?,?,?,?,?, 'live')", (
+                str(task_id), routing.mode, routing.reason_code, routing.policy_version, routing.tool_name,
+                routing.tool_version, elapsed_ms, timestamp(now),
+            ))
             await conn.execute("INSERT INTO task_events(task_id, revision, kind, created_at) VALUES (?, 0, 'queued', ?)", (str(task_id), timestamp(now)))
             await audit(conn, str(owner_id), str(task_id), "task.created", now)
             return await load_task(conn, task_id)

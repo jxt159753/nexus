@@ -107,7 +107,8 @@ workspace={json.dumps(str(root))}
                 assert conn.execute("SELECT count(*) FROM task_attempts").fetchone()[0] == 2
                 assert conn.execute("SELECT count(*) FROM execution_grants").fetchone()[0] == 2
                 tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-                assert "model_calls" not in tables
+                assert "model_calls" in tables
+                assert conn.execute("SELECT count(*) FROM model_calls").fetchone()[0] == 0
             (tmp_path / "evidence.json").write_text(json.dumps({
                 "old_core_pid": old_pid, "restarted_core_pid": core.pid, "node_pid": node.pid,
                 "system_task": system_id, "directory_task": directory["task_id"],

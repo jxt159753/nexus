@@ -30,7 +30,7 @@
 | 方向 | type | payload 字段 |
 | --- | --- | --- |
 | 浏览器 → Core | `client.sync` | event_id 或 null |
-| 浏览器 → Core | `task.submit` | request_id、intent、arguments |
+| 浏览器 → Core | `task.submit` | request_id、intent、arguments；可选 project_id=null |
 | 浏览器 → Core | `task.cancel` | task_id |
 | 浏览器 → Core | `approval.decide` | approval_id、decision=approve/reject |
 | 浏览器 → Core | `control.pause / control.resume / control.cancel_all` | request_id |
@@ -45,12 +45,20 @@
 | Core → Node | `command.execute` | session_id、task_id、attempt_id、tool、tool_version、arguments、command_digest、grant_id、expires_at、execution_timeout_seconds |
 | Node → Core | `command.accepted / command.started` | session_id、task_id、attempt_id、command_digest、boot_id |
 | Core → Node | `command.status` | session_id、attempt_id |
-| Node → Core | `command.status_result` | session_id、attempt_id、phase；按阶段携带 command_digest/result |
+| Node → Core | `command.status_result` | session_id、attempt_id、phase；按阶段携带 command_digest/result；可选 execution_stopped=false |
 | Core → Node | `command.cancel` | session_id、attempt_id、reason |
 | Node → Core | `command.cancelled` | session_id、attempt_id、stopped_phase=received/started |
 | Node → Core | `command.result` | session_id、task_id、attempt_id、command_digest、tool、tool_version、observed_at、outcome；result 或 error |
 | Core → Node | `result.ack` | session_id、attempt_id、status=stored/already_settled |
 | 双向 | `error` | code、message、retryable；可选 session_id；correlation_id 位于信封 |
+
+S5 增加可选 `execution_stopped` 布尔字段，缺省 false；unknown 只有确认旧执行已停止才可能安全重试。not_found 不允许携带停止证据。新 Node 与 Core 应同步升级，严格旧 Core 不接受新字段；动作摘要及消息名称不变。实际恢复、取消和限额见 [S5 恢复](s5-recovery.md)。
+
+S6 已实现浏览器端点 `/ws/v1/client?node_id=<配置节点 UUID>`，Cookie/Origin 认证，首条必须 client.sync。node_id 查询仅选择执行目标，不授予权限；单配置节点可省略，多节点省略不能提交任务。可选 project_id 由 Core 检查归属，不进入 Node 动作。升级前无该字段的历史请求通过规范化比较保持幂等。
+
+S7 不改变信封、工具版本、摘要或消息字段。现有 Core 入口直接提供 HTTPS/WSS，Node 必须校验信任链与主机名；远程模式不信任代理头。停机恢复保留 attempt、审批绑定和事件游标，Node 在线状态只能通过新认证连接重建；恢复旧快照后的浏览器应重新登录并完整同步。部署和本机/Android 验收边界见 [S7 部署](s7-deployment.md)与 [S7 验证](S7-VERIFICATION.md)。
+
+浏览器 event_id 来自统一持久 client_events，不能混用原任务详情或 HTTP 控制历史的各自 ID。client.synced 给出回放起点；有效游标回放其后所有可见通知，null/无效游标返回当前高水位并要求完整 HTTP 查询。回放的 task.updated 是该任务最新已提交快照，revision 与结果/状态一致；页面按游标去重后查询详情。队列满或发送超过 2 秒关闭 1013，断线不取消任务。接口、限额和边界见 [S6 说明](s6-browser-records.md)。
 
 ## 工具、证据和限额
 
@@ -65,4 +73,4 @@
 
 P02 只定义上述数据和无 I/O 的编解码。消息方向权限、当前认证会话、资源范围、动作摘要的计算与绑定、实际期限、状态转移、重试、持久化和工具验证分别由后续任务落实；模型解析通过不代表获得执行权限或任务已经成功。
 
-P05 已实现 Node 本地执行，并在 `nexus.contracts.commands` 定义共享摘要：对命令排除 session_id / command_digest、加入可信 node_id 后按键排序，以紧凑且不转义非 ASCII 字符的 JSON 的 UTF-8 字节取 SHA-256；覆盖动作、task/attempt、grant 和期限。会话变化允许重传，动作或期限变化不得复用 attempt。具体算法与回执重传接口见 [Node Runtime](node-runtime.md)。P06 已接入认证会话、Node welcome 限额及有界控制传输，见 [S3 Link](s3-link.md)；Core 派发与权威验证已在 [S4](s4-harness.md) 接入。本轮不修改 25 种消息形状。
+P05 已实现 Node 本地执行，并在 `nexus.contracts.commands` 定义共享摘要：命令排除 session_id / command_digest，加入可信 node_id，按键排序后以紧凑 UTF-8 JSON 取 SHA-256；覆盖动作、task/attempt、grant 和期限。会话变化允许重传，动作/期限变化不得复用 attempt。P06 接入认证 Link，P07 接入权威派发与验证，P08 接入 [恢复与控制](s5-recovery.md)。消息名称和摘要算法不变，S5 增加上文停止证据字段。

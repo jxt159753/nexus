@@ -1,4 +1,4 @@
-"""Owner HTTP entry points for the S4 backend loop; browser WS is S6."""
+"""Owner HTTP entry points sharing the browser's Harness authority."""
 
 import asyncio
 import json
@@ -9,10 +9,10 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import ValidationError
 
 from nexus.contracts.base import StrictContract
+from nexus.contracts.messages import ControlRequest
 from nexus.contracts.task import TaskRequest
 from nexus.core.harness.service import Harness
 from nexus.core.security.http import SecurityHTTP
-from nexus.core.storage.database import one
 
 
 class Submission(StrictContract):
@@ -24,12 +24,12 @@ class Decision(StrictContract):
     decision: Literal["approve", "reject"]
 
 
-async def body(request: Request, model):
+async def body(request: Request, model, *, max_bytes: int = 4096):
     value = bytearray()
     try:
         async with asyncio.timeout(2):
             async for chunk in request.stream():
-                if len(value) + len(chunk) > 4096:
+                if len(value) + len(chunk) > max_bytes:
                     raise HTTPException(413, detail="INVALID_MESSAGE")
                 value.extend(chunk)
     except TimeoutError:
@@ -56,6 +56,26 @@ class HarnessHTTP:
         self.router.add_api_route("/api/v1/tasks", self.list_tasks, methods=["GET"])
         self.router.add_api_route("/api/v1/tasks/{task_id}", self.detail, methods=["GET"])
         self.router.add_api_route("/api/v1/approvals/{approval_id}", self.decide, methods=["POST"])
+        self.router.add_api_route("/api/v1/tasks/{task_id}/cancel", self.cancel, methods=["POST"])
+        self.router.add_api_route("/api/v1/control", self.control_state, methods=["GET"])
+        self.router.add_api_route("/api/v1/control/{kind}", self.control, methods=["POST"])
+
+    async def cancel(self, task_id: UUID, request: Request, response: Response) -> dict:
+        principal = await self.guards.owner_http(request)
+        await body(request, StrictContract)
+        response.headers["Cache-Control"] = "no-store"
+        return await self.harness.cancel(principal, task_id)
+
+    async def control_state(self, request: Request, response: Response) -> dict:
+        await self.guards.owner_http(request)
+        response.headers["Cache-Control"] = "no-store"
+        return await self.harness.controls.state()
+
+    async def control(self, kind: Literal["pause", "resume", "cancel_all"], request: Request, response: Response) -> dict:
+        principal = await self.guards.owner_http(request)
+        value = await body(request, ControlRequest)
+        response.headers["Cache-Control"] = "no-store"
+        return await self.harness.control(principal, kind, value.request_id)
 
     async def submit(self, request: Request, response: Response) -> dict:
         principal = await self.guards.owner_http(request)
@@ -79,11 +99,6 @@ class HarnessHTTP:
     async def decide(self, approval_id: UUID, request: Request, response: Response) -> dict:
         principal = await self.guards.owner_http(request)
         decision = await body(request, Decision)
-        async with self.harness.security.database.transaction(write=False) as conn:
-            row = await one(conn, "SELECT node_id FROM approvals WHERE approval_id=? AND owner_id=?", (str(approval_id), str(principal.identity_id)))
-            if row is None:
-                raise HTTPException(404, detail="NOT_FOUND")
-        task = await self.harness.security.decide(approval_id, principal, decision.decision, self.harness.scope(UUID(row[0])))
-        self.harness.wake.set()
+        task = await self.harness.decide(principal, approval_id, decision.decision)
         response.headers["Cache-Control"] = "no-store"
         return {"task": task}

@@ -1,0 +1,58 @@
+{
+  "date": "2026-10-18",
+  "observed_at": "2026-10-18T05:00:31.477211+00:00",
+  "transport": "Direct HTTPS/WSS bound to the configured Tailscale IPv4 only",
+  "certificate": {
+    "issuer": "Let's Encrypt YE1",
+    "expires_at_utc": "2027-01-16T03:50:31Z",
+    "sha256": "b5755563f434ea290f4ff8548e68273cf67a94fecff3e9f6e0ba26d66d10f245",
+    "default_windows_trust_checked": true,
+    "android_no_warning_reported_by_user": true
+  },
+  "android": {
+    "device": "NX789J",
+    "os": "Android",
+    "browser": "Chrome (requested user test)",
+    "os_and_browser_versions": "not collected",
+    "login_and_two_tools_reported_by_user": true,
+    "history_after_core_restart_reported_by_user": true,
+    "network_switch_and_recovery_reported_by_user": true,
+    "new_task_prefix_provided_by_user": "5a652919"
+  },
+  "server_correlated_phone_tasks": [
+    {
+      "task_id": "59a51a21-aab2-4ef6-b79c-865c5878a753",
+      "tool": "system.info",
+      "status": "succeeded",
+      "verification": "node_report_schema_checked",
+      "attempt_count": 1
+    },
+    {
+      "task_id": "22e666a4-1a1c-4c2f-8a65-5cd2bb27ec90",
+      "tool": "filesystem.list",
+      "status": "succeeded",
+      "verification": "node_report_schema_checked",
+      "attempt_count": 1
+    },
+    {
+      "task_id": "5a652919-c3ed-4fe4-99f8-00d37d8c75aa",
+      "tool": "system.info",
+      "status": "succeeded",
+      "verification": "node_report_schema_checked",
+      "attempt_count": 1
+    }
+  ],
+  "core_restart": {
+    "prior_task_details_preserved": true,
+    "node_boot_retained": true,
+    "node_session_changed": true,
+    "node_online": true
+  },
+  "routing": {
+    "rule_records": 5,
+    "model_calls": 0
+  },
+  "filesystem_scope": "Dedicated synthetic demo directory; direct listing only; approval required",
+  "local_artifacts": "var/remote/ (ignored by Git; credentials and private keys excluded from this summary)",
+  "user_acceptance": "Technical checks complete; final M1 acceptance not asserted"
+}

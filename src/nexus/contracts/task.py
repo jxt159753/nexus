@@ -23,14 +23,17 @@ class ListDirectoryArguments(StrictContract):
     limit: Annotated[StrictInt, Field(ge=1, le=200)]
 
 
-class SystemInfoRequest(StrictContract):
+class TaskMetadata(StrictContract):
     request_id: UUID
+    project_id: UUID | None = None
+
+
+class SystemInfoRequest(TaskMetadata):
     intent: Literal["get_system_info"]
     arguments: SystemInfoArguments
 
 
-class ListDirectoryRequest(StrictContract):
-    request_id: UUID
+class ListDirectoryRequest(TaskMetadata):
     intent: Literal["list_directory"]
     arguments: ListDirectoryArguments
 

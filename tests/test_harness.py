@@ -132,6 +132,10 @@ def test_matching_evidence_still_requires_tool_validation(world, kind):
         await repo.store_result(world.node, result)
         await repo.verify(command.attempt_id)
         task = await world.tasks.get(command.task_id, world.owner_id)
+        if kind == "failure":
+            assert task.status == "recovering" and task.execution_outcome == "known"
+            assert (await repo.active(world.node_id)) == []
+            return
         assert task.status == "failed" and task.result is None and task.verification is None
         assert task.error.code == (ErrorCode.TOOL_TIMEOUT if kind == "failure" else ErrorCode.RESULT_INVALID)
         assert task.execution_outcome == "known"

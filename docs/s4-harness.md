@@ -1,5 +1,7 @@
 # S4 / P07 后端执行闭环
 
+本文保留 S4 的交付边界。后续 S5 已接入恢复、重试、总期限、取消及全局控制；当前行为见 [S5 恢复说明](s5-recovery.md)。
+
 本阶段在既有 [认证 Link](s3-link.md)、[权限](storage-security.md)和 [Windows Runtime](node-runtime.md)上接入 Harness。批准与状态统一见 [ROADMAP](ROADMAP.md)，实测见 [S4 验证](S4-VERIFICATION.md)，实现决定见 [ADR 0004](decisions/0004-s4-durable-execution.md)。
 
 ## 运行与接口

@@ -1,0 +1,109 @@
+{
+  "recorded_at": "2026-10-18T09:39:26.514622+00:00",
+  "authorization": "User explicitly approved own-server public IP TLS, renewal and migration after preflight.",
+  "environment": {
+    "core_os": "Ubuntu 24.04.2",
+    "architecture": "x86_64",
+    "core_python": "3.12.3",
+    "node_os": "Windows 11",
+    "node_python": "3.13.9"
+  },
+  "verification": {
+    "linux_existing_core_modules": 16,
+    "linux_test_result": "409 passed in 26.32s",
+    "locked_packages": 25,
+    "pip_check": "passed",
+    "matched_wheel_source_resources": 67,
+    "public_default_ca_and_ip_san": "passed",
+    "authenticated_https_and_wss": "passed"
+  },
+  "migration": {
+    "old_core_stopped": true,
+    "old_listener_count": 0,
+    "consistent_core_and_node_backup": true,
+    "backup_sha256": {
+      "core.sqlite3": "9972b50b2395fd3b410f4cd74717994a5bacfd3893db75f19890fd2a302370aa",
+      "receipts.sqlite3": "0bae34114b4e54a34749298367fbc7e4f51c482bfbd5faf8a9e3f3325bdb6a16"
+    },
+    "old_task_details_preserved": 5,
+    "post_hook_restart_task_details_preserved": 7,
+    "core_single_authority": "cloud",
+    "windows_launcher_roles": [
+      "node"
+    ],
+    "original_owner_node_identity_and_scope": "preserved",
+    "raw_credentials_migrated": false
+  },
+  "certificate": {
+    "issuer": "CN=YE1,O=Let's Encrypt,C=US",
+    "not_before": "2026-10-18T08:22:01+00:00",
+    "not_after": "2026-10-25T00:22:00+00:00",
+    "sha256": "d8fa5a054c1b9426b5dff293515c723a232a58dd329343c60fa09573cfad5d7f"
+  },
+  "services": {
+    "core": {
+      "ActiveState": "active",
+      "SubState": "running",
+      "MainPID": "15750",
+      "User": "nexus",
+      "UnitFileState": "enabled",
+      "MemoryMax": "536870912",
+      "TasksMax": "64"
+    },
+    "renew_timer": {
+      "ActiveState": "active",
+      "UnitFileState": "enabled",
+      "NextElapseUSecRealtime": "Mon 2026-10-19 00:09:42 CST"
+    },
+    "renew_service": {
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "Restart": "on-failure",
+      "RestartUSec": "1min",
+      "StartLimitBurst": "2",
+      "StartLimitIntervalUSec": "1h"
+    },
+    "full_ca_dry_run": "one successful before cutover; later extra staging exercise timed out",
+    "active_core_certificate_hook": "passed; PID changed 8607 to 15750; history preserved",
+    "retry_policy": "on failure after 60 seconds; maximum two starts per hour; regular check every eight hours"
+  },
+  "android": {
+    "confirmation": "User reported success and prefix 9ac1bb94 after requested Chrome/Tailscale-off/history/two-tool checks.",
+    "independent_phone_settings_inspection": false,
+    "reported_prefix_matches": "filesystem.list",
+    "tasks": [
+      {
+        "task_id": "70e6d49a-55ae-4d9d-bc25-80de496dfb65",
+        "tool": "system.info",
+        "status": "succeeded",
+        "attempts": 1
+      },
+      {
+        "task_id": "9ac1bb94-c8c5-4e79-98f2-8421248fa9c7",
+        "tool": "filesystem.list",
+        "status": "succeeded",
+        "attempts": 1
+      }
+    ]
+  },
+  "final_state": {
+    "tasks": 9,
+    "successful_tasks": 9,
+    "attempts": 9,
+    "approvals": 4,
+    "rule_routes": 9,
+    "model_calls": 0,
+    "paused": false,
+    "node_online": true,
+    "cloud_tailscale_present": false,
+    "windows_tailscale_backend": "NoState"
+  },
+  "limits": [
+    "Android and Chrome versions not collected",
+    "Host reboot and long-term renewal/growth not observed",
+    "No Windows Node logon autostart",
+    "Physical phone settings and UI are user reports, correlated with server tasks",
+    "CA requests can time out; retries are bounded",
+    "M1 final user acceptance unchanged"
+  ]
+}

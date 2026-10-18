@@ -1,10 +1,10 @@
 # NEXUS 架构与第一阶段 MVP 技术方案
 
-状态：M1 技术设计，整体方案仍待用户确认；已实现范围与阶段批准见 ROADMAP。日期：2026-10-17。
+状态：M1 技术设计，整体方案仍待用户确认；已实现范围与阶段批准见 ROADMAP。日期：2026-10-18。
 
 本文件是唯一架构设计入口，供后续每次开发前完整读取。项目规范见 [AGENTS.md](../AGENTS.md)，阶段批准与任务验收见 [ROADMAP.md](ROADMAP.md)，项目入口见 [README.md](../README.md)。
 
-本文件描述目标架构，不代表所有功能已经实现。当前已交付 S1 工程基础、S2 契约/仓储/权限、S3 独立 Windows Node 与认证 Link，以及 S4/P07 的持久派发、结果验证和历史查询。Core/Node 可独立运行两个固定只读任务；P08–P12 尚未实施，交付和用户验收状态以 [ROADMAP](ROADMAP.md) 为准。当前接口与证据见 [S4 Harness](s4-harness.md)、[S4 验证](S4-VERIFICATION.md)；历史接口见 [存储与安全](storage-security.md)、[Node Runtime](node-runtime.md) 和 [S3 Link](s3-link.md)。设计文档完成不代表后续实施授权。
+本文件描述目标架构，不代表远期能力均已实现。S1–S6 已交付工程、契约/仓储/权限、独立 Windows Node、只读闭环及恢复、同源浏览器、显式记忆/项目/路由和禁用模型适配器。S7 已有本机 TLS/故障/一致恢复，以及实际 Tailscale 公信证书、Android 登录/任务/审批、Core 重启历史和手机网络恢复后新执行证据，见 [S7 验证](S7-VERIFICATION.md)。M1 技术交付完成，最终用户验收以 [ROADMAP](ROADMAP.md)为准。当前部署入口见 [S7 部署](s7-deployment.md)，功能见 [S6 说明](s6-browser-records.md)及 [S5 恢复](s5-recovery.md)。设计文档不授予后续实施权限。
 
 ## 项目愿景
 
@@ -76,6 +76,7 @@ flowchart LR
 - 第一版固定单个 Core worker、每个 Node 同时执行一个任务；Core 可同时处理多个网络连接。
 - 单例锁绑定规范化数据目录，防止误启动第二实例。它不提供跨主机分布式锁；禁止复制数据库后同时启动两套 Core。
 - 将来移动 Core 时，停旧 Core、取得一致备份、迁移数据及身份配置，再让 Node 修改连接地址。移动的是权威数据，不是重新建立一套人格。
+- 2026-10-18 用户明确批准自有 Ubuntu 云端单活 Core、无域名 IP 直连 HTTPS/WSS、正式证书和自动续期。实际迁移保留原身份及权威历史，Windows 仍只运行 Node；不引入第二 Core 或新工具。网络不再依赖 Tailscale，CA 只负责签发和续期；决策见 [ADR 0008](decisions/0008-self-hosted-core-ip-tls.md)，结果见 ROADMAP 和部署说明。
 - 不引入 Redis、Celery、Kafka、容器编排、向量数据库或独立调度微服务。
 
 FastAPI 支持 WebSocket 依赖认证；其内存连接列表示例也明确仅适用于存活的单进程。NEXUS 因此将任务事实放入数据库，内存只保留可重建的连接与唤醒信号。[FastAPI 官方文档](https://fastapi.tiangolo.com/advanced/websockets/)
@@ -135,7 +136,7 @@ Godot 项目状态检查适合下一项只读工具，本 MVP 先不增加第三
 - 浏览器通过同源 HTTPS 登录换取有时限、可撤销的 HttpOnly / Secure / SameSite 会话 Cookie。浏览器原生 WebSocket 不提供任意 Authorization 请求头接口，因此浏览器与 Python Node 不共用同一种握手方式。[MDN WebSocket 构造器](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/WebSocket)
 - 对浏览器握手和 HTTP 写操作检查允许的 Origin；HTTP 写操作另校验会话关联的 CSRF 令牌。会话过期或凭证撤销时关闭现有连接。所有消息继续执行授权检查。
 - 不把长期令牌放在 URL、LocalStorage、示例配置或日志里。不依赖 CORS 自动保护 WebSocket。
-- 默认只绑定 localhost；此开发模式允许 HTTP/WS，Cookie Secure 只在该显式本机模式关闭。Android 接入必须显式开启远程模式并提供 Android 信任的 HTTPS/WSS 证书，可由 Uvicorn 直接加载，或由部署层终止 TLS。配置好 TLS 前不开放远程访问。
+- 默认只绑定 localhost；此开发模式允许 HTTP/WS，Cookie Secure 只在该显式本机模式关闭。Android 接入必须显式开启远程模式并提供 Android 信任的 HTTPS/WSS 证书。当前入口由 Uvicorn 直接加载，禁用代理头；部署层终止 TLS 是目标选项，尚未交付该接入模式。配置好 TLS 前不开放远程访问。
 - LAN 和 Tailscale 都只是连接路径；应用权限检查相同。不自动修改防火墙、证书信任或系统安全设置。
 
 Origin、逐消息授权、过期会话关闭和消息限额是参考 OWASP 建议采用的边界；具体角色与策略是 NEXUS 的设计选择。[OWASP WebSocket 安全指南](https://cheatsheetseries.owasp.org/cheatsheets/WebSocket_Security_Cheat_Sheet.html)
@@ -150,7 +151,7 @@ MVP 将 `system.info` 设为可配置的预授权只读操作，将 `filesystem.
 
 审批记录绑定：`approval_id`、`task_id`、owner、目标 `node_id`、工具名及版本、规范化参数 SHA-256、资源/策略版本和到期时间。单个批准只解锁该任务中完全一致的动作，最多允许预算内的只读重试，不允许复用到新任务。参数、节点或策略变化后必须重新评估，必要时重新审批；已派发任务不原地改写动作。
 
-S2 已实现离线身份/授权管理、随机凭证摘要、8 小时浏览器会话（最多 10 个有效会话）、同源会话路由及 HTTP/WS 认证守卫。P06 的 Node Link 已接入 `SecurityHTTP.receive_text`，每秒检查空闲连接的撤销/过期，并在返回每条消息前再次检查。资源范围摘要绑定 `NodeScope.resource_version`，持久授权或身份变化递增全局策略版本。Link 从认证节点、可信工具/资源配置与持久授权交集构建范围；自报能力不能扩大授权。实际 loopback WS 已验证，远程 TLS 尚未实测。
+S2 已实现离线身份/授权管理、随机凭证摘要、8 小时浏览器会话（最多 10 个有效会话）、同源会话路由及 HTTP/WS 认证守卫。P06 的 Node Link 已接入 `SecurityHTTP.receive_text`，每秒检查空闲连接的撤销/过期，并在返回每条消息前再次检查。资源范围摘要绑定 `NodeScope.resource_version`，持久授权或身份变化递增全局策略版本。Link 从认证节点、可信工具/资源配置与持久授权交集构建范围；自报能力不能扩大授权。loopback WS 及 S7 实际公信 HTTPS/WSS、Android 接入均已有证据，范围见 [S7 验证](S7-VERIFICATION.md)。
 
 删除重要文件、发送对外消息、支付和修改安全设置目前都没有工具实现，直接拒绝。以后加入时，必须同时具备精确授权、效果验证、幂等/对账策略，不能只增加一个“同意”按钮。
 
@@ -226,7 +227,9 @@ stateDiagram-v2
 
 ## 8. JARVIS Link v1 协议
 
-P02 已实现本节 25 种消息的数据契约；字段名、严格解析入口、错误映射和字节计算约定见 [protocol-v1.md](protocol-v1.md)。P06 已实现认证连接、心跳、会话替换和重连，详见 [S3 Link](s3-link.md)；P07 已接入持久派发和执行结算，见 [S4 Harness](s4-harness.md)；P08 的网络对账与全局控制尚未实施。
+P02 已实现本节 25 种消息的数据契约；字段、严格解析、错误及字节约定见 [protocol-v1.md](protocol-v1.md)。P06 已实现认证连接、心跳、会话替换和重连；P07 已接入持久派发和执行结算；P08 已实现网络对账、取消及全局控制，见 [S5 恢复](s5-recovery.md)。status_result 新增可选 execution_stopped=false；未知结果仅在有停止证据时允许预算内重试，严格 Core/Node 应同步升级。
+
+P09 已接入同源静态页面、会话恢复、浏览器 WS 及消息授权。任务/控制事务通过触发器追加统一 client_events 游标，有效游标有界回放，无效游标先取得 HTTP 快照；慢连接独立排队并超时断开。历史事件附当前已提交状态及对应 revision，不伪造旧快照。详情见 [S6](s6-browser-records.md)及 [ADR 0006](decisions/0006-s6-browser-records.md)。
 
 ### 8.1 端点和消息信封
 
@@ -329,6 +332,8 @@ Core 的 grant_id 引用已持久授权；它通过已验证的 Core 连接传�
 | 每次尝试的命令派发数 | 总计 3 次，含首次；均使用相同 attempt_id |
 | 单次工具执行时间 | 10 秒，Node 用单调时钟限时 |
 | 接收确认等待 | 5 秒；丢失后对账，不能直接认定未执行 |
+| 每尝试状态/停止请求 | 总计 64 次；每 5 秒至多一个周期请求，取消可立即发起；耗尽仍未知则保留执行槽 |
+| Node 未确认结果主动重传 | 每 5 秒扫描最多 4 条，单连接每条最多 3 次；仍可响应 Core 查询 |
 | 任务总期限 | 5 分钟，包含等待审批、离线和重试 |
 | 审批有效期 | 最多 2 分钟，且不得晚于任务期限 |
 | 每 Node 工具并发 | 1 |
@@ -366,7 +371,7 @@ Core 概念表：
 | system_state | 全局 pause 状态和配置版本 |
 | schema_migrations | 已执行迁移版本 |
 
-Node 单独的 `receipts.sqlite3` 保存 execution_receipts，以及必要的 schema_migrations / node_identity 元数据，不属于长期认知存储。P05 使用专用 Node 身份、模式摘要与 FULL 同步，提供 received/started/结果先落盘、重复 attempt 去重、重启 unknown 和结果恢复；默认容量 10000 条，满后拒绝新执行并保留旧证据。当前只支持初建和同版本重开；后续模式升级须先实现一致备份和前向迁移。Windows Job 的输入门和进程归属双重检查、真实停止确认、独占 Node 数据目录锁及本地限额已在 Windows 11 上验证，详见 [Node Runtime](node-runtime.md) 和 [ADR 0002](decisions/0002-p05-node-execution.md)。
+Node 的 `receipts.sqlite3` 保存 execution_receipts、schema_migrations / node_identity，以及 S5 迁移 002 的 cancellation_tombstones，不属于长期认知存储。使用专用身份、模式摘要与 FULL 同步；received/started/结果先落盘、重复 attempt 去重、重启 unknown 和结果恢复均有证据。回执和墓碑各默认最多 10000 条，满后拒绝新增并保留旧证据。S5 增加升级前一致备份及前向迁移、持久取消屏障和停止证据。Windows Job 门控、进程清理、数据目录锁及恢复见 [Node Runtime](node-runtime.md)和 [S5](s5-recovery.md)。
 
 模型调用记录与最终工具验证结果关联，以后分别计算调用可用率和任务验证通过率，不能把模型正常返回等同于任务成功。MVP 仅产生规则路由记录，模型成功率显示“不适用”，不填造零成本调用记录。
 
@@ -376,7 +381,9 @@ Node 单独的 `receipts.sqlite3` 保存 execution_receipts，以及必要的 sc
 
 使用 SQLite 一致备份接口或完全停机后的备份，不在运行时只复制一个 .sqlite3 文件。迁移前备份并校验；第一版只提供向前迁移，失败恢复使用备份，不自动执行破坏性降级。
 
-S2 已实现的表为 `schema_migrations`、`identities`、`tasks`、`task_events`、`audit_events`、`sessions`、`policy_state`、`grants`、`approvals`，仅创建当前任务使用的表。迁移验证版本连续性和脚本摘要；已有数据库升级前通过 SQLite backup 生成唯一备份并执行 quick_check，拒绝无版本旧库或未知新版本。任务仓储只开放派发前状态，不开放写入成功结果的捷径；S4 已通过迁移 003 增加 execution_grants、task_attempts 和任务结果字段，由 Harness 负责执行状态及验证；全局控制留待 P08。离线管理审计以空 actor 表示本地管理入口，subject 单独记录被管理身份，不冒充 Node 发起授权。实现选择见 [ADR 0001](decisions/0001-s2-storage-security.md)。
+S2 实现身份、会话、静态授权、任务、事件、审计与审批；S4 迁移 003 增加 execution_grants、task_attempts 和任务结果字段；S5 迁移 004 增加取消/停止/对账计数、system_state、control_requests 和 control_events。只创建当前使用的表。迁移验证连续版本及摘要，升级前生成唯一一致备份并 quick_check；拒绝无版本旧库或未知新版本。任务权威由 Harness 负责；离线管理审计的 actor 为空，subject 记录被管理身份。设计见 [ADR 0001](decisions/0001-s2-storage-security.md)及 [ADR 0005](decisions/0005-s5-recovery-controls.md)。
+
+S6 迁移 005 增加 projects、memory_consents、memory_entries、routing_decisions、model_calls 和 client_events；tasks 可选关联项目。保存、替代记忆与明确同意同事务；撤销/过期默认不作为当前信息查询，不物理删除。每个新任务原子记录规则路由；历史路由补记明确 migrated 且不捏造耗时。model_calls 保持零行，应用仅装配无网络的禁用 Provider/DecisionModel；不以虚构的零费用调用填充记录。
 
 记忆至少区分以下独立字段：
 
@@ -439,11 +446,13 @@ NEXUS/
 
 `contracts` 只共享通信/数据契约，不共享认知逻辑。Node 不导入 Core 的 Harness、记忆或模型模块。协议以 JSON 及工具版本定义，使后续 Kotlin Node 无需重写 Core。
 
-配置优先级：指定环境变量 > 指定 TOML > 安全默认值；凭证不得进入 TOML。S3 服务使用严格 CoreConfig / NodeServiceConfig 和有界 TOML 加载器；Core 可覆盖 NEXUS_DATA_DIR/HOST/PORT，Node 可覆盖 NEXUS_NODE_DATA_DIR/CORE_URL，Node 凭证仅由 NEXUS_NODE_TOKEN 环境变量提供。显式 loopback 模式允许 HTTP/WS，远程 Core 必须配置证书和私钥，Node WSS 保留默认 CA 与主机名验证。配置加载不创建目录或数据库；单活 Core 在生命周期中持锁后才初始化存储。P01 的 load_settings 保留给离线身份命令及原有接口，只读取环境变量且只允许 localhost；不自动读取 .env。实际启动及未验证 TLS 边界见 [S3 Link](s3-link.md)。
+配置优先级：指定环境变量 > 指定 TOML > 安全默认值；凭证不得进入 TOML。服务使用严格 CoreConfig / NodeServiceConfig 和有界 TOML 加载器；Core 可覆盖 NEXUS_DATA_DIR/HOST/PORT，Node 可覆盖 NEXUS_NODE_DATA_DIR/CORE_URL，Node 凭证仅由 NEXUS_NODE_TOKEN 环境变量提供。显式 loopback 模式允许 HTTP/WS，远程 Core 必须配置证书和私钥，Node WSS 保留默认 CA 与主机名验证。配置加载不创建目录或数据库；单活 Core 在生命周期中持锁后才初始化存储。P01 的 load_settings 保留给离线身份命令及原有接口，只读取环境变量且只允许 localhost；不自动读取 .env。当前直接 TLS 配置、恢复与设备验证边界见 [S7 部署](s7-deployment.md)和 [S7 验证](S7-VERIFICATION.md)。
 
 当前开发依赖为 pytest 与 httpx2；S2 使用标准 `asyncio.run`，未引入 pytest-asyncio。S2 增加架构指定的 aiosqlite 0.22.1；由于现有 Starlette 1.8.0 TestClient 已弃用 httpx，使用 httpx2 2.13.1 替换无代码调用方的旧 httpx 开发依赖，并锁定 httpcore2/truststore；没有升级现有 FastAPI、Starlette、Pydantic。`requirements.lock` 和实际 wheel 已在 Windows / Python 3.13.9 独立环境离线安装验证；构建依赖 `setuptools>=75,<81` 仍为范围约束，Python 3.12 和其他平台尚未实测。
 
 S3 唯一新增安装包为锁定的 websockets 17.1，用作 Node 客户端与 Uvicorn Sans-I/O 后端；其他 24 个包版本不变。Core/Node 共用可移植数据目录锁和有界消息辅助函数，互不导入对方业务模块。连接观测仅保存在可重建内存中，接入/断开写入现有审计；没有为 P06 创建 devices 或 attempt 新表。S3 交付时拒绝网络执行派发，见 [ADR 0003](decisions/0003-s3-authenticated-link.md)。S4 已通过专用 Harness 路径启用持久派发与结果验证；普通 send 控制接口仍禁止执行命令，见 [ADR 0004](decisions/0004-s4-durable-execution.md)。本轮无新依赖。
+
+云部署补验：Ubuntu 24.04 / Python 3.12.3 上已安装相同锁定版本，409 项 Core/协议/权限检查及实际跨主机只读闭环通过。上文 Python 3.12 未测描述是云迁移前的依赖验证记录；本轮不代表 Linux Node、其他版本或全平台均已验证。
 
 ## 12. 第一版明确不做
 
@@ -454,7 +463,7 @@ S3 唯一新增安装包为锁定的 websockets 17.1，用作 Node 客户端与 
 - 任意 shell、Python 代码执行、读写任意文件、修改系统设置。
 - 对外消息发送、删除、支付、自动升级自身权限或工具代码。
 - Godot 编辑器控制与项目扫描工具。
-- 多用户、公开互联网服务、云多租户、活动双主、自动热迁移。
+- 多用户、公开注册、云多租户、活动双主、自动热迁移。用户明确批准的自有服务器单用户 IP HTTPS/WSS 部署沿用既有认证和权限边界。
 - 向量检索、自动个人画像、未经许可的记忆提取。
 - 完整插件市场、分布式队列、通用 DAG 工作流、炫技式多 Agent 框架。
 

@@ -1,0 +1,169 @@
+{
+  "date": "2026-10-18",
+  "scope": "S7 local checks; Android and remote trusted deployment pending",
+  "environment": {
+    "platform": "Windows",
+    "python": "3.13.9",
+    "python_ssl": "OpenSSL 3.0.18 30 Sep 2025"
+  },
+  "final_installed_suite": {
+    "passed": 506,
+    "duration_seconds": 110.15,
+    "failed": 0,
+    "skipped": 0
+  },
+  "wheel_sha256": "3f73e86829f77e107cfddc059d22a44dfea8cadf860580a5cdedfa552186451e",
+  "requirements_lock_sha256": "9d0bdf2aa3913a66ffff4338af0972b5843d308ffc755062ddb9e35166c6a326",
+  "tls": {
+    "transport": "HTTPS/WSS with explicit isolated CA and hostname verification",
+    "core_pid": 58352,
+    "node_pid": 17448,
+    "system_task": "5eb81d82-90ff-4910-8b1a-24a18476a18b",
+    "directory_task": "074c4dec-9c0d-4c13-8d1e-ab88c1a5c48c",
+    "verification": "node_report_schema_checked",
+    "certificate_rejections": [
+      "untrusted CA",
+      "hostname mismatch"
+    ],
+    "wss_auth_rejections": [
+      "missing cookie",
+      "wrong origin"
+    ],
+    "idempotency_conflict_status": 409,
+    "model_calls": 0
+  },
+  "offline_restore": {
+    "original_pids": [
+      58984,
+      49756
+    ],
+    "restored_core_pid": 58224,
+    "restored_node_pid": 15352,
+    "backup_sha256": {
+      "core": "891cf6e645299291352333b05895026871b07e146795f7d53f698048ae948d51",
+      "node": "fd04cba5549f8fcc76db1a41a6033e0b303fa8e40c2a387602c4a53712d72301"
+    },
+    "restored_into_fresh_directories": true,
+    "node_initially_offline": true,
+    "scope_preserved": true,
+    "paused_preserved": true,
+    "history_preserved": true,
+    "pending_approval_preserved": "95538d14-b99d-4d20-8fea-0f199bdd2055",
+    "system_task": "2b5434a9-66c5-427a-9294-64a0d477bebd",
+    "directory_task": "60d3021c-f5a4-4a1d-8780-19473ba184ee",
+    "memory_consent": "6002d706-0c9e-4010-8756-8eec3ddc1890",
+    "model_calls": 0
+  },
+  "independent_process_faults": [
+    {
+      "fault": "before_send",
+      "core_pid": 42704,
+      "node_pid": 56604,
+      "old_core_pid": 57720,
+      "old_node_pid": null,
+      "worker_pid": null,
+      "receipt_count": 1,
+      "task_id": "6c6a7668-dab7-4d2f-9e13-a44658e4e96c",
+      "status": "succeeded",
+      "execution_outcome": "known",
+      "attempt_count": 1
+    },
+    {
+      "fault": "before_ack",
+      "core_pid": 58616,
+      "node_pid": 5556,
+      "old_core_pid": 55904,
+      "old_node_pid": null,
+      "worker_pid": null,
+      "receipt_count": 1,
+      "task_id": "340bd0eb-050a-4299-a6a6-7f7d963bad03",
+      "status": "succeeded",
+      "execution_outcome": "known",
+      "attempt_count": 1
+    },
+    {
+      "fault": "lost_receipts",
+      "core_pid": 9848,
+      "node_pid": 41868,
+      "old_core_pid": null,
+      "old_node_pid": null,
+      "worker_pid": null,
+      "receipt_count": 1,
+      "task_id": "76524be3-9b49-47ef-b2d4-a91fd74971a0",
+      "status": "succeeded",
+      "execution_outcome": "known",
+      "attempt_count": 1
+    },
+    {
+      "fault": "after_result_disconnect",
+      "core_pid": 37176,
+      "node_pid": 7556,
+      "old_core_pid": null,
+      "old_node_pid": null,
+      "worker_pid": null,
+      "receipt_count": 1,
+      "task_id": "4c06bfcb-adc4-468a-801f-383c63661b69",
+      "status": "succeeded",
+      "execution_outcome": "known",
+      "attempt_count": 1
+    },
+    {
+      "fault": "node_crash",
+      "core_pid": 16020,
+      "node_pid": 54428,
+      "old_core_pid": null,
+      "old_node_pid": 53400,
+      "worker_pid": 55552,
+      "receipt_count": 2,
+      "task_id": "70fa3aa1-9d89-4e19-9e69-f89e6a24e9e1",
+      "status": "succeeded",
+      "execution_outcome": "known",
+      "attempt_count": 2
+    },
+    {
+      "fault": "cancel",
+      "core_pid": 12944,
+      "node_pid": 28604,
+      "old_core_pid": null,
+      "old_node_pid": null,
+      "worker_pid": 4748,
+      "receipt_count": 1,
+      "task_id": "c4b45870-dd22-448f-9775-da54dd02c415",
+      "status": "cancelled",
+      "execution_outcome": "known",
+      "attempt_count": 1
+    },
+    {
+      "fault": "timeout",
+      "core_pid": 48272,
+      "node_pid": 1996,
+      "old_core_pid": null,
+      "old_node_pid": null,
+      "worker_pid": 55396,
+      "receipt_count": 2,
+      "task_id": "94f92ac2-6bb0-4461-8cb7-ad542fc80f43",
+      "status": "failed",
+      "execution_outcome": "known",
+      "attempt_count": 2
+    }
+  ],
+  "test_listener_ports_closed": [
+    49901,
+    49927,
+    50226,
+    52637,
+    53648,
+    54407,
+    54885,
+    60378,
+    60401,
+    61043,
+    61057,
+    61803
+  ],
+  "not_verified": [
+    "Android physical browser",
+    "user remote certificate trust and network",
+    "mobile network interruption/recovery"
+  ]
+}

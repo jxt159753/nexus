@@ -135,7 +135,7 @@ class SecurityService:
         principal = await self.authenticate_token(token, "owner")
         session_id = uuid4()
         session_token = SecretStr(secrets.token_urlsafe(32))
-        csrf = SecretStr(secrets.token_urlsafe(32))
+        csrf = SecretStr(digest("nexus-csrf-v1:" + session_token.get_secret_value()))
         expires = now + timedelta(hours=8)
         async with self.database.transaction() as conn:
             await assert_owner(conn, principal, now)
@@ -147,6 +147,16 @@ class SecurityService:
             ))
             await audit(conn, str(principal.identity_id), None, "session.created", now)
         return BrowserSession(session_id, session_token, csrf, expires)
+
+    async def session_info(self, token: SecretStr) -> dict:
+        principal = await self.authenticate_session(token)
+        csrf = digest("nexus-csrf-v1:" + token.get_secret_value())
+        async with self.database.transaction(write=False) as conn:
+            await assert_owner(conn, principal, utc_now())
+            row = await one(conn, "SELECT csrf_hash,expires_at FROM sessions WHERE session_id=?", (str(principal.session_id),))
+            if not secrets.compare_digest(row["csrf_hash"], digest(csrf)):
+                raise AccessDenied("AUTH_REQUIRED")  # Pre-S6 sessions require a new login.
+            return {"csrf_token": csrf, "expires_at": row["expires_at"], "owner_id": str(principal.identity_id)}
 
     async def authenticate_session(self, token: SecretStr, *, csrf: SecretStr | None = None, now: datetime | None = None) -> Principal:
         now = now or utc_now()
@@ -244,6 +254,10 @@ class SecurityService:
             return await self._prepare(conn, task, scope, version, now)
 
     async def _prepare(self, conn: aiosqlite.Connection, task: TaskRecord, scope: NodeScope, version: int, now: datetime) -> Authorization:
+        if task.status == "recovering" and not task.cancel_requested:
+            old = await one(conn, "SELECT execution_stopped,phase FROM task_attempts WHERE attempt_id=?", (str(task.current_attempt_id),))
+            if old is not None and old["execution_stopped"] and old["phase"] == "completed":
+                task = await transition(conn, task, "ready", task.owner_id, now, execution=True)
         if task.status not in {"queued", "awaiting_approval", "ready"}:
             raise AccessDenied("POLICY_DENIED")
         if task.action.tool == "system.info":

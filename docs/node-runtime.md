@@ -55,7 +55,7 @@ config = NodeConfig(
 
 没有 Core 任务终态写入入口。completed 指 Node 已持久化成功结果或结构化失败；不是 Core 已验证成功。目录结果还会检查 root_id、请求条目数及结果字节；Core 的权威验证已在 P07 接入，并与 Node 共用 contracts 中的结果约束。
 
-回执库为专用 `receipts.sqlite3`，包含 `execution_receipts` 及模式/Node 身份元数据。只记录有限命令身份、boot_id、局部阶段、Job 名称、停止确认及结果，不记录个人长期记忆。使用版本 SQL 001、摘要校验、FULL 同步及短事务；拒绝无版本库、未知模式、篡改 SQL 摘要或其他 Node 的数据库，不覆盖或重建旧库。当前只有首次建库与同版本重开；未来升级须先添加一致备份和前向迁移。
+回执库为专用 `receipts.sqlite3`，包含 `execution_receipts`、取消墓碑及模式/Node 身份元数据。只记录有限命令身份、boot_id、局部阶段、Job 名称、停止确认及结果，不记录个人长期记忆。使用版本 SQL 001/002、摘要校验、FULL 同步及短事务；拒绝无版本库、未知模式、篡改摘要或其他 Node 的数据库，不覆盖或重建旧库。S5 已加入前向升级及升级前经 quick_check 的一致备份。
 
 received 落盘失败或 started 落盘失败时不启动工具。结果落盘失败时不返回缓存成功，并停止新的执行；重开时将原 started 保留为 unknown。已完成回执即使命令后来过期或连接更换仍可重传；这不会再次运行工具。Core 对重传授权及当前会话的验证由后续 Link 完成。
 
@@ -67,4 +67,4 @@ received 落盘失败或 started 落盘失败时不启动工具。结果落盘�
 
 Node 意外退出时 OS 清理 Job；重启后查询原 Job 是否还有进程。started 永远转为 unknown，即使已确认进程结束，也不能据此推断读取没有发生。若停止尚未确认，阻止新执行；确认停止后可接受 Core 创建的另一 attempt，但绝不自行重试原 attempt。仅 received 的命令可以在重新校验策略和期限后继续。
 
-本地进程停止是 P05 的基础设施；Core 重试预算、全局暂停、取消竞争和网络对账属于 P08，尚未实现。Windows API 依据 [Microsoft Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects) 和 [AssignProcessToJobObject](https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-assignprocesstojobobject) 封装，平台代码仅在 Node 内。
+本地进程停止是 P05 的基础设施；P08 已接入 Core 重试预算、持久暂停、取消竞争和网络对账，见 [S5 说明](s5-recovery.md)。Node 同时增加取消墓碑、停止证据和模式升级前一致备份。Windows API 依据 [Microsoft Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects) 和 [AssignProcessToJobObject](https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-assignprocesstojobobject) 封装，平台代码仅在 Node 内。
