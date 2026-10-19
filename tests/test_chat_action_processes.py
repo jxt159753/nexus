@@ -8,6 +8,7 @@ import sys
 from uuid import uuid4
 
 import httpx2
+import pytest
 
 from test_link_processes import spawn, stop, wait_for
 from test_node_link import grant
@@ -30,7 +31,20 @@ class Stream(httpx2.AsyncByteStream):
             if usage is not None:body['usage']=usage
             return ('data: '+json.dumps(body,ensure_ascii=False)+'\n\n').encode()
         title='{"title":"工作区检查"}\n' if 'Start your content' in value['messages'][0]['content'] else ''
-        if value.get('tools'):
+        if value['messages'][-1]['role']=='tool':
+            assert 'tools' not in value
+            previous=value['messages'][-2]['tool_calls'][0]
+            assert value['messages'][-1]['tool_call_id']==previous['id']=='call-synthetic'
+            data=json.loads(value['messages'][-1]['content'])
+            assert data['verification']=='node_report_schema_checked'
+            answer='根据工具结果，系统是 '+data['result']['os_name'] if 'os_name' in data['result'] else '目录条目包括 '+', '.join(e['name'] for e in data['result']['entries'])
+            yield event({'content':answer[:4]})
+            if any('BLOCKFINAL' in m.get('content','') for m in value['messages'] if m['role']=='user'):
+                await asyncio.sleep(60)
+            await asyncio.sleep(.15)
+            yield event({'content':answer[4:]})
+            yield event({},'stop',{'prompt_tokens':200,'completion_tokens':30})
+        elif value.get('tools'):
             assert len(value['tools'])==2 and value['tool_choice']=='auto'
             directory='directory' in value['messages'][-1]['content'] or '目录' in value['messages'][-1]['content']
             name='list_directory' if directory else 'get_system_info'
@@ -87,7 +101,8 @@ workspace={json.dumps(str(root))}
     return config,node_config,origin
 
 
-def test_chat_actions_real_tools_confirmation_approval_and_restart(world,tmp_path):
+@pytest.mark.parametrize('summarize',[False,True])
+def test_chat_actions_real_tools_confirmation_approval_and_restart(world,tmp_path,summarize):
     config,node_config,origin=configure(world,tmp_path)
     env={k:v for k,v in os.environ.items() if not k.startswith("NEXUS_")}
     env["DEEPSEEK_API_KEY"]="synthetic-no-external-api"
@@ -122,11 +137,19 @@ def test_chat_actions_real_tools_confirmation_approval_and_restart(world,tmp_pat
                 detail=wait_for(lambda:(item if (item:=client.get("/api/v1/tasks/"+task["task_id"]).json())["task"]["status"]=="succeeded" else None))
                 assert len(detail["attempts"])==1 and detail["task"]["verification"]=="node_report_schema_checked"
                 results.append(detail)
+                if summarize:
+                    preview=client.post(turn_path+'/result-preview',json={},headers=auth).json()['preview']
+                    assert preview['data']['result']==detail['task']['result']
+                    consent={key:preview[key] for key in ('result_digest','expected_revision')};consent['allow_model']=True
+                    assert client.post(turn_path+'/result-consent',json=consent,headers=auth).status_code==200
+                    completed=wait_for(lambda:(item if (item:=client.get(turn_path).json()['turn'])['status']=='completed' and item['phase']=='summary' else None))
+                    assert ('Windows' if 'system' in text else 'example.txt') in completed['response_text']
+                    assert client.post(turn_path+'/result-consent',json=consent,headers=auth).status_code==200
             assert results[0]["task"]["result"]["os_name"]=="Windows"
             assert results[1]["task"]["result"]["entries"]==[{"name":"example.txt","kind":"file"}]
             history=client.get(path).json()
             assert history["conversation"]["title"]=="工作区检查" and "title" not in history["turns"][0]["response_text"]
-            usage=client.get("/api/v1/models/usage").json();assert usage["calls"]==2
+            usage=client.get("/api/v1/models/usage").json();assert usage["calls"]==(4 if summarize else 2)
             stop(core);core=start();wait_for(lambda:client.get("/api/v1/session").status_code==200)
             assert client.get(path).json()==history and client.get("/api/v1/models/usage").json()==usage
             for detail in results:assert client.get("/api/v1/tasks/"+detail["task"]["task_id"]).json()==detail

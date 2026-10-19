@@ -24,6 +24,7 @@ class ModelReply:
     finish_reason: str = "stop"
     title: str | None = None
     proposal: dict | None = None
+    native_tool_call: dict | None = None
 
 
 class DecisionModel(Protocol):

@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Query, Request
 
 from nexus.contracts.base import StrictContract
-from nexus.contracts.chat import ChatActionDecision, ChatSubmission, ConversationCreate, ConversationUpdate
+from nexus.contracts.chat import ChatActionDecision, ChatResultConsent, ChatResultPreview, ChatSubmission, ConversationCreate, ConversationUpdate
 from nexus.core.harness.http import body
 
 
@@ -20,6 +20,8 @@ class ChatHTTP:
             ("/conversations/{conversation_id}/turns", "POST", self.submit),
             ("/turns/{turn_id}", "GET", self.get), ("/turns/{turn_id}/stop", "POST", self.stop),
             ("/turns/{turn_id}/action", "POST", self.decide_action),
+            ("/turns/{turn_id}/result-preview", "POST", self.preview_result),
+            ("/turns/{turn_id}/result-consent", "POST", self.consent_result),
         ]:
             self.router.add_api_route(path, handler, methods=[method])
 
@@ -52,3 +54,11 @@ class ChatHTTP:
     async def decide_action(self,turn_id: UUID,request: Request):
         principal=await self.guards.owner_http(request)
         return await self.service.decide_action(principal,turn_id,await body(request,ChatActionDecision))
+
+    async def preview_result(self, turn_id: UUID, request: Request):
+        principal = await self.guards.owner_http(request)
+        return {"preview": await self.service.preview_result(principal, turn_id, await body(request, ChatResultPreview))}
+
+    async def consent_result(self, turn_id: UUID, request: Request):
+        principal = await self.guards.owner_http(request)
+        return {"turn": await self.service.consent_result(principal, turn_id, await body(request, ChatResultConsent))}

@@ -10,6 +10,18 @@ from nexus.contracts.language import SystemProposal, DirectoryProposal
 
 CHAT_PROPOSAL = TypeAdapter(Annotated[SystemProposal | DirectoryProposal, Field(discriminator="intent")])
 
+ResultField = Literal["os_name", "os_version", "architecture", "python_version", "root_id", "entries", "truncated"]
+
+
+class ChatResultPreview(StrictContract):
+    fields: list[ResultField] | None = Field(default=None, min_length=1, max_length=7)
+
+
+class ChatResultConsent(StrictContract):
+    result_digest: StrictStr = Field(pattern=r"^[a-f0-9]{64}$")
+    expected_revision: StrictInt = Field(ge=1)
+    allow_model: StrictBool = False
+
 
 class ChatActionDecision(StrictContract):
     proposal_digest: StrictStr = Field(pattern=r"^[a-f0-9]{64}$")

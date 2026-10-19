@@ -203,12 +203,12 @@ class SecurityService:
             raise AccessDenied()
         return await self._policy_eligible(conn, task, scope, now)
 
-    async def _policy_eligible(self, conn: aiosqlite.Connection, task: TaskRecord, scope: NodeScope, now: datetime) -> int:
+    async def _policy_eligible(self, conn: aiosqlite.Connection, task: TaskRecord, scope: NodeScope, now: datetime, *, require_unexpired: bool = True) -> int:
         """Recheck durable identities and grants independently of browser presence."""
         owner = await one(conn, "SELECT role, revoked_at FROM identities WHERE identity_id=?", (str(task.owner_id),))
         if owner is None or owner["role"] != "owner" or owner["revoked_at"] is not None:
             raise AccessDenied("POLICY_DENIED")
-        if scope.node_id != task.node_id or now >= task.expires_at:
+        if scope.node_id != task.node_id or (require_unexpired and now >= task.expires_at):
             raise AccessDenied("POLICY_DENIED")
         node = await one(conn, "SELECT role, revoked_at FROM identities WHERE identity_id=?", (str(task.node_id),))
         if node is None or node["role"] != "node" or node["revoked_at"] is not None:

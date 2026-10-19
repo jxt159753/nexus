@@ -1,0 +1,63 @@
+{
+  "wheel_sha256": "1fb3492b6f1e3afb9e3bfb004c4f40519fcc95a7d1b4192fd9039a47b498dba7",
+  "source_resource_files_matched": 84,
+  "python_syntax": "passed",
+  "local_document_links_checked": 130,
+  "new_dependencies": 0,
+  "actual_deepseek_calls": 0,
+  "production_changed": false,
+  "source_tests": {
+    "passed": 613,
+    "seconds": 158.8,
+    "warnings_as_errors": true,
+    "skipped": 0
+  },
+  "installed_tests": {
+    "passed": 613,
+    "seconds": 159.91,
+    "source_pythonpath_disabled": true,
+    "warnings_as_errors": true,
+    "skipped": 0
+  },
+  "browser": {
+    "browser": "real headless Edge",
+    "desktop": "1280x960",
+    "mobile_viewport": "390x844",
+    "model": "mock DeepSeek native SSE",
+    "real_windows_tools": true,
+    "field_selection": true,
+    "changed_fields_disable_consent": true,
+    "preview_makes_no_model_calls": true,
+    "final_system_answer": true,
+    "directory_approved": true,
+    "final_directory_answer": true,
+    "refresh_history": true,
+    "model_calls": 4,
+    "actual_deepseek_calls": 0,
+    "page_errors": [],
+    "horizontal_overflow": false,
+    "android_device": false
+  },
+  "migration": 9,
+  "production_schema": 8,
+  "model_calls_per_round": {
+    "ordinary": 1,
+    "with_approved_result": 2
+  },
+  "daily_cost_microunits": 1000000,
+  "root_round_cost_microunits": 50000,
+  "daily_calls": 100,
+  "linux": {
+    "python": "3.12.3",
+    "passed": 512,
+    "seconds": 45.05,
+    "modules": 20,
+    "dependency_pins": 25,
+    "warnings_as_errors": true,
+    "skipped": 0,
+    "source_pythonpath_disabled": true,
+    "non_login_nexus_user": true,
+    "production_service_active": true,
+    "deployed": false
+  }
+}

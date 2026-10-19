@@ -1,5 +1,5 @@
 "use strict";
-const chatState = {conversation:null, conversations:new Map(), turns:new Map(), active:null, retry:null, createRequest:null, before:null, listBefore:null, latest:true, loading:false, enabled:false, epoch:0};
+const chatState = {conversation:null, conversations:new Map(), turns:new Map(), previews:new Map(), active:null, retry:null, createRequest:null, before:null, listBefore:null, latest:true, loading:false, enabled:false, epoch:0};
 const chatLabels = {queued:"等待回复",generating:"正在回复",completed:"已完成",incomplete:"达到输出上限，回复未完整结束",stopping:"正在停止",stopped:"已停止",interrupted:"服务中断，未自动重发",failed:"回复失败",expired:"请求已过期"};
 function chatNodes(nodes) {
   const selected=$("chat-node").value;
@@ -8,7 +8,7 @@ function chatNodes(nodes) {
   if (nodes.some(n=>n.node_id===selected)) $("chat-node").value=selected;
 }
 function chatReset() {
-  chatState.epoch++; chatState.conversation=null; chatState.conversations.clear(); chatState.turns.clear(); chatState.active=null; chatState.retry=null; chatState.createRequest=null; chatState.before=null; chatState.listBefore=null; chatState.latest=true;
+  chatState.epoch++; chatState.conversation=null; chatState.conversations.clear(); chatState.turns.clear(); chatState.previews.clear(); chatState.active=null; chatState.retry=null; chatState.createRequest=null; chatState.before=null; chatState.listBefore=null; chatState.latest=true;
   $("chat-messages").replaceChildren(); $("chat-conversation").replaceChildren(new Option("新建一个会话开始", "")); $("chat-form").reset(); $("chat-title-form").reset(); $("chat-send").disabled=true; $("chat-stop").disabled=true;
 }
 function chatAvailability(enabled) {
@@ -31,7 +31,7 @@ async function chatList(older=false) {
 }
 async function chatSelect(id) {
   if (chatState.conversation?.conversation_id!==id) {
-    chatState.epoch++; chatState.turns.clear(); chatState.retry=null; chatState.before=null; chatState.latest=true; $("chat-context").checked=true; $("chat-text").value="";
+    chatState.epoch++; chatState.turns.clear(); chatState.previews.clear(); chatState.retry=null; chatState.before=null; chatState.latest=true; $("chat-context").checked=true; $("chat-text").value="";
   }
   chatState.conversation=chatState.conversations.get(id);
   await chatHistory();
@@ -77,6 +77,38 @@ function chatContent(text) {
   if (offset<text.length) fragment.append(el("div",text.slice(offset),"chat-prose"));
   return fragment;
 }
+function chatResultPreview(turn, card) {
+  const value=chatState.previews.get(turn.turn_id), box=el("section",undefined,"chat-result-preview");
+  const load=el("button",value ? "更新所选字段预览" : "预览可发送的结果","quiet");
+  const choices=[];
+  const send=el("button","同意发送这些结果给 DeepSeek 并生成最终回答","primary");
+  send.disabled=!value || value.expected_revision!==chatState.conversation?.revision || new Date(value.expires_at)<=new Date();
+  if (value) {
+    const labels={os_name:"操作系统",os_version:"系统版本",architecture:"处理器架构",python_version:"Python 版本",root_id:"工作区别名",entries:"目录条目名称和类型",truncated:"是否截断"};
+    box.append(el("p","选择本次外发字段；改选后请更新预览。原输入及当时所选上下文也将再次发送。","hint"));
+    for (const field of value.available_fields) {
+      const label=el("label",undefined,"checkbox"), input=document.createElement("input"); input.type="checkbox"; input.checked=value.fields.includes(field); input.value=field;
+      input.onchange=()=>{send.disabled=true;}; choices.push(input); label.append(input,document.createTextNode(labels[field])); box.append(label);
+    }
+    box.append(el("pre",JSON.stringify(value.data,null,2)),el("p",`以上为实际外发结果；有效至 ${new Date(value.expires_at).toLocaleTimeString()}。最多再调用一次，与本轮已用费用共用 $0.05 上限。`,"hint"));
+  }
+  load.onclick=action(async()=>{
+    load.disabled=true;
+    try {
+      const fields=choices.length ? choices.filter(c=>c.checked).map(c=>c.value) : null;
+      const reply=await api(`/api/v1/chat/turns/${turn.turn_id}/result-preview`,{method:"POST",body:JSON.stringify({fields})});
+      chatState.previews.set(turn.turn_id,reply.preview); await chatHistory();
+    } finally {load.disabled=false;}
+  });
+  send.onclick=action(async()=>{
+    send.disabled=true;
+    try {
+      await api(`/api/v1/chat/turns/${turn.turn_id}/result-consent`,{method:"POST",body:JSON.stringify({result_digest:value.result_digest,expected_revision:value.expected_revision,allow_model:true})});
+      chatState.previews.delete(turn.turn_id); await chatHistory();
+    } finally {if (send.isConnected) send.disabled=false;}
+  });
+  box.append(load); if (value) box.append(send); card.append(box);
+}
 function chatRender() {
   const log=$("chat-messages"), nearBottom=log.scrollHeight-log.scrollTop-log.clientHeight<90;
   const existing=new Map([...log.querySelectorAll("[data-turn-id]")].map(n=>[n.dataset.turnId,n]));
@@ -86,12 +118,12 @@ function chatRender() {
     keep.add(turn.turn_id); let article=existing.get(turn.turn_id);
     if (!article) {article=el("article",undefined,"chat-turn"); article.dataset.turnId=turn.turn_id;}
     const task=turn.task_id ? state.tasks.get(turn.task_id) : null;
-    const revision=`${turn.revision}:${task?.task.revision ?? ""}`;
+    const revision=`${turn.revision}:${task?.task.revision ?? ""}:${chatState.conversation?.revision}:${chatState.previews.get(turn.turn_id)?.result_digest ?? ""}`;
     if (article.dataset.revision!==revision) {
       article.dataset.revision=revision;
       const question=el("div",undefined,"chat-user"), answer=el("div",undefined,"chat-assistant");
       question.append(el("strong","你"),el("div",turn.text,"chat-prose"));
-      answer.append(el("strong","NEXUS"),chatContent(turn.response_text || (turn.proposal ? "已提出只读动作，等待你的决定。" : turn.status==="queued" ? "等待模型…" : turn.status==="generating" ? "正在生成…" : "尚无回复内容")));
+      answer.append(el("strong","NEXUS"),chatContent(turn.phase==="summary" ? (turn.initial_response_text || "已确认只读动作。") : turn.response_text || (turn.proposal ? "已提出只读动作，等待你的决定。" : turn.status==="queued" ? "等待模型…" : turn.status==="generating" ? "正在生成…" : "尚无回复内容")));
       const cost=turn.cost_status==="unknown" ? " · 费用未知，保留预留" : turn.cost_microunits!=null ? ` · 费用上界 $${turn.cost_microunits/1000000}` : "";
       answer.append(el("p",`${chatLabels[turn.status]}${turn.error_code ? " · "+turn.error_code : ""}${cost}${turn.context_truncated ? " · 本轮较早上下文已裁剪" : ""}`,"hint"));
       const inspect=el("button","查看本轮发送内容","quiet");
@@ -108,10 +140,12 @@ function chatRender() {
             button.onclick=action(async()=>{button.disabled=true; try {const value=await api(`/api/v1/chat/turns/${turn.turn_id}/action`,{method:"POST",body:JSON.stringify({proposal_digest:turn.proposal_digest,decision})}); if (value.task) await updateTask(value.task.task_id); await chatHistory();} finally {button.disabled=false;}});
             buttons.append(button);
           }
-          card.append(el("p","确认后进入权限检查；目录仍需单独审批。工具结果仅在控制台显示。","hint"),buttons);
+          card.append(el("p","确认后进入权限检查；目录仍需单独审批。结果可在预览并同意后回传模型。","hint"),buttons);
         } else if (!turn.task_id) card.append(el("p",turn.action_status==="rejected" ? "你已拒绝这个动作。" : "动作已过期或会话已归档，请重新提出请求。","hint"));
+        if (turn.result_supported && turn.phase==="reply" && turn.status==="completed" && task?.task.status==="succeeded" && !chatState.active && turn===turns.at(-1) && !chatState.conversation?.archived) chatResultPreview(turn,card);
         answer.append(card);
       }
+      if (turn.phase==="summary") answer.append(el("strong","最终回答"),chatContent(turn.response_text || (turn.status==="queued" ? "等待模型解读结果…" : turn.status==="generating" ? "正在根据结果生成回答…" : "本次解读未完成；工具执行结果已保留。")));
       article.replaceChildren(question,answer);
     }
     log.append(article);
