@@ -42,7 +42,7 @@ $env:PATH = 'C:\Program Files\Git\usr\bin;' + $env:PATH
 & .\.venv\Scripts\python.exe -B -m pytest -q -p no:cacheprovider --tb=short -W error --basetemp ./var/m4-check/pytest-source
 ```
 
-结果：`657 passed in 303.30s`，退出码 0，无跳过。使用 Git OpenSSL 3.5.4 是既有测试环境要求；未修改 TLS/信任设置。原始 basetemp 在 Git 忽略的 `var/m4-check/pytest-source`。
+结果：`657 passed in 288.11s`，退出码 0，无跳过。使用 Git OpenSSL 3.5.4 是既有测试环境要求；未修改 TLS/信任设置。原始 basetemp 在 Git 忽略的 `var/m4-check/pytest-source`。
 
 ### 3.3 独立安装包完整回归
 
@@ -54,9 +54,9 @@ $env:PATH = 'C:\Program Files\Git\usr\bin;' + $env:PATH
 & E:\NEXUS\var\m4-check\installed-env\Scripts\python.exe -I -B -m pytest -q -p no:cacheprovider -o pythonpath= --tb=short -W error --basetemp E:\NEXUS\var\m4-check\pytest-installed
 ```
 
-结果：wheel 构建成功；25 个锁定依赖离线安装、`pip check` 通过；禁用源码 pythonpath 后 `657 passed in 267.53s`，退出码 0，无跳过。
+结果：wheel 构建成功；25 个锁定依赖离线安装、`pip check` 通过；禁用源码 pythonpath 后 `657 passed in 274.56s`，退出码 0，无跳过。
 
-- wheel：`nexus-0.1.0-py3-none-any.whl`，SHA-256 `d3605c7e887750fbefb20edcd1bc241fc02ea7134ab5a2644dd2c26c4d06c1a5`。
+- wheel：`nexus-0.1.0-py3-none-any.whl`，SHA-256 `ef6ece8d6ba168113159fc3a774292c0085f7cfa84178da755966f0db0d9f716`。
 - wheel 内 `nexus/` 102 个源码/资源文件与 `src/` 逐字节一致；含迁移 011、`extensions.js`、`sandbox` 包。
 - 未在 Linux 安装该 wheel；Linux/3.12 本轮未复测。
 

@@ -27,12 +27,12 @@
   },
   "tests": {
     "focused_m4": {"passed": 20, "skipped": 0, "command": "pytest tests/test_extensions_m4.py tests/test_extensions_http.py tests/test_sandbox_m4.py tests/test_extension_migration.py"},
-    "source_windows": {"passed": 657, "skipped": 0, "seconds": 303.3, "warnings_as_errors": true},
-    "installed_wheel_windows": {"passed": 657, "skipped": 0, "seconds": 267.53, "pythonpath_disabled": true, "pip_check": "ok"}
+    "source_windows": {"passed": 657, "skipped": 0, "seconds": 288.11, "warnings_as_errors": true},
+    "installed_wheel_windows": {"passed": 657, "skipped": 0, "seconds": 274.56, "pythonpath_disabled": true, "pip_check": "ok"}
   },
   "package": {
     "wheel": "nexus-0.1.0-py3-none-any.whl",
-    "sha256": "d3605c7e887750fbefb20edcd1bc241fc02ea7134ab5a2644dd2c26c4d06c1a5",
+    "sha256": "ef6ece8d6ba168113159fc3a774292c0085f7cfa84178da755966f0db0d9f716",
     "files_compared": 102,
     "source_resource_mismatches": 0,
     "migrations_and_web_assets_included": true

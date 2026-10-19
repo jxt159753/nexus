@@ -412,7 +412,7 @@ DSH 按用户最新启动指令连续实施 P21–P24 的开发与隔离验证�
 | P23 | v2 协议、独立 Sandbox Node、runsc 预检、Windows/缺失沙箱拒绝、可信 Tool 控制器和测试替身已实现；**无专用 Linux/runsc 主机，真实隔离、宿主限额和生成 Tool 批准/执行未完成**。 |
 | P24 | 三步组合候选、参考/截断/依赖门、停用/回退和替身闭环有测试；**第三步真实沙箱业务执行、Android 真机、生产部署未完成**。 |
 | 页面 | 真实 headless Edge 390/1280 完成预览→生成→测试→批准→启用，无 JS 错误、无横向溢出；不是 Android 真机。 |
-| 证据 | [M4-VERIFICATION](M4-VERIFICATION.md)、[脱敏证据](assets/m4-evidence.json)、[v2 协议](m4-extension-protocol.md)、[使用说明](m4-usage.md)、[ADR 0014](decisions/0014-m4-self-extension.md)；wheel SHA-256 `d3605c7e887750fbefb20edcd1bc241fc02ea7134ab5a2644dd2c26c4d06c1a5`。 |
+| 证据 | [M4-VERIFICATION](M4-VERIFICATION.md)、[脱敏证据](assets/m4-evidence.json)、[v2 协议](m4-extension-protocol.md)、[使用说明](m4-usage.md)、[ADR 0014](decisions/0014-m4-self-extension.md)；wheel SHA-256 `ef6ece8d6ba168113159fc3a774292c0085f7cfa84178da755966f0db0d9f716`。 |
 | 提交/推送 | 仅本地提交；用户未授予本轮推送授权。工作区未提交 `var/`、数据库、凭证或虚拟环境。 |
 
 当前状态：**M4 首版开发交付部分完成，待 Codex 独立复核与 owner 决定**。P21/P22 的 Core/契约/Skill/页面与拒绝路径可复核；P23/P24 的真实 runsc 隔离、生成 Tool 的候选→测试→批准→执行、Android 与生产验收保持未完成。不能把本次交付宣布为用户验收通过或完整 M4，也不自动进入下一阶段。复现步骤、A01–A18 逐项状态、中间失败和限制见 [M4-VERIFICATION](M4-VERIFICATION.md)。
