@@ -156,6 +156,8 @@ class ToolService:
                 approval = await self.extensions.current_approval(conn, version, now)
             except AccessDenied:
                 return "failed"
+            if approval["node_id"] is not None and approval["node_id"] != str(node_id):
+                return "failed"
             existing = await one(conn, "SELECT * FROM extension_tool_runs WHERE skill_run_id=? AND step_index=?", (skill_run_id, step_index))
             if existing is not None:
                 return existing["status"]
