@@ -6,7 +6,7 @@
     "implementation_commit": "57ea5a252ec1a24a1fc4f8e704405f2d803d9750",
     "initial_implementation_commit": "9220281a91b3dd37bdacccda8e0f8dbf77e3388f",
     "baseline_commit": "a8baa7710eb84c14b54d15fbdeb1532184625eee",
-    "branch": "main",
+    "branch": "codex/m4-self-extension",
     "codex_review": "pending",
     "user_acceptance": "not_claimed"
   },

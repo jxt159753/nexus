@@ -6,7 +6,7 @@
 
 - 交接基线：`a8baa7710eb84c14b54d15fbdeb1532184625eee`（工作文档记录）。
 - 代码提交：`9220281a91b3dd37bdacccda8e0f8dbf77e3388f`（`feat: implement M4 bounded Tool and Skill self-extension`），最终代码提交 `57ea5a252ec1a24a1fc4f8e704405f2d803d9750`（`fix: bind sandbox Tool execution to its approved node`）。本文与证据文件位于其后的文档提交。
-- 分支：`main`（未新建分支、未推送；用户未给本轮推送授权）。
+- 分支：`codex/m4-self-extension`（本地分支；`main` 保持交接基线 `a8baa77`，未推送；用户未给本轮推送授权）。
 - 平台：Windows 11 `10.0.26200`，PowerShell `5.1.26100.9711`，Python `3.13.9`，项目 `.venv`。
 - Core schema：升级前 `010`，新增顺序迁移 `011_self_extension.sql`；未改写 001–010。
 - 依赖：未新增运行依赖；`requirements.lock` 的 25 个锁定包不变。
