@@ -55,7 +55,11 @@ class Stream(httpx2.AsyncByteStream):
             yield event({'tool_calls':[{'index':0,'function':{'arguments':arguments[1:]}}]})
             yield event({},'tool_calls',{'prompt_tokens':100,'completion_tokens':20})
         else:
-            yield event({'content':title+'这是普通聊天，不执行工具。'})
+            previous=[m['content'] for m in value['messages'] if m['role']=='assistant' and ('根据工具结果' in (m.get('content') or '') or '目录条目包括' in (m.get('content') or ''))]
+            if value['messages'][-1]['content'].strip()=='信息是啥':
+                assert previous,'Follow-up lost the verified final answer'
+            answer='上次结果：'+previous[-1] if previous else '这是普通聊天，不执行工具。'
+            yield event({'content':title+answer})
             yield event({},'stop',{'prompt_tokens':100,'completion_tokens':20})
         yield b'data: [DONE]\n\n'
     async def aclose(self):pass
@@ -101,7 +105,7 @@ workspace={json.dumps(str(root))}
     return config,node_config,origin
 
 
-@pytest.mark.parametrize('summarize',[False,True])
+@pytest.mark.parametrize('summarize',[False,True,'auto'])
 def test_chat_actions_real_tools_confirmation_approval_and_restart(world,tmp_path,summarize):
     config,node_config,origin=configure(world,tmp_path)
     env={k:v for k,v in os.environ.items() if not k.startswith("NEXUS_")}
@@ -126,7 +130,7 @@ def test_chat_actions_real_tools_confirmation_approval_and_restart(world,tmp_pat
                 proposed=wait_for(lambda:(item if (item:=client.get(turn_path).json()["turn"])["action_status"]=="proposed" else None))
                 assert proposed["status"]=="completed" and proposed["task_id"] is None
                 assert len(client.get("/api/v1/tasks").json()["tasks"])==len(results)
-                value={"decision":"confirm","proposal_digest":proposed["proposal_digest"]}
+                value={"decision":"confirm","proposal_digest":proposed["proposal_digest"],"allow_result_model":summarize=='auto'}
                 task=client.post(turn_path+"/action",json=value,headers=auth).json()["task"]
                 assert client.post(turn_path+"/action",json=value,headers=auth).json()["task"]["task_id"]==task["task_id"]
                 if "directory" in text:
@@ -138,13 +142,14 @@ def test_chat_actions_real_tools_confirmation_approval_and_restart(world,tmp_pat
                 assert len(detail["attempts"])==1 and detail["task"]["verification"]=="node_report_schema_checked"
                 results.append(detail)
                 if summarize:
-                    preview=client.post(turn_path+'/result-preview',json={},headers=auth).json()['preview']
-                    assert preview['data']['result']==detail['task']['result']
-                    consent={key:preview[key] for key in ('result_digest','expected_revision')};consent['allow_model']=True
-                    assert client.post(turn_path+'/result-consent',json=consent,headers=auth).status_code==200
+                    if summarize is True:
+                        preview=client.post(turn_path+'/result-preview',json={},headers=auth).json()['preview']
+                        assert preview['data']['result']==detail['task']['result']
+                        consent={key:preview[key] for key in ('result_digest','expected_revision')};consent['allow_model']=True
+                        assert client.post(turn_path+'/result-consent',json=consent,headers=auth).status_code==200
                     completed=wait_for(lambda:(item if (item:=client.get(turn_path).json()['turn'])['status']=='completed' and item['phase']=='summary' else None))
                     assert ('Windows' if 'system' in text else 'example.txt') in completed['response_text']
-                    assert client.post(turn_path+'/result-consent',json=consent,headers=auth).status_code==200
+                    if summarize is True:assert client.post(turn_path+'/result-consent',json=consent,headers=auth).status_code==200
             assert results[0]["task"]["result"]["os_name"]=="Windows"
             assert results[1]["task"]["result"]["entries"]==[{"name":"example.txt","kind":"file"}]
             history=client.get(path).json()

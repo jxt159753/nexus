@@ -9,7 +9,7 @@ from datetime import timedelta
 from uuid import UUID, uuid4
 
 from nexus.contracts.chat import CHAT_PROPOSAL, ChatActionDecision, ChatResultConsent, ChatResultPreview, ChatSubmission, ConversationCreate, ConversationUpdate
-from nexus.core.cognitive.chat_results import checked_native, preview, public_preview, validate_preview
+from nexus.core.cognitive.chat_results import RESULT_FIELDS, checked_native, preview, public_preview, queue_summary, validate_preview
 from nexus.core.models.budget import budget_error
 from nexus.core.models.deepseek import MODEL, ProviderFailure
 from nexus.core.security.types import AccessDenied, Principal
@@ -19,7 +19,7 @@ from nexus.core.models.providers import ModelReply
 from nexus.core.storage.database import audit, one, timestamp, utc_now
 from nexus.core.storage.tasks import REQUEST, Conflict, canonical
 
-ACTIVE = "('queued','generating','stopping')"
+ACTIVE = "(status IN ('queued','generating','stopping') OR auto_result_status='waiting')"
 TURN_SELECT = """SELECT t.rowid AS cursor,t.*,m.cost_status,m.cost_microunits,coalesce(m.model_call_count,0) AS model_call_count
 FROM chat_turns t LEFT JOIN (
  SELECT chat_turn_id,CASE WHEN sum(cost_status='unknown')>0 THEN 'unknown'
@@ -36,8 +36,10 @@ def public_turn(row: sqlite3.Row, *, detail: bool = False) -> dict:
     proposal=value.pop("proposal_json")
     value["result_supported"] = bool(value.pop("native_tool_call_json"))
     result_preview = value.pop("result_preview_json")
+    value["auto_result_allowed"] = bool(value.pop("auto_result_json"))
     value.update(include_context=request["include_context"], context_truncated=bool(value["context_truncated"]),
                  allow_tools=request.get("allow_tools",False),node_id=request.get("node_id"),proposal=json.loads(proposal) if proposal else None)
+    value["result_fields"] = RESULT_FIELDS[value["proposal"]["intent"]] if value["proposal"] else ()
     if detail:
         value["context_messages"] = context
         if result_preview and value["summary_consented_at"]:
@@ -92,7 +94,7 @@ class ChatService:
         async with self.database.transaction(write=False) as conn:
             conversation = await self.conversation(conn, principal, conversation_id)
             rows = await conn.execute_fetchall(TURN_SELECT + " WHERE t.conversation_id=? AND t.rowid<? ORDER BY t.rowid DESC LIMIT 20", (str(conversation_id), before))
-            active = await one(conn, f"SELECT turn_id FROM chat_turns WHERE conversation_id=? AND status IN {ACTIVE}", (str(conversation_id),))
+            active = await one(conn, f"SELECT turn_id FROM chat_turns WHERE conversation_id=? AND {ACTIVE}", (str(conversation_id),))
             return {"conversation": dict(conversation), "active_turn_id": active[0] if active else None, "turns": [public_turn(row) for row in reversed(rows)]}
 
     async def get(self, principal: Principal, turn_id: UUID | str) -> dict:
@@ -104,6 +106,11 @@ class ChatService:
             return public_turn(row, detail=True)
 
     async def submit(self, principal: Principal, conversation_id: UUID | str, value: ChatSubmission) -> dict:
+        # Confirmation and the next message cannot interleave task association.
+        async with self.harness.operation:
+            return await self._submit(principal, conversation_id, value)
+
+    async def _submit(self, principal: Principal, conversation_id: UUID | str, value: ChatSubmission) -> dict:
         value = ChatSubmission.model_validate_json(value.model_dump_json())
         encoded = canonical(value.model_dump(mode="json"))
         async with self.database.transaction() as conn:
@@ -125,11 +132,11 @@ class ChatService:
                     raise AccessDenied("POLICY_DENIED")
             if conversation["archived"] or conversation["revision"] != value.expected_revision:
                 raise Conflict("IDEMPOTENCY_CONFLICT")
-            if await one(conn, f"SELECT 1 FROM chat_turns WHERE conversation_id=? AND status IN {ACTIVE}", (str(conversation_id),)):
+            if await one(conn, f"SELECT 1 FROM chat_turns WHERE conversation_id=? AND {ACTIVE}", (str(conversation_id),)):
                 raise Conflict("BUSY")
             now = utc_now()
             recent = await one(conn, "SELECT count(*) FROM chat_turns WHERE owner_id=? AND created_at>?", (str(principal.identity_id), timestamp(now-timedelta(minutes=1))))
-            total = await one(conn, "SELECT count(*),coalesce(sum(length(CAST(context_json AS BLOB))+length(CAST(response_text AS BLOB))+length(CAST(request_json AS BLOB))+coalesce(length(CAST(result_preview_json AS BLOB)),0)+coalesce(length(CAST(initial_response_text AS BLOB)),0)),0) FROM chat_turns")
+            total = await one(conn, "SELECT count(*),coalesce(sum(length(CAST(context_json AS BLOB))+length(CAST(response_text AS BLOB))+length(CAST(request_json AS BLOB))+coalesce(length(CAST(result_preview_json AS BLOB)),0)+coalesce(length(CAST(initial_response_text AS BLOB)),0)+coalesce(length(CAST(auto_result_json AS BLOB)),0)),0) FROM chat_turns")
             count = (await one(conn, "SELECT count(*) FROM chat_turns WHERE conversation_id=?", (str(conversation_id),)))[0]
             if recent[0] >= 10 or total[0] >= 10000 or total[1] >= 268000000 or count >= 200:
                 raise Conflict("BUSY")
@@ -170,6 +177,8 @@ class ChatService:
                     raise Conflict("IDEMPOTENCY_CONFLICT")
                 if row["task_id"]:
                     if value.decision!="confirm":raise Conflict("IDEMPOTENCY_CONFLICT")
+                    if value.allow_result_model != bool(row["auto_result_json"]):
+                        raise Conflict("IDEMPOTENCY_CONFLICT")
                     return {"task":await self.harness.tasks.get(UUID(row["task_id"]),principal.identity_id)}
                 if value.decision=="reject":
                     await conn.execute("UPDATE chat_turns SET action_status='rejected',revision=revision+1 WHERE turn_id=? AND action_status='proposed'",(str(turn_id),))
@@ -185,6 +194,20 @@ class ChatService:
                     raise AccessDenied("POLICY_DENIED")
                 node_id=UUID(json.loads(row["request_json"])["node_id"])
                 request=REQUEST.validate_python({**proposal,"request_id":turn_id})
+                automatic = None
+                if value.allow_result_model:
+                    if not row["native_tool_call_json"]:
+                        raise AccessDenied("RESULT_UNAVAILABLE")
+                    if not self.config.enabled or not self.config.chat_enabled or self.provider is None:
+                        raise AccessDenied("MODEL_DISABLED")
+                    if await one(conn, "SELECT 1 FROM chat_turns WHERE conversation_id=? AND rowid>(SELECT rowid FROM chat_turns WHERE turn_id=?)", (row["conversation_id"], str(turn_id))):
+                        raise Conflict("IDEMPOTENCY_CONFLICT")
+                    now = utc_now()
+                    automatic = canonical({"fields": RESULT_FIELDS[proposal["intent"]], "proposal_digest": value.proposal_digest,
+                        "policy_version": version, "scope_digest": scope_digest(self.harness.scope(node_id)),
+                        "consented_at": timestamp(now), "expires_at": timestamp(now+timedelta(minutes=5))})
+                    await audit(conn, row["owner_id"], None, "chat.result_preconsented", now)
+                await conn.execute("UPDATE chat_turns SET auto_result_json=? WHERE turn_id=?", (automatic, str(turn_id)))
             # Task creation and association commit together; no model call here.
             task=await self.harness.submit(principal,node_id,request,chat_turn_id=turn_id)
             return {"task":task}
@@ -230,8 +253,7 @@ class ChatService:
                 snapshot = await validate_preview(self, conn, row)
                 if snapshot["conversation_revision"] != value.expected_revision:
                     raise Conflict("IDEMPOTENCY_CONFLICT")
-                await conn.execute("UPDATE chat_turns SET phase='summary',initial_response_text=response_text,response_text='',status='queued',error_code=NULL,summary_consented_at=?,revision=revision+1 WHERE turn_id=?", (timestamp(utc_now()), str(turn_id)))
-                await conn.execute("UPDATE conversations SET revision=revision+1 WHERE conversation_id=?", (row["conversation_id"],))
+                await queue_summary(conn, row, timestamp(utc_now()))
                 await audit(conn, row["owner_id"], row["task_id"], "chat.result_consented", utc_now())
                 return public_turn(await one(conn, TURN_SELECT+" WHERE t.turn_id=?", (str(turn_id),)))
 
@@ -246,6 +268,10 @@ class ChatService:
                     await conn.execute("UPDATE chat_turns SET status=?,revision=revision+1 WHERE turn_id=?", ("stopped" if row["status"] == "queued" else "stopping", str(turn_id)))
                     await conn.execute("UPDATE conversations SET revision=revision+1 WHERE conversation_id=?", (row["conversation_id"],))
                     await audit(conn, str(principal.identity_id), None, "chat.stop_requested", utc_now())
+                if row["auto_result_status"] == "waiting":
+                    await conn.execute("UPDATE chat_turns SET auto_result_status='stopped',revision=revision+1 WHERE turn_id=?", (str(turn_id),))
+                    await conn.execute("UPDATE conversations SET revision=revision+1 WHERE conversation_id=?", (row["conversation_id"],))
+                    await audit(conn, str(principal.identity_id), row["task_id"], "chat.auto_result_stopped", utc_now())
             if self.active and self.active[0] == str(turn_id):
                 self.active[1].cancel()
         return await self.get(principal, turn_id)
@@ -265,6 +291,7 @@ class ChatService:
     async def claim(self):
         if self.failed or self.harness.failed:
             return None
+        await self.queue_automatic_result()
         async with self.database.transaction(write=False) as conn:
             if await one(conn, "SELECT 1 FROM chat_turns WHERE status='queued' LIMIT 1") is None:
                 return None
@@ -332,6 +359,46 @@ class ChatService:
             task = asyncio.create_task(self.provider.invoke(messages, receive, **options))
             self.active = row["turn_id"], task
             return row, call_id, task, lambda: accumulated
+
+    async def queue_automatic_result(self) -> None:
+        # Idle polling is read-only; task execution/recovery remains in Harness.
+        async with self.database.transaction(write=False) as conn:
+            rows = await conn.execute_fetchall("SELECT t.*,c.archived,k.status AS tool_status FROM chat_turns t JOIN conversations c USING(conversation_id) JOIN tasks k ON k.task_id=t.task_id WHERE auto_result_status='waiting' ORDER BY t.rowid LIMIT 100")
+        candidate = next((row for row in rows if row["archived"] or row["tool_status"] in {"succeeded", "failed", "cancelled", "timed_out"}
+                          or json.loads(row["auto_result_json"])["expires_at"] <= timestamp(utc_now())), None)
+        if candidate is None:
+            return
+        async with self.harness.operation:
+            async with self.database.transaction() as conn:
+                row = await one(conn, "SELECT * FROM chat_turns WHERE turn_id=?", (candidate["turn_id"],))
+                if row["auto_result_status"] != "waiting" or row["phase"] != "reply":
+                    return
+                consent = json.loads(row["auto_result_json"])
+                conversation = await one(conn, "SELECT * FROM conversations WHERE conversation_id=?", (row["conversation_id"],))
+                now = utc_now()
+                if not conversation["archived"] and consent["expires_at"] > timestamp(now) and (await one(conn, "SELECT paused FROM system_state WHERE singleton=1"))[0]:
+                    return
+                error = None
+                try:
+                    if conversation["archived"] or consent["expires_at"] <= timestamp(now):
+                        raise AccessDenied("APPROVAL_EXPIRED")
+                    snapshot = await preview(self, conn, row, conversation, consent["fields"])
+                    if (consent["proposal_digest"] != row["proposal_digest"] or any(consent[key] != snapshot[key] for key in ("policy_version", "scope_digest"))):
+                        raise AccessDenied("POLICY_DENIED")
+                    snapshot["expires_at"] = min(snapshot["expires_at"], consent["expires_at"])
+                    encoded = canonical(snapshot)
+                    digest = hashlib.sha256(encoded.encode()).hexdigest()
+                    await conn.execute("UPDATE chat_turns SET result_preview_json=?,result_digest=? WHERE turn_id=?", (encoded, digest, row["turn_id"]))
+                    await validate_preview(self, conn, await one(conn, "SELECT * FROM chat_turns WHERE turn_id=?", (row["turn_id"],)))
+                except (AccessDenied, ValueError) as exc:
+                    error = exc.code if isinstance(exc, AccessDenied) else "RESULT_UNAVAILABLE"
+                if error:
+                    await conn.execute("UPDATE chat_turns SET auto_result_status='unavailable',error_code=?,revision=revision+1 WHERE turn_id=?", (error, row["turn_id"]))
+                    await conn.execute("UPDATE conversations SET revision=revision+1 WHERE conversation_id=?", (row["conversation_id"],))
+                    await audit(conn, row["owner_id"], row["task_id"], "chat.auto_result_unavailable", now)
+                elif not (await one(conn, "SELECT paused FROM system_state WHERE singleton=1"))[0]:
+                    await queue_summary(conn, row, consent["consented_at"])
+                    await audit(conn, row["owner_id"], row["task_id"], "chat.result_auto_queued", now)
 
     async def finish(self, row: sqlite3.Row, call_id: str, reply: ModelReply | None, partial: str, *, interrupted: bool = False) -> None:
         cost, error, status = None, "MODEL_OUTCOME_UNKNOWN", "failed"

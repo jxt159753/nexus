@@ -26,6 +26,13 @@ class ChatResultConsent(StrictContract):
 class ChatActionDecision(StrictContract):
     proposal_digest: StrictStr = Field(pattern=r"^[a-f0-9]{64}$")
     decision: Literal["confirm", "reject"]
+    allow_result_model: StrictBool = False
+
+    @model_validator(mode="after")
+    def result_requires_action(self):
+        if self.allow_result_model and self.decision != "confirm":
+            raise ValueError("result consent requires action confirmation")
+        return self
 
 
 class ConversationCreate(StrictContract):

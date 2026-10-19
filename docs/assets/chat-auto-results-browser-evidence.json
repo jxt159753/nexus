@@ -1,0 +1,22 @@
+{
+  "browser": "real headless Edge",
+  "desktop": "1280x960",
+  "mobile_viewport": "390x844",
+  "real_windows_tools": true,
+  "model": "simulated DeepSeek SSE",
+  "explicit_opt_in_default_off": true,
+  "automatic_system_answer": true,
+  "immediate_followup_blocked_until_final": true,
+  "followup_uses_final_answer": true,
+  "directory_separate_approval": true,
+  "automatic_directory_answer": true,
+  "no_extra_result_button": true,
+  "unchecked_never_auto_shares": true,
+  "earlier_unshared_result_status_visible": true,
+  "refresh_history": true,
+  "model_calls": 7,
+  "actual_deepseek_calls": 0,
+  "page_errors": [],
+  "horizontal_overflow": false,
+  "android_device": false
+}

@@ -1,0 +1,23 @@
+{
+  "wheel_sha256": "3c7fc5a988a8676931a1b82bd8c347ff0227a398f20b2c2bb6741518ee0fd818",
+  "source_resource_files_matched": 85,
+  "python_syntax": "passed",
+  "javascript_syntax": "passed",
+  "local_document_links_checked": 136,
+  "new_dependencies": 0,
+  "source_tests": {"passed": 637, "seconds": 210.32, "warnings_as_errors": true, "skipped": 0},
+  "installed_tests": {"passed": 637, "seconds": 189.35, "source_pythonpath_disabled": true, "warnings_as_errors": true, "skipped": 0},
+  "process_tests": {"passed": 5, "seconds": 20.59, "real_windows_tools": true, "simulated_model": true, "waiting_recovery": true, "inflight_summary_not_replayed": true},
+  "linux": {"python": "3.12.3", "passed": 533, "seconds": 51.34, "modules": 21, "dependency_pins": 25, "warnings_as_errors": true, "skipped": 0, "source_pythonpath_disabled": true, "non_login_nexus_user": true, "production_service_active": true, "deployed": false},
+  "browser": {"evidence": "chat-auto-results-browser-evidence.json", "real_headless_edge": true, "real_windows_tools": true, "simulated_model_calls": 7, "explicit_opt_in_default_off": true, "automatic_system_and_directory_answers": true, "followup_uses_final_answer": true, "immediate_followup_race_fixed_and_retested": true, "unchecked_no_automatic_share": true, "page_errors": 0, "horizontal_overflow": false, "android_device": false},
+  "migration": {"candidate": 10, "production": 9, "nonempty_v9_ledger_preserved": true, "old_turns_not_retroactively_consented": true},
+  "daily_cost_microunits": 1000000,
+  "root_round_cost_microunits": 50000,
+  "daily_calls": 100,
+  "model_calls_per_round": {"ordinary": 1, "with_approved_result": 2},
+  "actual_deepseek_calls_by_this_change": 0,
+  "production_modified_by_this_change": false,
+  "deployed": false,
+  "real_auto_result_and_followup_verified": false,
+  "user_acceptance": "pending"
+}

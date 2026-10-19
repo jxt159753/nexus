@@ -140,6 +140,8 @@ class TaskRepository:
                 expected={"intent":request.intent,"arguments":request.arguments.model_dump(mode="json")}
                 if chat is None or chat["status"]!="completed" or chat["action_status"]!="proposed" or chat["proposal_json"]!=canonical(expected) or json.loads(chat["request_json"]).get("node_id")!=str(node_id) or chat["proposal_policy_version"]!=version:
                     raise Conflict("chat proposal binding changed")
+                if chat["auto_result_json"] and await one(conn, "SELECT 1 FROM chat_turns WHERE conversation_id=? AND rowid>(SELECT rowid FROM chat_turns WHERE turn_id=?)", (chat["conversation_id"], str(chat_turn_id))):
+                    raise Conflict("chat automatic result context changed")
             if rate_limit:
                 recent = await one(conn, "SELECT count(*) FROM tasks WHERE owner_id=? AND created_at>?", (str(owner_id), timestamp(now - timedelta(minutes=1))))
                 if recent[0] >= 10:
@@ -165,7 +167,7 @@ class TaskRepository:
                 await conn.execute("UPDATE model_calls SET task_id=? WHERE language_id=?", (str(task_id), str(language_id)))
                 await audit(conn, str(owner_id), str(task_id), "language.confirmed", now)
             if chat_turn_id is not None:
-                linked=await conn.execute("UPDATE chat_turns SET task_id=?,action_status='submitted',revision=revision+1 WHERE turn_id=? AND owner_id=? AND action_status='proposed' AND task_id IS NULL AND expires_at>?",(str(task_id),str(chat_turn_id),str(owner_id),timestamp(now)))
+                linked=await conn.execute("UPDATE chat_turns SET task_id=?,action_status='submitted',auto_result_status=CASE WHEN auto_result_json IS NULL THEN 'none' ELSE 'waiting' END,revision=revision+1 WHERE turn_id=? AND owner_id=? AND action_status='proposed' AND task_id IS NULL AND expires_at>?",(str(task_id),str(chat_turn_id),str(owner_id),timestamp(now)))
                 if linked.rowcount!=1:raise Conflict("chat proposal no longer valid")
                 await conn.execute("UPDATE model_calls SET task_id=? WHERE chat_turn_id=?",(str(task_id),str(chat_turn_id)))
                 await audit(conn,str(owner_id),str(task_id),"chat.action_confirmed",now)

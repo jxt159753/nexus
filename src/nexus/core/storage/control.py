@@ -88,6 +88,9 @@ class ControlRepository:
             event = await conn.execute("INSERT INTO control_events(owner_id,kind,paused,revision,created_at) VALUES(?,?,?,?,?)", (str(principal.identity_id), kind, int(paused), revision, timestamp(now)))
             affected = 0
             if kind == "cancel_all":
+                await conn.execute("UPDATE conversations SET revision=revision+1 WHERE owner_id=? AND conversation_id IN (SELECT conversation_id FROM chat_turns WHERE auto_result_status='waiting')", (str(principal.identity_id),))
+                automatic = await conn.execute("UPDATE chat_turns SET auto_result_status='stopped',revision=revision+1 WHERE owner_id=? AND auto_result_status='waiting'", (str(principal.identity_id),))
+                affected += automatic.rowcount
                 await conn.execute("UPDATE chat_turns SET action_status='rejected',revision=revision+1 WHERE owner_id=? AND action_status='proposed'",(str(principal.identity_id),))
                 await conn.execute("UPDATE conversations SET revision=revision+1 WHERE owner_id=? AND conversation_id IN (SELECT conversation_id FROM chat_turns WHERE status IN ('queued','generating'))", (str(principal.identity_id),))
                 chats = await conn.execute("UPDATE chat_turns SET status=CASE WHEN status='queued' THEN 'stopped' ELSE 'stopping' END,revision=revision+1 WHERE owner_id=? AND status IN ('queued','generating')", (str(principal.identity_id),))

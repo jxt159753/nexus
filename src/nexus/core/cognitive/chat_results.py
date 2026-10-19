@@ -12,6 +12,16 @@ from nexus.core.security.types import AccessDenied
 from nexus.core.storage.database import one, timestamp, utc_now
 from nexus.core.storage.tasks import Conflict, canonical, load_task
 
+RESULT_FIELDS = {
+    "get_system_info": ("os_name", "os_version", "architecture", "python_version"),
+    "list_directory": ("root_id", "entries", "truncated"),
+}
+
+
+async def queue_summary(conn, row, consented_at: str) -> None:
+    await conn.execute("UPDATE chat_turns SET phase='summary',initial_response_text=response_text,response_text='',status='queued',error_code=NULL,summary_consented_at=?,auto_result_status=CASE WHEN auto_result_json IS NULL THEN 'none' ELSE 'queued' END,revision=revision+1 WHERE turn_id=?", (consented_at, row["turn_id"]))
+    await conn.execute("UPDATE conversations SET revision=revision+1 WHERE conversation_id=?", (row["conversation_id"],))
+
 
 def checked_native(value: dict, proposal: dict) -> dict:
     if (set(value) != {"id", "type", "function"} or value["type"] != "function"

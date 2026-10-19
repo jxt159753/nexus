@@ -18,13 +18,13 @@ from test_chat_actions import SYSTEM, DIRECTORY, decision, setup_chat, submit
 from test_harness import result_for
 
 
-async def executed(chat, world, provider, *, directory=False, result=None):
+async def executed(chat, world, provider, *, directory=False, result=None, automatic=False):
     provider.reply = replace(provider.reply, native_tool_call={"id": "actual-native-call", "type": "function", "function": {
         "name": provider.reply.proposal["intent"], "arguments": json.dumps(provider.reply.proposal["arguments"])}})
     conv, turn = await submit(chat, world)
     await chat.process_one()
     turn = await chat.get(world.owner, turn["turn_id"])
-    task = (await chat.decide_action(world.owner, UUID(turn["turn_id"]), decision(turn)))["task"]
+    task = (await chat.decide_action(world.owner, UUID(turn["turn_id"]), decision(turn).model_copy(update={"allow_result_model":automatic})))["task"]
     scope = chat.harness.scope(world.node_id)
     if directory:
         detail = await chat.harness.executions.detail(task.task_id, world.owner_id)
