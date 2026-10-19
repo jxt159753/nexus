@@ -112,6 +112,8 @@ class TaskRepository:
         rate_limit: bool = False,
         language_id: UUID | None = None,
         chat_turn_id: UUID | None = None,
+        skill_run_id: UUID | None = None,
+        skill_step_index: int | None = None,
     ) -> TaskRecord:
         now = now or utc_now()
         request = REQUEST.validate_json(REQUEST.dump_json(request))
@@ -123,6 +125,11 @@ class TaskRepository:
         }))
         encoded = canonical(request.model_dump(mode="json"))
         async with self.database.transaction() as conn:
+            if skill_run_id is not None:
+                from nexus.core.extensions.authorization import skill_run_allowed
+                run = await one(conn, "SELECT * FROM skill_runs WHERE run_id=? AND owner_id=? AND node_id=?", (str(skill_run_id), str(owner_id), str(node_id)))
+                if not await skill_run_allowed(conn, run, now) or run["current_step"] != skill_step_index:
+                    raise Conflict("Skill execution authorization changed")
             for identity, role in ((owner_id, "owner"), (node_id, "node")):
                 row = await one(conn, "SELECT role, revoked_at FROM identities WHERE identity_id=?", (str(identity),))
                 if row is None or row["role"] != role or row["revoked_at"] is not None:
@@ -131,6 +138,8 @@ class TaskRepository:
             if existing:
                 if canonical(REQUEST.validate_json(existing["request_json"]).model_dump(mode="json")) != encoded or existing["node_id"] != str(node_id):
                     raise Conflict("IDEMPOTENCY_CONFLICT")
+                if skill_run_id is not None and not await one(conn, "SELECT 1 FROM skill_run_steps WHERE run_id=? AND step_index=? AND task_id=?", (str(skill_run_id), skill_step_index, existing["task_id"])):
+                    raise Conflict("Skill task association changed")
                 return task_record(existing)
             if request.project_id is not None and not await one(conn, "SELECT 1 FROM projects WHERE project_id=? AND owner_id=?", (str(request.project_id), str(owner_id))):
                 raise LookupError("project not found")
@@ -172,6 +181,10 @@ class TaskRepository:
                 await conn.execute("UPDATE model_calls SET task_id=? WHERE chat_turn_id=?",(str(task_id),str(chat_turn_id)))
                 await audit(conn,str(owner_id),str(task_id),"chat.action_confirmed",now)
             await audit(conn, str(owner_id), str(task_id), "task.created", now)
+            if skill_run_id is not None:
+                linked = await conn.execute("UPDATE skill_run_steps SET task_id=?,status='dispatchable',updated_at=? WHERE run_id=? AND step_index=? AND task_id IS NULL AND status='pending'", (str(task_id), timestamp(now), str(skill_run_id), skill_step_index))
+                if linked.rowcount != 1:
+                    raise Conflict("Skill step association changed")
             return await load_task(conn, task_id)
 
     async def get(self, task_id: UUID, owner_id: UUID) -> TaskRecord:

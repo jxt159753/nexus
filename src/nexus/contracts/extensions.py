@@ -244,9 +244,9 @@ def validate_instance(schema: dict, value: Any, *, path: str = "$") -> None:
     elif kind == "null":
         if value is not None:
             raise ValueError(f"{path}: null required")
-    if "enum" in schema and value not in schema["enum"]:
+    if "enum" in schema and not any(type(value) is type(item) and value == item for item in schema["enum"]):
         raise ValueError(f"{path}: value is not in enum")
-    if "const" in schema and value != schema["const"]:
+    if "const" in schema and (type(value) is not type(schema["const"]) or value != schema["const"]):
         raise ValueError(f"{path}: value differs from const")
 
 
@@ -277,6 +277,10 @@ class StepReference(StrictContract):
     field: Literal["entries", "truncated", "root_id", "os_name", "os_version", "architecture", "python_version"]
 
 
+class InputReference(StrictContract):
+    field: StrictStr = Field(pattern=r"^[A-Za-z][A-Za-z0-9_]{0,63}$")
+
+
 class SkillStep(StrictContract):
     id: StrictStr = Field(pattern=r"^[a-z][a-z0-9_]{0,31}$")
     tool: Literal["system.info", "filesystem.list"] | None = None
@@ -290,10 +294,6 @@ class SkillStep(StrictContract):
             raise ValueError("tool and tool_version must be supplied together")
         if (self.tool is None) == (self.tool_version_id is None):
             raise ValueError("exactly one of builtin tool or extension tool version is required")
-        if self.tool_version_id is not None and self.arguments:
-            # Extension arguments are resolved by schema later, but they still
-            # have to be finite and bounded here.
-            pass
         check_json_value(self.arguments)
         if len(canonical(self.arguments).encode("utf-8")) > 4096:
             raise ValueError("step arguments exceed 4 KiB")
@@ -303,6 +303,8 @@ class SkillStep(StrictContract):
             if isinstance(value, dict):
                 if set(value) == {"$ref"}:
                     StepReference.model_validate(value["$ref"])
+                elif set(value) == {"$input"}:
+                    InputReference.model_validate(value["$input"])
                 else:
                     raise ValueError("only explicit $ref objects are accepted as structured arguments")
         return self
@@ -355,6 +357,7 @@ class ToolCase(StrictContract):
 
 class SkillCase(StrictContract):
     name: StrictStr = Field(min_length=1, max_length=80)
+    input: dict[str, Any] = Field(default_factory=dict)
     expected_steps: list[StrictStr] = Field(max_length=3)
 
 
@@ -390,6 +393,11 @@ class SkillGeneration(StrictContract):
         if len(set(ids)) != len(ids):
             raise ValueError("duplicate step id")
         for index, step in enumerate(self.steps):
+            for value in step.arguments.values():
+                if isinstance(value, dict) and "$input" in value:
+                    reference = InputReference.model_validate(value["$input"])
+                    if reference.field not in self.manifest.input_schema.get("properties", {}):
+                        raise ValueError("input reference must name a declared input field")
             for reference in step.references():
                 if reference.step not in ids[:index]:
                     raise ValueError("references must point to an earlier declared step")
@@ -409,7 +417,9 @@ def environment_for(kind: str, sandbox: dict | None) -> dict:
         return {"type": "skill_standin", "controller": "trusted-skill-v1", "version": 1}
     if sandbox is None:
         return {"type": "sandbox", "runtime": "runsc", "image_digest": None, "available": False}
-    return {"type": "sandbox", "runtime": "runsc", "image_digest": sandbox["image_digest"], "available": True}
+    return {"type": "sandbox", "runtime": "runsc", "image_digest": sandbox["image_digest"],
+            "platform": sandbox.get("platform", "systrap"), "runsc_digest": sandbox.get("runsc_digest"),
+            "policy": "runsc-host-limits-v2", "available": True}
 
 
 def build_release(generation: ExtensionGeneration, *, capability_id: str, revision: int,

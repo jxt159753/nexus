@@ -2,9 +2,14 @@
 # This example contains no credential. Do not enable it on the Windows host.
 node_id = '00000000-0000-0000-0000-000000000000'
 core_url = 'wss://nexus.example.invalid/ws/v2/sandbox'
+# Plain ws is allowed only with explicit development mode and 127.0.0.1 / ::1.
+local_http = false
 data_dir = '/var/lib/nexus-sandbox'
 staging_dir = '/var/lib/nexus-sandbox/runs'
 runsc_path = '/usr/local/bin/runsc'
+# SHA-256 binding of launcher plus gvisor-bin components; see WSL guide.
+runsc_digest = '0000000000000000000000000000000000000000000000000000000000000000'
+platform = 'systrap' # WSL2 may require explicitly approved kvm; no automatic fallback.
 runsc_root = '/var/lib/nexus-sandbox/runsc-state'
 image_rootfs = '/var/lib/nexus-sandbox/image/rootfs'
 python_path = '/usr/bin/python3'

@@ -1,0 +1,140 @@
+{
+  "date": "2026-10-19",
+  "branch": "codex/m4-self-extension",
+  "baseline": "694d4ec",
+  "package": {
+    "wheel_sha256": "6f4a88b8c056ac17b52d8e99f0d6a8ded8440099438af86025f4322fe3270b34",
+    "packaged_files": 105,
+    "source_identical": true,
+    "linux_modules": 28,
+    "python_syntax": "passed"
+  },
+  "schema": 12,
+  "dependency_pins": 25,
+  "windows": {
+    "source": {
+      "passed": 695,
+      "skipped": 0,
+      "seconds": 243.19
+    },
+    "installed": {
+      "passed": 695,
+      "skipped": 0,
+      "seconds": 232.07
+    },
+    "previous_full_passed": 695,
+    "warnings_as_errors": true
+  },
+  "linux": {
+    "os": "Ubuntu 24.04",
+    "python": "3.12.3",
+    "passed": 588,
+    "skipped": 2,
+    "skip_reason": "2 Windows-only refusal paths skipped by their platform guard; absolute --deselect arguments did not match relative node ids"
+  },
+  "sandbox": {
+    "os": "WSL2 Ubuntu 22.04.5",
+    "kernel": "6.18.54.1-microsoft-standard-WSL2",
+    "python": "3.12.15",
+    "runtime": "runsc release-20261012.0",
+    "platform": "kvm",
+    "runtime_digest": "be25aff8bad3f0ad4adafa525107b22475802c1c0f5a8ae334c5320fb697a21a",
+    "image_digest": "753aed32346183e5820e0a9a0631339d213607d22fd000ed4ec0b85681512d16",
+    "host_limits": {
+      "cpu": 1,
+      "memory_bytes": 536870912,
+      "pids": 64,
+      "swap_bytes": 0
+    },
+    "guest_uid": 65534,
+    "host_marker_visible": false,
+    "canary_visible": false,
+    "network_connections": 0,
+    "memory_pressure_stopped": true,
+    "temporary_storage_pressure_stopped": true,
+    "stdout_limit_stopped": true,
+    "timeout_stopped": true,
+    "fork_pressure": "host cgroup OOM killed owned group; stopped containers reconciled; not a successful 64-process guest test"
+  },
+  "three_step": {
+    "run_id": "01bc2ecc-f761-41c3-9da2-a84f8678de30",
+    "status": "succeeded",
+    "directory_approval": true,
+    "windows_attempts_per_step": 1,
+    "sandbox_business_runs": 1,
+    "model_calls": 0,
+    "candidate_source": "deterministic development fixture"
+  },
+  "recovery": {
+    "ack_loss": true,
+    "core_restart": true,
+    "business_sandbox_killed_while_running": true,
+    "duplicate_executions": 0,
+    "model_calls": 0,
+    "missing_result": "EXECUTION_RESULT_UNKNOWN"
+  },
+  "truncation": {
+    "run_id": "4e089078-dee2-4085-adde-b7b140e5d304",
+    "truncated": true,
+    "returned_and_counted": 100,
+    "fixture_entries": 207
+  },
+  "real_model": {
+    "calls": 2,
+    "first": {
+      "status": "CANDIDATE_INVALID",
+      "cost_microunits": 724,
+      "code_executed": false
+    },
+    "second": {
+      "status": "candidate",
+      "cost_microunits": 1285,
+      "version_id": "e3aca15c-439b-4d0a-98e8-bb1345c9ec2c",
+      "artifact_digest": "be8e572c860bbf53a6c499612277cb234c46d5fcc6df5587852246101a036b5e",
+      "test_status": "passed",
+      "trusted_cases": 8,
+      "actual_sandbox_executions": 3,
+      "enabled": true,
+      "owner_explicitly_approved": true
+    },
+    "total_cost_microunits": 2009,
+    "global_calls_after": 26,
+    "global_cost_microunits_after": 8424,
+    "unknown_cost_calls": 0,
+    "automatic_retries": 0
+  },
+  "deployment": {
+    "single_cloud_core": true,
+    "core_release": "m4-20261019-contract",
+    "old_schema": 10,
+    "new_schema": 12,
+    "old_tasks_preserved": 18,
+    "old_conversations_preserved": 11,
+    "old_turns_preserved": 19,
+    "old_tables_all_columns_compared": true,
+    "budget_unchanged": true,
+    "sandbox_location": "dedicated local WSL2 user"
+  },
+  "browser": {
+    "actual_browser": true,
+    "responsive_width": 390,
+    "document_scroll_width": 375,
+    "input_survived_list_refresh": true,
+    "console_errors": 0,
+    "screenshot": "m4-completion-mobile.png"
+  },
+  "android": {
+    "owner_reply": "可以",
+    "specific_device_and_browser": "not supplied",
+    "scope": "capability content/test report and refresh question only; no whole-stage acceptance claimed"
+  },
+  "user_acceptance": "not_claimed",
+  "m5_excluded_from_commit": true,
+  "limitations": [
+    "phone device/browser details not supplied",
+    "real model-generated Tool enabled but no production Skill created automatically",
+    "Windows shutdown/sleep or WSL exit makes sandbox unavailable",
+    "generated-code isolation has a bounded tested threat model, not proof against all vulnerabilities"
+  ],
+  "publication_date": "2026-10-20"
+}

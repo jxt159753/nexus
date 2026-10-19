@@ -2,6 +2,8 @@
 
 S6/P09–P10 的实现说明。阶段批准和验收状态以 [ROADMAP](ROADMAP.md) 为准，技术证据见 [S6 验证](S6-VERIFICATION.md)。只支持既有两个只读工具；Core 仍是唯一权威。
 
+阅读范围：本文保留 M1 控制台与记录接口，后文“模型禁用”描述 S6 交付时的配置。后续模型与聊天的配置分别见 [M2 说明](m2-language.md)和 [M3 说明](m3-chat.md)，不将 S6 当时的限制理解为当前全项目没有模型。
+
 ## 启动与浏览器操作
 
 1. 按 [S3 Link](s3-link.md)准备独立 Core/Node 数据目录、owner/Node 身份、双方授权及 workspace 资源。

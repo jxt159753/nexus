@@ -1,0 +1,115 @@
+{
+  "date": "2026-10-19",
+  "reviewer": "Codex",
+  "branch": "codex/m4-self-extension",
+  "review_base": "694d4ec4158a602713c7cfd24b04f68573f93dcb",
+  "original_code": "57ea5a252ec1a24a1fc4f8e704405f2d803d9750",
+  "fixes_committed": false,
+  "pushed": false,
+  "deployed": false,
+  "dsh_started_or_contacted": false,
+  "production_access": false,
+  "real_model_calls": 0,
+  "generated_code_executed": false,
+  "schema": 11,
+  "python": "3.13.9",
+  "platform": "Windows",
+  "original_source_review": {
+    "passed": 657,
+    "seconds": 263.8
+  },
+  "original_independent_regressions": {
+    "failed": 7,
+    "seconds": 4.46,
+    "log": "var/m4-codex-review/independent-final.log"
+  },
+  "focused": {
+    "passed": 45,
+    "failed": 0,
+    "skipped": 0,
+    "warnings_as_errors": true,
+    "seconds": 23.49,
+    "log": "var/m4-codex-review/focused-final-all.log"
+  },
+  "source": {
+    "passed": 682,
+    "failed": 0,
+    "skipped": 0,
+    "warnings_as_errors": true,
+    "seconds": 246.86,
+    "log": "var/m4-codex-review/source-final.log"
+  },
+  "installed": {
+    "passed": 682,
+    "failed": 0,
+    "skipped": 0,
+    "warnings_as_errors": true,
+    "seconds": 234.06,
+    "log": "var/m4-codex-review/installed-final.log",
+    "source_pythonpath_disabled": true
+  },
+  "package": {
+    "sha256": "843abaecd96201ec55b4d7541e5e1272de28295478aca8df8a8d8bfcf14622af",
+    "source_resource_files_matched": 103,
+    "source_content_manifest_sha256": "f30762e54e7efb6fbdb920e0bfd290310eec9c04e9d6df4ebea18e1d5f2dc09f",
+    "locked_dependencies": 25,
+    "offline_install": true,
+    "pip_check": "passed",
+    "build_setuptools": "80.10.2",
+    "wheel": "var/m4-codex-review/dist/nexus-0.1.0-py3-none-any.whl"
+  },
+  "syntax": {
+    "python_files": 130,
+    "javascript": [
+      "app.js",
+      "chat.js",
+      "extensions.js"
+    ],
+    "status": "passed"
+  },
+  "real_windows_skill": {
+    "test": "tests/test_m4_processes.py",
+    "independent_core_and_node": true,
+    "directory_approval_preserved": true,
+    "core_restart_while_waiting_for_approval": true,
+    "same_task_ids_after_restart": true,
+    "attempts_per_step": 1,
+    "real_model_calls": 0
+  },
+  "runtime_pipe_probes": {
+    "trusted_static_programs_only": true,
+    "stdout_and_stderr_overflow": true,
+    "timeout_and_cancellation": true,
+    "proves_runsc_isolation": false
+  },
+  "browser": {
+    "type": "ChatGPT in-app browser",
+    "environment": "isolated loopback Core; synthetic identities",
+    "viewport": {
+      "width": 392,
+      "height": 719
+    },
+    "horizontal_overflow": false,
+    "separate_device_and_sandbox_options": true,
+    "offline_tool_test_unavailable": true,
+    "source_visible": true,
+    "expanded_details_survive_refresh": true,
+    "android_device": false,
+    "temporary_core_and_tab_closed": true,
+    "screenshot": "docs/assets/m4-codex-sandbox-refusal.png"
+  },
+  "not_verified_or_incomplete": [
+    "real Linux/runsc host isolation and resource limits",
+    "real generated Tool test/approval/execution and three-step business run",
+    "durable sandbox test attempts, result ack and automatic reconciliation",
+    "Skill user-input references, run-creation request idempotency and record capacity",
+    "real extension model generation, Linux/Python 3.12 wheel regression, Android, production deployment"
+  ],
+  "m4_acceptance": "incomplete; local defect fixes validated; user acceptance not granted",
+  "delivery_checks": {
+    "local_document_links": 119,
+    "documents": 7,
+    "example_toml": "valid",
+    "git_diff_check": "passed"
+  }
+}

@@ -20,6 +20,8 @@ class SandboxNodePolicy(StrictContract):
     """Owner-registered sandbox host; self-reported capability never grants this."""
 
     runtime: Literal["runsc"] = "runsc"
+    platform: Literal["systrap", "kvm"] = "systrap"
+    runsc_digest: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     image_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
     verification_profiles: frozenset[Literal["directory_entry_stats_v1"]] = frozenset(
         {"directory_entry_stats_v1"})
@@ -34,6 +36,9 @@ class ExtensionConfig(StrictContract):
     sandbox_test_timeout_seconds: StrictInt = Field(default=60, ge=10, le=60)
     max_candidates: StrictInt = Field(default=64, ge=1, le=256)
     max_total_bytes: StrictInt = Field(default=4 * 1024 * 1024, ge=65536, le=16 * 1024 * 1024)
+    max_skill_runs: StrictInt = Field(default=10000, ge=1, le=10000)
+    max_sandbox_executions: StrictInt = Field(default=10000, ge=1, le=10000)
+    max_test_runs: StrictInt = Field(default=10000, ge=1, le=10000)
 
 
 class CoreConfig(StrictContract):
@@ -73,4 +78,7 @@ class CoreConfig(StrictContract):
             raise ValueError("result budget must leave 2048 bytes for metadata")
         if (self.extensions.fixture_generation or self.extensions.generation_enabled) and not self.extensions.enabled:
             raise ValueError("extension generation requires the extension feature to be enabled")
+        worst = (16384*self.models.input_price + self.extensions.max_output_tokens*self.models.output_price + 999999)//1000000
+        if self.models.enabled and self.extensions.generation_enabled and self.models.task_cost_microunits and worst > self.models.task_cost_microunits:
+            raise ValueError("extension token price ceiling exceeds request budget")
         return self

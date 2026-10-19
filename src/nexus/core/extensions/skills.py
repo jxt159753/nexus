@@ -15,6 +15,7 @@ from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 from nexus.contracts.extensions import (
     RESULT_FIELDS,
     canonical,
+    digest_value,
     validate_instance,
 )
 from nexus.contracts.task import ListDirectoryArguments, ListDirectoryRequest, SystemInfoArguments, SystemInfoRequest
@@ -53,7 +54,7 @@ def _stats(entries: list[dict]) -> dict:
     return {"counts": counts, "total": len(entries)}
 
 
-def _resolve(arguments: dict, results: dict) -> dict:
+def _resolve(arguments: dict, results: dict, input_value: dict | None = None) -> dict:
     value = {}
     for key, item in arguments.items():
         if isinstance(item, dict) and set(item) == {"$ref"}:
@@ -65,6 +66,11 @@ def _resolve(arguments: dict, results: dict) -> dict:
             if field not in result:
                 raise ValueError("reference field is absent")
             value[key] = result[field]
+        elif isinstance(item, dict) and set(item) == {"$input"}:
+            field = item["$input"]["field"]
+            if input_value is None or field not in input_value:
+                raise ValueError("required input reference is absent")
+            value[key] = input_value[field]
         else:
             value[key] = item
     return value
@@ -85,11 +91,13 @@ class SkillService:
             release = json.loads(row["release_json"])
             steps = release["steps"]
             manifest = release["manifest"]
-            for truncated in (False, True):
+            inputs = [case.get("input", {}) for case in release["tests"]] or [{}]
+            for input_value, truncated in ((value, flag) for value in inputs for flag in (False, True)):
+                validate_instance(manifest["input_schema"], input_value)
                 results: dict[str, dict] = {}
                 observed = []
                 for step in steps:
-                    arguments = _resolve(step.get("arguments", {}), results)
+                    arguments = _resolve(step.get("arguments", {}), results, input_value)
                     if step.get("tool_version_id"):
                         tool = await self._tool_version(step["tool_version_id"])
                         if tool is None:
@@ -130,14 +138,26 @@ class SkillService:
                 raise AccessDenied()
             return Principal(UUID(owner_id), "owner", row["token_hash"])
 
-    async def start(self, principal: Principal, version_id: UUID, node_id: UUID, input_value: dict) -> dict:
+    async def start(self, principal: Principal, version_id: UUID, node_id: UUID, input_value: dict, *, request_id: UUID | None = None) -> dict:
         self.extensions.require_enabled()
         input_value = json.loads(json.dumps(input_value, allow_nan=False))
         if type(input_value) is not dict:
             raise ValueError("Skill input must be an object")
+        request_id = request_id or uuid4()
+        request_digest = digest_value({"version_id": str(version_id), "node_id": str(node_id), "input": input_value})
+        existing_id = None
         async with self.harness.operation:
             async with self.database.transaction() as conn:
                 now = utc_now()
+                await self.extensions.owner(conn, principal)
+                existing = await one(conn, "SELECT run_id,request_digest FROM skill_runs WHERE owner_id=? AND request_id=?", (str(principal.identity_id), str(request_id)))
+                if existing is not None:
+                    if existing["request_digest"] != request_digest:
+                        raise Conflict("IDEMPOTENCY_CONFLICT")
+                    existing_id = UUID(existing["run_id"])
+            if existing_id is not None:
+                return await self.get(principal, existing_id)
+            async with self.database.transaction() as conn:
                 await self.extensions.owner(conn, principal)
                 version = await one(conn, "SELECT * FROM extension_versions WHERE version_id=? AND owner_id=? AND kind='skill'", (str(version_id), str(principal.identity_id)))
                 if version is None:
@@ -154,6 +174,24 @@ class SkillService:
                 if policy is None:
                     raise AccessDenied("POLICY_DENIED")
                 steps = json.loads(version["steps_json"])
+                # Resolve and validate all input-dependent builtins before the first task.
+                for definition in steps:
+                    for argument in definition.get("arguments", {}).values():
+                        if isinstance(argument, dict) and "$input" in argument:
+                            _resolve({"value": argument}, {}, input_value)
+                    if definition.get("tool") == "filesystem.list":
+                        ListDirectoryArguments.model_validate(_resolve(definition.get("arguments", {}), {}, input_value))
+                    elif definition.get("tool_version_id"):
+                        dependency = await one(conn, "SELECT manifest_json FROM extension_versions WHERE version_id=?", (definition["tool_version_id"],))
+                        schema = json.loads(dependency[0])["input_schema"]
+                        for name, argument in definition.get("arguments", {}).items():
+                            if isinstance(argument, dict) and "$ref" in argument:
+                                continue
+                            resolved = _resolve({name: argument}, {}, input_value)[name]
+                            validate_instance(schema["properties"][name], resolved)
+                count = await one(conn, "SELECT count(*) FROM skill_runs")
+                if count[0] >= self.extensions.config.max_skill_runs:
+                    raise AccessDenied("SKILL_STORAGE_FULL")
                 run_id = uuid4()
                 expires = now + timedelta(minutes=5)
                 await conn.execute("INSERT INTO skill_runs(run_id,owner_id,version_id,approval_id,artifact_digest,environment_digest,node_id,input_json,status,current_step,created_at,updated_at,expires_at) VALUES(?,?,?,?,?,?,?,?,'running',1,?,?,?)", (
@@ -165,6 +203,7 @@ class SkillService:
                     await conn.execute("INSERT INTO skill_run_steps(run_id,step_index,step_id,status,created_at,updated_at) VALUES(?,?,?,'pending',?,?)", (
                         str(run_id), index, step["id"], timestamp(now), timestamp(now),
                     ))
+                await conn.execute("UPDATE skill_runs SET request_id=?,request_digest=? WHERE run_id=?", (str(request_id), request_digest, str(run_id)))
                 await audit(conn, str(principal.identity_id), None, "extension.skill_started", now)
         self.wake.set()
         return await self.get(principal, run_id)
@@ -190,6 +229,10 @@ class SkillService:
                 item = dict(step)
                 item["result"] = json.loads(item["result_json"]) if item["result_json"] else None
                 item.pop("result_json")
+                if step["tool_run_id"]:
+                    tool = await one(conn, "SELECT status,error_json FROM extension_tool_runs WHERE tool_run_id=?", (step["tool_run_id"],))
+                    if tool is not None:
+                        item["tool_execution"] = {"status": tool["status"], "error": json.loads(tool["error_json"]) if tool["error_json"] else None}
                 value["steps"].append(item)
             return value
 
@@ -201,7 +244,7 @@ class SkillService:
 
     async def cancel(self, principal: Principal, run_id: UUID) -> dict:
         self.extensions.require_enabled()
-        async with self.database.transaction() as conn:
+        async with self.harness.operation, self.database.transaction() as conn:
             now = utc_now()
             await self.extensions.owner(conn, principal)
             run = await one(conn, "SELECT * FROM skill_runs WHERE run_id=? AND owner_id=?", (str(run_id), str(principal.identity_id)))
@@ -230,12 +273,16 @@ class SkillService:
             request = SystemInfoRequest(request_id=request_id, intent="get_system_info", arguments=SystemInfoArguments())
         else:
             request = ListDirectoryRequest(request_id=request_id, intent="list_directory", arguments=ListDirectoryArguments.model_validate(arguments))
-        return await self.harness.submit(principal, UUID(run["node_id"]), request, rate_limit=False)
+        async with self.harness.operation:
+            return await self.harness.submit(principal, UUID(run["node_id"]), request, rate_limit=False,
+                                             skill_run_id=UUID(run["run_id"]), skill_step_index=step["step_index"])
 
     async def _finish(self, run_id: str, status: str, *, result: dict | None = None, error: str | None = None) -> None:
         async with self.database.transaction() as conn:
             run = await one(conn, "SELECT * FROM skill_runs WHERE run_id=?", (run_id,))
             if run is None or run["status"] in {"succeeded", "failed", "cancelled", "timed_out"}:
+                return
+            if status == "succeeded" and run["cancel_requested"]:
                 return
             await conn.execute("UPDATE skill_runs SET status=?,result_json=?,error_json=?,revision=revision+1,updated_at=? WHERE run_id=?", (
                 status, canonical(result) if result is not None else None,
@@ -262,12 +309,18 @@ class SkillService:
             await self._finish(run_id, "timed_out", error="DEADLINE_EXCEEDED")
             return
         if version is None or not version["enabled"]:
+            await self._cancel_step(run, step)
             await self._finish(run_id, "failed", error="VERSION_DISABLED")
             return
         if not await self._approval_ok(version, now):
+            await self._cancel_step(run, step)
             await self._finish(run_id, "failed", error="APPROVAL_EXPIRED")
             return
         if run["cancel_requested"]:
+            if step is not None and step["tool_run_id"]:
+                tool_run = await self._tool_run(step["tool_run_id"])
+                if tool_run is None or tool_run["status"] in {"dispatching", "unknown"}:
+                    return  # Cancellation remains pending until the execution is accounted for.
             if step is not None and step["status"] in {"pending", "dispatchable", "approval", "running"} and step["task_id"]:
                 if step["task_id"]:
                     try:
@@ -315,7 +368,10 @@ class SkillService:
             if tool_run["status"] == "succeeded":
                 await self._step_succeeded(run, step, tool_run["output_json"])
                 return
-            if tool_run["status"] in {"failed", "unknown", "cancelled"}:
+            if tool_run["status"] == "unknown":
+                await self._step_status(run_id, step["step_index"], "unknown")
+                return
+            if tool_run["status"] in {"failed", "cancelled"}:
                 await self._finish(run_id, "failed", error=json.loads(tool_run["error_json"])["code"] if tool_run["error_json"] else "TOOL_FAILED")
                 return
             await self._step_status(run_id, step["step_index"], "running")
@@ -326,7 +382,7 @@ class SkillService:
         definition = release["steps"][step["step_index"] - 1]
         try:
             previous = {item["step_id"]: json.loads(item["result_json"]) for item in steps if item["result_json"]}
-            arguments = _resolve(definition.get("arguments", {}), previous)
+            arguments = _resolve(definition.get("arguments", {}), previous, json.loads(run["input_json"]))
         except (ValueError, KeyError, TypeError):
             await self._finish(run_id, "failed", error="REFERENCE_INVALID")
             return
@@ -339,9 +395,12 @@ class SkillService:
                 await self._finish(run_id, "failed", error="SANDBOX_UNAVAILABLE")
                 return
             status = await self.tools.execute_skill_step(
-                owner_id=run["owner_id"], version=tool, node_id=UUID(run["node_id"]),
+                owner_id=run["owner_id"], version=tool,
                 input_value=arguments, skill_run_id=run_id, step_index=step["step_index"])
-            if status == "started":
+            if status in {"started", "dispatching", "unknown"}:
+                return
+            if status == "cancelled":
+                await self._finish(run_id, "cancelled")
                 return
             step_row = await self._read_step(run_id, step["step_index"])
             if step_row and step_row["status"] == "succeeded":
@@ -355,11 +414,15 @@ class SkillService:
             LOGGER.warning("skill step submit failed: %s %s", type(exc).__name__, exc)
             await self._finish(run_id, "failed", error="STEP_SUBMIT_FAILED")
             return
-        async with self.database.transaction() as conn:
-            await conn.execute("UPDATE skill_run_steps SET task_id=?,status=? ,updated_at=? WHERE run_id=? AND step_index=? AND task_id IS NULL", (
-                str(task.task_id), "approval" if task.status == "awaiting_approval" else "dispatchable",
-                timestamp(utc_now()), run_id, step["step_index"]))
+        await self._step_status(run_id, step["step_index"], "approval" if task.status == "awaiting_approval" else "dispatchable")
         self.wake.set()
+
+    async def _cancel_step(self, run, step):
+        if step is not None and step["task_id"]:
+            try:
+                await self.harness.cancel(await self._owner_principal(run["owner_id"]), UUID(step["task_id"]))
+            except (AccessDenied, LookupError):
+                pass
 
     async def _approval_ok(self, version, now) -> bool:
         async with self.database.transaction(write=False) as conn:
@@ -375,8 +438,13 @@ class SkillService:
 
     async def _step_succeeded(self, run, step, result_json: str) -> None:
         async with self.database.transaction() as conn:
+            current = await one(conn, "SELECT status,cancel_requested FROM skill_runs WHERE run_id=?", (run["run_id"],))
+            if current is None:
+                return
             await conn.execute("UPDATE skill_run_steps SET status='succeeded',result_json=?,updated_at=? WHERE run_id=? AND step_index=?", (
                 result_json, timestamp(utc_now()), run["run_id"], step["step_index"]))
+            if current["status"] != "running" or current["cancel_requested"]:
+                return
             total = await one(conn, "SELECT count(*) FROM skill_run_steps WHERE run_id=?", (run["run_id"],))
             if step["step_index"] >= total[0]:
                 results = await conn.execute_fetchall("SELECT step_id,result_json FROM skill_run_steps WHERE run_id=? ORDER BY step_index", (run["run_id"],))

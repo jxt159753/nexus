@@ -13,6 +13,7 @@
 5. Tool 只接受显式有界 JSON 和单一 Python 标准库源码；可信控制器维护固定用例并通过 v2 协议在 runsc 沙箱执行。Core 不导入候选，也不采信候选自报通过。
 6. v1 协议和 Windows Node 两工具保持不变；生成 Tool 只走独立的 `/ws/v2/sandbox` 和登记授权的 Sandbox Node。
 7. 缺少合格沙箱时，测试状态为 `unavailable`，批准与执行被服务端拒绝；不得退回普通 subprocess 或 Windows Job。
+8. 独立复核后，Core 采用共享的批准校验及最终发送门：停用/取消与发送共用 Harness 锁，步骤关联与任务创建同事务。业务 Tool 的 execution_id 取持久 tool_run_id；无法确认停止时保留 unknown 并阻断，Node 等待所持执行清理后释放数据目录锁。输出采用运行期间有界管道，禁止先向宿主文件无限输出再事后检查。
 
 ## 后果
 

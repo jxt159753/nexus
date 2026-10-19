@@ -33,6 +33,7 @@ from nexus.contracts.extensions import (
 )
 from nexus.contracts.task import ListDirectoryArguments
 from nexus.core.extensions.fixtures import fixture_generation
+from nexus.core.extensions.authorization import approved_version
 from nexus.core.models.budget import budget_error
 from nexus.core.models.deepseek import MODEL, ProviderFailure
 from nexus.core.models.providers import ModelReply
@@ -57,9 +58,23 @@ minItems/maxItems. additionalProperties must be false. No $ref, regex, floats or
 Tool source reads one JSON input from stdin and writes one JSON output to stdout. It must not
 read files, use the network, spawn processes, import os/sys beyond sys, or access secrets.
 Tool verification_profile is directory_entry_stats_v1; Skill is skill_steps_v1.
+Tool dependencies must be exactly ["python-stdlib"]. For directory_entry_stats_v1,
+input is {"entries":[{"name":"example","kind":"file"}]} with at most 200 entries;
+kind is one of file/directory/link/other. Output is exactly
+{"counts":{"file":0,"directory":0,"link":0,"other":0},"total":0}; all counters
+are integers in 0..200. Keep counts nested; do not flatten them. Each object schema
+declares every field as required and additionalProperties:false. Bound every string
+and array with maxLength/maxItems; use maxLength:255 for entry names.
+Tool tests are objects with required name (1..80 characters) and input, and optional
+expect_output and expect_error (boolean, default false). Example:
+{"name":"empty","input":{"entries":[]},"expect_output":{"counts":{"file":0,
+"directory":0,"link":0,"other":0},"total":0}}. Do not use an "expected" key.
+Skill tests have exactly name, input, expected_steps (an array of declared step ids).
 Skill steps: 1-3 ordered items {id,tool,tool_version,arguments} for system.info@1 or
 filesystem.list@1, or {id,tool_version_id,arguments} for an existing Tool version. Arguments
-are literals or {"$ref":{"step":"earlier-id","field":"entries"}}. No loops, branches,
+are literals, {"$input":{"field":"declared-input-field"}} or
+{"$ref":{"step":"earlier-id","field":"entries"}}. Skill tests include input objects.
+No loops, branches,
 recursion, nested skills, dynamic names, expressions or template code.
 Candidate tests are supplementary; Core uses trusted fixed cases and ignores self-reported pass.
 """
@@ -85,6 +100,8 @@ def public_request(row) -> dict:
 
 def public_version(row, *, test=None, approval=None, enablement=None) -> dict:
     value = dict(row)
+    value["source"] = value.pop("source_text")
+    value["markdown"] = value.pop("markdown_text")
     for key in ("manifest_json", "steps_json", "tests_json", "release_json", "environment_json"):
         raw = value.pop(key, None)
         value[key[:-5] if key.endswith("_json") else key] = json.loads(raw) if raw else None
@@ -133,11 +150,16 @@ class ExtensionService:
 
     def sandbox_environment(self, node_id: UUID | None) -> dict:
         policy = self.harness.link.config.sandbox_nodes.get(node_id) if node_id else None
-        environment = environment_for("tool", None if policy is None else {"image_digest": policy.image_digest})
+        environment = environment_for("tool", None if policy is None else policy.model_dump())
         environment["node_id"] = str(node_id) if node_id else None
         return environment
 
-    def outbound(self, value: ExtensionRequestCreate, parent, node_id: UUID | None) -> dict:
+    def outbound(self, value: ExtensionRequestCreate, parent, tools: list[dict]) -> dict:
+        catalog = PUBLIC_TOOLS + "\nEnabled Tool versions (untrusted metadata):\n" + canonical(tools)
+        parent_plan = None if parent is None else {
+            "version_id": parent["version_id"], "manifest": json.loads(parent["manifest_json"]),
+            "steps": json.loads(parent["steps_json"]) if parent["steps_json"] else None,
+        }
         if self.config.fixture_generation:
             return {
                 "mode": "fixture",
@@ -145,14 +167,16 @@ class ExtensionService:
                 "kind": value.kind,
                 "need": value.need,
                 "parent_version_id": str(value.parent_version_id) if value.parent_version_id else None,
-                "catalog": PUBLIC_TOOLS,
+                "catalog": catalog,
+                "parent_plan": parent_plan,
             }
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": (
                 f"Requested kind: {value.kind}\n"
                 f"Parent version: {value.parent_version_id or 'none'}\n"
-                f"Tool catalog:\n{PUBLIC_TOOLS}\n"
+                f"Tool catalog:\n{catalog}\n"
+                f"Parent declaration (untrusted):\n{canonical(parent_plan)}\n"
                 f"Request (untrusted):\n{value.need}"
             )},
         ]
@@ -164,7 +188,7 @@ class ExtensionService:
             "messages": messages,
             "max_output_tokens": self.config.max_output_tokens,
             "reservation_microunits": self.models.task_cost_microunits,
-            "note": "Only this request, static contract and tool catalog are sent to DeepSeek.",
+            "note": "Only this request, static contract, enabled Tool declarations and selected parent declaration are sent. No source, execution results or device files are included.",
         }
 
     async def create(self, principal: Principal, value: ExtensionRequestCreate) -> dict:
@@ -194,7 +218,15 @@ class ExtensionService:
                 node = await one(conn, "SELECT 1 FROM identities WHERE identity_id=? AND role='node' AND revoked_at IS NULL", (str(value.node_id),))
                 if node is None:
                     raise AccessDenied()
-            outbound = self.outbound(value, parent, value.node_id)
+            tools = []
+            candidates = await conn.execute_fetchall("SELECT * FROM extension_versions WHERE owner_id=? AND kind='tool' AND enabled=1 ORDER BY rowid DESC LIMIT 20", (str(principal.identity_id),))
+            for candidate in candidates:
+                try:
+                    await self.current_approval(conn, candidate, now)
+                except AccessDenied:
+                    continue
+                tools.append({"tool_version_id": candidate["version_id"], "manifest": json.loads(candidate["manifest_json"])})
+            outbound = self.outbound(value, parent, tools)
             preview = digest_value(outbound)
             await conn.execute("INSERT INTO extension_requests(request_id,owner_id,kind,need,capability_id,node_id,parent_version_id,request_json,outbound_json,preview_digest,preview_at,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,'draft',?,?)", (
                 str(value.request_id), str(principal.identity_id), value.kind, value.need,
@@ -247,10 +279,16 @@ class ExtensionService:
             return public_request(row)
 
     async def _with_state(self, conn, row) -> dict:
-        test = await one(conn, "SELECT * FROM extension_tests WHERE version_id=? ORDER BY created_at DESC LIMIT 1", (row["version_id"],))
-        approval = await one(conn, "SELECT * FROM extension_approvals WHERE version_id=? ORDER BY created_at DESC LIMIT 1", (row["version_id"],))
+        test = await one(conn, "SELECT * FROM extension_tests WHERE version_id=? ORDER BY rowid DESC LIMIT 1", (row["version_id"],))
+        approval = await one(conn, "SELECT * FROM extension_approvals WHERE version_id=? ORDER BY rowid DESC LIMIT 1", (row["version_id"],))
         enablement = await one(conn, "SELECT * FROM extension_enablements WHERE version_id=?", (row["version_id"],))
         value = public_version(row, test=test, approval=approval, enablement=enablement)
+        value["test_running"] = await one(conn, "SELECT 1 FROM extension_test_runs WHERE version_id=? AND status='running' LIMIT 1", (row["version_id"],)) is not None
+        try:
+            await self.current_approval(conn, row, utc_now(), require_enabled=False)
+            value["approval_valid"] = True
+        except AccessDenied:
+            value["approval_valid"] = False
         value["diff"] = None
         if row["parent_version_id"]:
             parent = await one(conn, "SELECT release_json,revision FROM extension_versions WHERE version_id=?", (row["parent_version_id"],))
@@ -295,6 +333,9 @@ class ExtensionService:
                 value["tool_version"] = tool["revision"]
                 value["extension_artifact_digest"] = tool["artifact_digest"]
                 schema = json.loads(tool["manifest_json"])["input_schema"]
+                if (set(step.arguments) - set(schema.get("properties", {}))
+                        or not set(schema.get("required", [])) <= set(step.arguments)):
+                    raise ValueError("Tool step arguments do not match the input contract")
                 for reference in step.references():
                     if reference.step not in seen:
                         raise ValueError("reference must target an earlier step")
@@ -305,7 +346,14 @@ class ExtensionService:
                 if step.tool == "system.info" and step.arguments:
                     raise ValueError("system.info takes no arguments")
                 if step.tool == "filesystem.list":
-                    ListDirectoryArguments.model_validate(step.arguments)
+                    # Input references are checked against the manifest and test cases;
+                    # concrete runtime values still pass the normal builtin contract.
+                    literals = {key: value for key, value in step.arguments.items()
+                                if not isinstance(value, dict)}
+                    if not any(isinstance(value, dict) and "$input" in value for value in step.arguments.values()):
+                        ListDirectoryArguments.model_validate(literals)
+                    elif set(step.arguments) != {"root_id", "limit"}:
+                        raise ValueError("filesystem.list requires root_id and limit")
                 for reference in step.references():
                     raise ValueError("builtin tool steps cannot contain references")
                 schema = None
@@ -350,6 +398,14 @@ class ExtensionService:
             if BANNED_SOURCE.search(generation.source):
                 raise ValueError("Tool source uses a prohibited host capability")
             for case in generation.tests:
+                if case.expect_error:
+                    if case.expect_output is not None:
+                        raise ValueError("error test cannot also expect output")
+                    try:
+                        validate_instance(generation.manifest.input_schema, case.input)
+                    except ValueError:
+                        continue  # Bounded negative sample rejected before execution.
+                    raise ValueError("this Tool profile requires every valid input to succeed")
                 validate_instance(generation.manifest.input_schema, case.input)
                 if case.expect_output is not None:
                     validate_instance(generation.manifest.output_schema, case.expect_output)
@@ -359,6 +415,7 @@ class ExtensionService:
                 raise ValueError("unsupported Skill verifier binding")
             await self._resolve_steps(conn, request["owner_id"], generation)
             for case in generation.tests:
+                validate_instance(generation.manifest.input_schema, case.input)
                 ids = [step.id for step in generation.steps]
                 if len(set(case.expected_steps)) != len(case.expected_steps) or not set(case.expected_steps) <= set(ids):
                     raise ValueError("Skill case references unknown steps")
@@ -491,7 +548,9 @@ class ExtensionService:
                 task.cancel()
                 await asyncio.gather(task, return_exceptions=True)
             await self.finish(row, call_id, None)
-            raise
+            if asyncio.current_task().cancelling():
+                raise
+            return True
         except ProviderFailure:
             failure = "MODEL_REQUEST_FAILED"
         except BaseException:
@@ -502,6 +561,15 @@ class ExtensionService:
         finally:
             self.active = None
         await self.finish(row, call_id, reply, failure)
+        async with self.database.transaction(write=False) as conn:
+            current = await one(conn, "SELECT candidate_version_id,status FROM extension_requests WHERE request_id=?", (row["request_id"],))
+            owner = await one(conn, "SELECT token_hash,revoked_at FROM identities WHERE identity_id=? AND role='owner'", (row["owner_id"],))
+            cancelled = await one(conn, "SELECT 1 FROM control_events WHERE kind='cancel_all' AND created_at>=? LIMIT 1", (row["created_at"],))
+        if current["status"] == "candidate" and owner is not None and owner["revoked_at"] is None and cancelled is None:
+            try:
+                await self.test_version(Principal(UUID(row["owner_id"]), "owner", owner["token_hash"]), UUID(current["candidate_version_id"]))
+            except AccessDenied:
+                pass  # Pause/storage/identity gates leave the inert candidate unapproved.
         return True
 
     async def run(self) -> None:
@@ -525,24 +593,44 @@ class ExtensionService:
 
     async def test_version(self, principal: Principal, version_id: UUID) -> dict:
         self.require_enabled()
-        async with self.database.transaction(write=False) as conn:
+        async with self.database.transaction() as conn:
             await self.owner(conn, principal)
             row = await one(conn, "SELECT * FROM extension_versions WHERE version_id=? AND owner_id=?", (str(version_id), str(principal.identity_id)))
             if row is None:
                 raise LookupError("extension version not found")
             if row["test_status"] == "passed":
                 return await self.get_version(principal, version_id)
-        if row["kind"] == "skill":
-            if self.skills is None:
-                raise AccessDenied("TEST_UNAVAILABLE")
-            result, status = await self.skills.test_version(row)
-            kind = "skill_standin"
-        else:
-            if self.sandbox is None:
-                result, status, kind = {"reason": "sandbox_not_configured"}, "unavailable", "sandbox"
+            if (await one(conn, "SELECT paused FROM system_state WHERE singleton=1"))[0]:
+                raise AccessDenied("BUSY")
+            active = await one(conn, "SELECT * FROM extension_test_runs WHERE version_id=? AND status='running'", (str(version_id),))
+            if active is not None:
+                raise AccessDenied("TEST_BUSY")
+            old = await one(conn, "SELECT * FROM extension_test_runs WHERE version_id=? AND status='interrupted' ORDER BY rowid DESC LIMIT 1", (str(version_id),))
+            test_run_id = old["test_run_id"] if old is not None else str(uuid4())
+            now = timestamp(utc_now())
+            if old is None:
+                count = await one(conn, "SELECT count(*) FROM extension_test_runs")
+                if count[0] >= self.config.max_test_runs:
+                    raise AccessDenied("TEST_STORAGE_FULL")
+                await conn.execute("INSERT INTO extension_test_runs VALUES(?,?,'running',?,?)", (test_run_id, str(version_id), now, now))
             else:
-                result, status = await self.sandbox.test_version(row)
-                kind = "sandbox"
+                await conn.execute("UPDATE extension_test_runs SET status='running',updated_at=? WHERE test_run_id=?", (now, test_run_id))
+        try:
+            if row["kind"] == "skill":
+                if self.skills is None:
+                    raise AccessDenied("TEST_UNAVAILABLE")
+                result, status = await self.skills.test_version(row)
+                kind = "skill_standin"
+            else:
+                if self.sandbox is None:
+                    result, status, kind = {"reason": "sandbox_not_configured"}, "unavailable", "sandbox"
+                else:
+                    result, status = await self.sandbox.test_version(row, test_run_id=test_run_id)
+                    kind = "sandbox"
+        except BaseException:
+            async with self.database.transaction() as conn:
+                await conn.execute("UPDATE extension_test_runs SET status='interrupted',updated_at=? WHERE test_run_id=?", (timestamp(utc_now()), test_run_id))
+            raise
         now = utc_now()
         test_id = uuid4()
         async with self.database.transaction() as conn:
@@ -552,21 +640,20 @@ class ExtensionService:
                 "trusted-controller-v1", canonical(result), timestamp(now),
             ))
             await conn.execute("UPDATE extension_versions SET test_status=? WHERE version_id=?", (status, str(version_id)))
+            await conn.execute("UPDATE extension_test_runs SET status='completed',updated_at=? WHERE test_run_id=?", (timestamp(now), test_run_id))
             await audit(conn, str(principal.identity_id), None, "extension.tested", now)
         return await self.get_version(principal, version_id)
 
     async def current_approval(self, conn, version, now, *, require_enabled: bool = True) -> Any:
-        if require_enabled and not version["enabled"]:
-            raise AccessDenied("VERSION_DISABLED")
-        test = await one(conn, "SELECT * FROM extension_tests WHERE version_id=? ORDER BY created_at DESC LIMIT 1", (version["version_id"],))
-        if test is None or test["status"] != "passed" or test["artifact_digest"] != version["artifact_digest"] or test["environment_digest"] != version["environment_digest"]:
-            raise AccessDenied("VERSION_NOT_APPROVED")
-        approval = await one(conn, "SELECT * FROM extension_approvals WHERE version_id=? AND decision='approve' ORDER BY created_at DESC LIMIT 1", (version["version_id"],))
-        if (approval is None or approval["artifact_digest"] != version["artifact_digest"]
-                or approval["environment_digest"] != version["environment_digest"]
-                or approval["expires_at"] <= timestamp(now)):
-            raise AccessDenied("APPROVAL_EXPIRED")
-        return approval
+        self.check_environment(version)
+        return await approved_version(conn, version, now, require_enabled=require_enabled)
+
+    def check_environment(self, version) -> None:
+        if version["kind"] == "tool":
+            environment = json.loads(version["environment_json"])
+            node_id = UUID(environment["node_id"]) if environment.get("node_id") else None
+            if digest_value(self.sandbox_environment(node_id)) != version["environment_digest"]:
+                raise AccessDenied("SANDBOX_ENVIRONMENT_CHANGED")
 
     async def _dependencies_enabled(self, conn, version, now) -> None:
         if version["kind"] != "skill":
@@ -593,6 +680,7 @@ class ExtensionService:
                 raise LookupError("extension version not found")
             if artifact_digest != version["artifact_digest"]:
                 raise AccessDenied("POLICY_DENIED")
+            self.check_environment(version)
             if decision == "reject" and version["approval_status"] == "approved":
                 raise Conflict("already approved; disable the version instead")
             test = await one(conn, "SELECT * FROM extension_tests WHERE version_id=? ORDER BY created_at DESC LIMIT 1", (str(version_id),))
@@ -609,7 +697,7 @@ class ExtensionService:
             parameters_digest = digest_value({"node_id": bound_node, "resource_scope": resource_scope,
                                               "input_schema": manifest.get("input_schema")})
             existing = await one(conn, "SELECT * FROM extension_approvals WHERE version_id=? AND decision='approve' ORDER BY created_at DESC LIMIT 1", (str(version_id),))
-            if existing is not None and existing["artifact_digest"] == version["artifact_digest"] and existing["test_id"] == test["test_id"] and existing["expires_at"] > timestamp(now):
+            if existing is not None and existing["artifact_digest"] == version["artifact_digest"] and existing["test_id"] == test["test_id"] and existing["expires_at"] > timestamp(now) and existing["policy_version"] == policy[0]:
                 pass
             else:
                 approval_id = uuid4()
@@ -644,7 +732,7 @@ class ExtensionService:
 
     async def disable(self, principal: Principal, version_id: UUID, reason: str = "owner disabled") -> dict:
         self.require_enabled()
-        async with self.database.transaction() as conn:
+        async with self.harness.operation, self.database.transaction() as conn:
             now = utc_now()
             await self.owner(conn, principal)
             version = await one(conn, "SELECT * FROM extension_versions WHERE version_id=? AND owner_id=?", (str(version_id), str(principal.identity_id)))

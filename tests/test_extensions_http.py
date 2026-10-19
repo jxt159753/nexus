@@ -6,7 +6,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from nexus.core.app import create_app
-from nexus.core.config import ExtensionConfig, TrustedNode
+from nexus.core.config import ExtensionConfig, SandboxNodePolicy, TrustedNode
 from test_harness_http import login
 from test_node_link import ORIGIN, core_config
 
@@ -45,6 +45,11 @@ def test_extension_http_requires_owner_csrf_and_strict_fields(world):
         versions = client.get("/api/v1/extensions/versions", headers=auth).json()["versions"]
         assert len(versions) == 1 and versions[0]["enabled"] is False
         version_id = versions[0]["version_id"]
+        for _ in range(60):
+            current_version = client.get(f"/api/v1/extensions/versions/{version_id}", headers=auth).json()["version"]
+            if not current_version["test_running"] and current_version["test_status"] != "untested":
+                break
+            time.sleep(.05)
         assert client.post(f"/api/v1/extensions/versions/{version_id}/test", json={}, headers=auth).status_code == 200
         tested = client.get(f"/api/v1/extensions/versions/{version_id}", headers=auth).json()["version"]
         assert tested["test_status"] == "passed"
@@ -68,3 +73,16 @@ def test_disabled_extensions_preserve_existing_reads_but_refuse_new_work(world):
         assert client.get("/api/v1/extensions/requests", headers=auth).status_code == 200
         refused = client.post("/api/v1/extensions/requests", json={"request_id": str(uuid4()), "kind": "skill", "need": "新的"}, headers=auth)
         assert refused.status_code == 403 and refused.json()["detail"] == "EXTENSIONS_DISABLED"
+
+
+def test_registered_sandbox_status_endpoint_returns_offline_node(world):
+    app = create_app(core_config(world, extensions=ExtensionConfig(enabled=True),
+                                sandbox_nodes={world.node_id: SandboxNodePolicy(image_digest="a" * 64)}))
+    with TestClient(app, base_url=ORIGIN) as client:
+        assert client.get("/api/v1/extensions/sandbox").status_code == 401
+        login(client, world)
+        response = client.get("/api/v1/extensions/sandbox")
+        assert response.status_code == 200
+        assert response.json()["sandbox_nodes"] == [{
+            "node_id": str(world.node_id), "runtime": "runsc", "image_digest": "a" * 64,
+            "status": {"available": False, "reason": "sandbox_offline", "image_digest": "a" * 64}}]

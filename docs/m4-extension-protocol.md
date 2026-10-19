@@ -1,6 +1,6 @@
 # M4 自扩展协议与 Sandbox Node 规格
 
-状态：2026-10-19 首版实现。v2 协议与 Core/Node 代码已实现并完成协议级负向测试；**尚未在专用 Linux/runsc 主机完成真实隔离实测**。本文记录实现接口和启用前检查清单，不把配置写成已验证能力。
+本文记录 v2 实现接口和启用前要求；具体发布、实际验证和验收状态统一见 [ROADMAP](ROADMAP.md#m4自定义工具与流程)。WSL2 的固定环境、KVM 选择和宿主限制见 [部署说明](m4-sandbox-wsl.md)。
 
 ## 1. 边界
 
@@ -57,7 +57,9 @@
 | 启用 | `enabled = 0/1`，另有 enablement 历史 |
 | Skill run | `running / cancelling / succeeded / failed / cancelled / timed_out` |
 
-批准记录绑定 `artifact_digest`、最新通过测试 `test_id`、`environment_digest`、请求登记的目标节点、资源范围、参数摘要、策略版本和期限（最长 168 小时）。每次启动 Skill、每个后续步骤、Tool 派发前都会重查版本启用、批准期限、测试摘要、环境摘要和节点范围。
+批准记录绑定 `artifact_digest`、最新通过测试 `test_id`、`environment_digest`、请求登记的目标节点、资源范围、参数摘要、策略版本和期限（最长 168 小时）。每次启动 Skill、每个后续步骤、Tool 派发前都会重查版本启用、最新批准决定和测试、当前策略、批准期限、摘要和节点范围。策略变化后旧批准无效，owner 需要重新批准；旧运行不能借用新批准恢复。
+
+Skill 使用设备节点，生成 Tool 使用其版本环境绑定的 Sandbox 节点，二者可以且通常应当是不同 UUID。任务与 Skill 步骤关联在创建事务中落盘；首次派发、重传及最终发送均检查根 Skill。停用/取消和最终发送共用 Harness 操作锁。
 
 ## 4. v2 端点与消息
 
@@ -87,19 +89,28 @@ Envelope：
 | Node → Core | `sandbox.result` | execution_id、artifact_digest、outcome=`succeeded/failed/unknown`、output_json 或 error_code、stopped |
 | Core → Node | `sandbox.cancel` | execution_id |
 | Node → Core | `sandbox.cancelled` | execution_id、stopped |
+| Core → Node | `sandbox.status` | session_id、原 execution_id；只查询不执行 |
+| Node → Core | `sandbox.status_result` | 原 execution_id、not_found/received/running/settled/unknown、command_digest、可用的完整结果 |
+| Core → Node | `sandbox.result_ack` | 原 execution_id、artifact_digest；仅在 Core 结果落盘后发送 |
 
-- Core 只在持久化 Tool 执行记录后发送 `sandbox.execute`；`sandbox.result` 的 attempt/execution、版本摘要和环境摘要必须匹配，否则记为 unknown，不标成功。
+- Core 对测试与业务命令都先提交 `sandbox_executions`；业务 execution_id 使用 tool_run_id，测试使用持久 test_run_id 与固定用例名推导的稳定 ID。完整命令摘要覆盖版本、产物/环境摘要、输入与时限，Node 收到相同 ID 不同内容时拒绝。`sandbox.result` 的节点、execution、产物摘要必须匹配，否则不标成功。
 - Node 在启动沙箱前持久化接收回执；相同 execution_id 只返回原结果，不重跑；同 ID 不同摘要拒绝。
 - 结果由 Core 的可信控制器与固定用例比较；候选自报的 `passed` 不作为通过依据。
-- 超时发送取消并保留 unknown；Node 无法确认停止时不得声称已停止。
+- 超时或控制取消发送 `sandbox.cancel`，等待实际结果或 `stopped=true` 的停止确认；`sandbox.cancelled(stopped=false)` 不结束等待。到期仍无停止证据则保留 unknown，阻断当前连接的新执行。Node 不认识的或 unknown 的回执不能声称已经停止。
 - 候选源码以 `release_json` 内联传输（≤64 KiB，按摘要核验），不接受模型 URL、压缩包或宿主路径。
+
+Node 接收循环与执行独立运行，取消事件传至所持 runsc 执行。连接断开及主协程关闭时等待执行清理后才释放执行槽、回执库及数据目录锁。重启发现未结算回执，先按容器 ID 清理并查询确认，未知期间不接新执行。只能确认停止但找不回结果时返回 `EXECUTION_RESULT_UNKNOWN`，不能恢复成成功。Core 恢复把未结算业务执行标记 unknown，随后查询原执行，不自动重放。
+
+Core 提交结果后才确认。Node 每次连接对每条未确认结果最多主动重发 3 次、每次扫描 4 条；仍可响应状态查询。Core 每条执行最多主动查询 64 次，计数持久化，不因重启重置。`not_found` 只证明本节点没有回执，原执行结算为未接收，不自动新建执行。收到已落盘结果时沿用原证据；恢复业务结果仍由可信控制器验证。测试流程中断后沿用原 test_run_id 和已保存结果，后续由显式重试测试继续；不重发费用请求。
+
+默认 Skill 运行、测试流程和沙箱执行各保存至多 10000 条，配置可收紧；到限拒绝新增而不删除证据。Skill HTTP 运行入口要求 request_id，并绑定固定版本、节点和规范输入摘要。相同内容重复返回原记录，变更内容拒绝。
 
 ## 5. 宿主环境门槛
 
-以下必须在专用 Linux 执行主机上逐项实测，当前仓库没有完成这些实测：
+以下必须在选定的 Linux 执行环境逐项实测；不能把本文的配置声明当成通过证据：
 
 1. 独立执行主机（优先与 Core 不同主机/VM），专用非特权用户；不把生产 Core 宿主改造为沙箱。
-2. `runsc` 已安装，版本可核验；镜像 rootfs 的树摘要与 Core 登记 `image_digest` 完全一致；不使用 `latest`。
+2. `runsc` 已安装，安装摘要覆盖 launcher 及外置 sentry 组件，明确选择 systrap/KVM；hello 的平台、安装摘要和镜像 rootfs 树摘要与 Core 登记一致，不使用 `latest`。修改环境后旧批准无效。
 3. 每次执行新建短生命周期 bundle；固定只读镜像 + 只读 `/work` 候选文件 + 16 MiB tmpfs；不挂载宿主目录、设备或控制 socket，不传 Node/Core 凭证和数据库。
 4. `--network=none`、非特权、无 host network/privileged/自定义 OCI 参数；固定 Python 入口，候选不能选择宿主程序。
 5. 宿主实际强制 1 vCPU、512 MiB、64 PID、16 MiB 临时空间、单工具 10 秒、整测试 60 秒、stdout 32 KiB；以宿主 cgroup/runsc 证据为准，不把沙箱内打印当成限制证据。
@@ -110,6 +121,8 @@ Envelope：
 10. 在独立测试主机运行，不对生产机做逃逸/破坏性测试。
 
 缺少任一前提时，Tool 测试保持 `unavailable` 或 `failed`，不产生可批准版本，不得以普通 subprocess 代替。
+
+当前 launcher 已改为在执行期间捕获有界管道：stdout 32 KiB、stderr 8 KiB，超限/超时/取消触发所持进程停止，并用固定 `runsc delete --force` 清理身份绑定的运行容器；清理不能确认成功则保持 unknown。该清理命令的语义以 [gVisor 官方实现](https://github.com/google/gvisor/blob/master/runsc/cmd/delete.go) 为依据。本机固定探针仅验证管道控制，不证明这些限制在真实 runsc 宿主已生效。
 
 ## 6. 当前实现入口
 
@@ -124,6 +137,8 @@ Envelope：
 | 示例配置 | `config/sandbox-node.example.toml` |
 
 `python -m nexus.sandbox --config <file>` 仅在 Linux 主机启动；preflight 失败时会以 `available=false` 登记原因，Core 不会派发执行。Windows 上 `SandboxConfig` 直接拒绝，防止把 Windows 主机误当沙箱。
+
+远端连接必须为 `wss://`。明文 `ws://` 仅允许显式 `local_http=true` 且主机为字面量 `127.0.0.1` 或 `::1` 的开发连接；`localhost`、远端明文、URL 用户名/密码、查询和片段均拒绝。不改变 TLS 校验或系统信任。
 
 ## 7. 启用检查
 

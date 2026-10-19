@@ -110,7 +110,7 @@ def test_tool_candidate_is_not_approvable_without_qualified_sandbox(world):
 
     async def run():
         version = await generate(app, world, "tool", "统计显式传入的目录条目类型")
-        assert version["kind"] == "tool" and version["test_status"] == "untested"
+        assert version["kind"] == "tool" and version["test_status"] == "unavailable"
         assert version["enabled"] is False
         value = await run_test(app, world, version)
         assert value["test_status"] == "unavailable"
@@ -197,7 +197,7 @@ class FakeSandbox:
     def status(self, node_id):
         return {"available": True, "reason": None, "image_digest": "a" * 64}
 
-    async def execute(self, node_id, version, input_value, timeout):
+    async def execute(self, node_id, version, input_value, timeout, **kwargs):
         self.calls.append(input_value)
         output = reference_stats(input_value["entries"])
         if self.forged:

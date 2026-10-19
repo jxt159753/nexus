@@ -14,6 +14,7 @@ from nexus.core.security.types import AccessDenied, NodeScope, Principal
 from nexus.core.storage.database import Database, audit, one, timestamp, utc_now
 from nexus.core.storage.control import expire_task, task_event
 from nexus.core.storage.tasks import TERMINAL, canonical, load_task, transition
+from nexus.core.extensions.authorization import skill_task_allowed
 
 COMMAND = TypeAdapter(CommandExecute)
 RESULT = TypeAdapter(CommandResult)
@@ -41,6 +42,8 @@ class ExecutionRepository:
         now = utc_now()
         async with self.database.transaction() as conn:
             task = await load_task(conn, task_id)
+            if not await skill_task_allowed(conn, task_id, now):
+                return None
             authorization = await self.security.authorize_dispatch(conn, task, node, scope, now)
             if task.cancel_requested or (await one(conn, "SELECT paused FROM system_state WHERE singleton=1"))[0]:
                 return None
@@ -239,6 +242,8 @@ class ExecutionRepository:
 
     async def may_send(self, node: Principal, scope: NodeScope, command: CommandExecute) -> bool:
         async with self.database.transaction(write=False) as conn:
+            if not await skill_task_allowed(conn, command.task_id, utc_now()):
+                return False
             task, row = await self._active(conn, node, command.attempt_id)
             if (task.status not in {"dispatching", "running", "recovering"} or task.cancel_requested or row["phase"] in {"completed", "verifying"}
                     or row["stop_reason"] or utc_now() >= command.expires_at
@@ -255,6 +260,8 @@ class ExecutionRepository:
         async with self.database.transaction() as conn:
             task, row = await self._active(conn, node, attempt_id)
             now = utc_now()
+            if not await skill_task_allowed(conn, task.task_id, now):
+                return None
             if task.status not in {"dispatching", "running", "recovering"} or task.cancel_requested or row["phase"] in {"completed", "verifying"} or row["stop_reason"]:
                 return None
             if (await one(conn, "SELECT paused FROM system_state WHERE singleton=1"))[0]:

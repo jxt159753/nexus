@@ -22,6 +22,8 @@ class SandboxHello(StrictContract):
     node_version: StrictStr = Field(min_length=1, max_length=50)
     boot_id: UUID
     runtime: Literal["runsc"]
+    platform: Literal["systrap", "kvm"] = "systrap"
+    runsc_digest: StrictStr | None = Field(default=None, pattern=DIGEST)
     runtime_version: StrictStr = Field(min_length=1, max_length=200)
     image_digest: StrictStr = Field(pattern=DIGEST)
     available: StrictBool
@@ -93,10 +95,48 @@ class SandboxCancelled(StrictContract):
     stopped: StrictBool
 
 
+class SandboxStatus(StrictContract):
+    session_id: UUID
+    execution_id: UUID
+
+
+class SandboxStatusResult(StrictContract):
+    session_id: UUID
+    execution_id: UUID
+    status: Literal["not_found", "received", "running", "settled", "unknown"]
+    command_digest: StrictStr | None = Field(default=None, pattern=DIGEST)
+    result: SandboxResult | None = None
+
+    @model_validator(mode="after")
+    def consistent(self):
+        if (self.status == "not_found") != (self.command_digest is None):
+            raise ValueError("receipt identity required for known execution")
+        if self.result is not None and (self.result.execution_id != self.execution_id or self.result.session_id != self.session_id):
+            raise ValueError("status result identity mismatch")
+        if (self.status == "settled") != (self.result is not None):
+            raise ValueError("settled status requires a result")
+        return self
+
+
+class SandboxResultAck(StrictContract):
+    session_id: UUID
+    execution_id: UUID
+    artifact_digest: StrictStr = Field(pattern=DIGEST)
+
+
+def sandbox_command_digest(version_id, artifact_digest: str, environment_digest: str,
+                           input_value: dict, timeout_seconds: int) -> str:
+    from nexus.contracts.extensions import digest_value
+    return digest_value({"version_id": str(version_id), "artifact_digest": artifact_digest,
+                         "environment_digest": environment_digest, "input": input_value,
+                         "timeout_seconds": timeout_seconds})
+
+
 class SandboxEnvelope(StrictContract):
     protocol_version: Literal[2]
     type: Literal["sandbox.hello", "sandbox.welcome", "sandbox.heartbeat", "sandbox.execute",
-                  "sandbox.result", "sandbox.cancel", "sandbox.cancelled", "error"]
+                  "sandbox.result", "sandbox.cancel", "sandbox.cancelled", "sandbox.status",
+                  "sandbox.status_result", "sandbox.result_ack", "error"]
     message_id: UUID
     correlation_id: UUID | None = None
     sent_at: StrictStr = Field(min_length=20, max_length=40)
@@ -111,7 +151,19 @@ PAYLOADS = {
     "sandbox.result": SandboxResult,
     "sandbox.cancel": SandboxCancel,
     "sandbox.cancelled": SandboxCancelled,
+    "sandbox.status": SandboxStatus,
+    "sandbox.status_result": SandboxStatusResult,
+    "sandbox.result_ack": SandboxResultAck,
 }
+
+
+def _unique_fields(items):
+    value = {}
+    for key, item in items:
+        if key in value:
+            raise ValueError("duplicate v2 JSON key")
+        value[key] = item
+    return value
 
 
 def parse_sandbox_message(data: str | bytes):
@@ -119,7 +171,8 @@ def parse_sandbox_message(data: str | bytes):
     if len(raw) > MAX_V2_BYTES:
         raise ProtocolError(ErrorCode.INVALID_MESSAGE, "v2 message exceeds its frame budget")
     try:
-        value = json.loads(raw, parse_constant=lambda item: (_ for _ in ()).throw(ValueError(item)))
+        value = json.loads(raw, object_pairs_hook=_unique_fields,
+                           parse_constant=lambda item: (_ for _ in ()).throw(ValueError(item)))
     except (ValueError, UnicodeError):
         raise ProtocolError(ErrorCode.INVALID_MESSAGE, "invalid v2 JSON") from None
     if not isinstance(value, dict) or value.get("protocol_version") != 2:

@@ -1,6 +1,10 @@
 # M4 首版自扩展验证记录
 
+本文件保留当时的交付快照。后续真实 WSL/KVM、恢复、模型与部署结果见 [M4 补充验证](M4-COMPLETION.md)，当前状态以 [ROADMAP](ROADMAP.md) 为准。
+
 日期：2026-10-19。实施方：DSH。独立复核与最终用户验收：待 Codex / owner。本文只记录实际执行结果；未运行的项不填 passed。
+
+后续记录：本文为 DSH 原始交付快照。Codex 独立复核发现原测试未覆盖的缺陷，并按用户“自己改、别找 DSH”的要求直接修复；最新结论、检查与剩余缺口见 [M4-CODEX-REVIEW](M4-CODEX-REVIEW.md)，阶段状态以 [ROADMAP](ROADMAP.md) 为准。
 
 ## 1. 基线与环境
 

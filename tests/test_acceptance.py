@@ -105,10 +105,11 @@ def login(browser, origin, world):
 
 
 def backup(source: Path, target: Path):
-    # The caller has stopped both processes. Never create or overwrite a source.
+    # Both owned processes are stopped. mode=rw refuses a missing source and
+    # lets SQLite recover a WAL left by Windows TerminateProcess before backup.
     with target.open("xb"):
         pass
-    with closing(sqlite3.connect(source.as_uri() + "?mode=ro", uri=True)) as src:
+    with closing(sqlite3.connect(source.as_uri() + "?mode=rw", uri=True)) as src:
         with closing(sqlite3.connect(target)) as dest:
             src.backup(dest)
             assert dest.execute("PRAGMA quick_check").fetchall() == [("ok",)]

@@ -1,0 +1,26 @@
+[Unit]
+Description=NEXUS isolated Sandbox Node
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=exec
+User=nexus-sandbox
+Group=nexus-sandbox
+# Include only for a reviewed KVM deployment.
+SupplementaryGroups=kvm
+EnvironmentFile=/etc/nexus/sandbox.env
+ExecStart=/usr/bin/rootlesskit --net=slirp4netns --disable-host-loopback --copy-up=/etc /opt/nexus-sandbox/venv/bin/python -I -B -m nexus.sandbox --config /etc/nexus/sandbox.toml
+MemoryMax=512M
+MemorySwapMax=0
+CPUQuota=100%
+TasksMax=64
+KillMode=control-group
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

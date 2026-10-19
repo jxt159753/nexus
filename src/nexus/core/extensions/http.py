@@ -25,6 +25,7 @@ class DisableInput(StrictContract):
 
 
 class RunCreate(StrictContract):
+    request_id: UUID
     version_id: UUID
     node_id: UUID
     input: dict[str, Any] = Field(default_factory=dict)
@@ -109,7 +110,7 @@ class ExtensionHTTP:
     async def start_run(self, request: Request):
         principal = await self.guards.owner_http(request)
         value = await body(request, RunCreate, max_bytes=16384)
-        return {"run": await self.service.skills.start(principal, value.version_id, value.node_id, value.input)}
+        return {"run": await self.service.skills.start(principal, value.version_id, value.node_id, value.input, request_id=value.request_id)}
 
     async def list_runs(self, request: Request, before: int = Query(2**63 - 1, ge=1, le=2**63 - 1)):
         return {"runs": await self.service.skills.list(await self.guards.owner_http(request), before)}

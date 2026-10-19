@@ -46,7 +46,7 @@ def create_app(config: CoreConfig) -> FastAPI:
     link = NodeLink(guards, config)
     harness = Harness(link)
     clients = ClientLink(harness, guards)
-    sandbox_link = SandboxLink(guards, config)
+    sandbox_link = SandboxLink(guards, config, harness.operation)
     provider = None
     chat_provider = None
     extension_provider = None
@@ -81,6 +81,7 @@ def create_app(config: CoreConfig) -> FastAPI:
             await language.recover()
             await chat.recover()
             await extensions.recover()
+            await tools.recover()
             scheduler = asyncio.create_task(harness.run())
             interpreter = asyncio.create_task(language.run())
             chatter = asyncio.create_task(chat.run())
