@@ -25,6 +25,12 @@ from nexus.core.cognitive.language import LanguageService
 from nexus.core.cognitive.http import LanguageHTTP
 from nexus.core.cognitive.chat import ChatService
 from nexus.core.cognitive.chat_http import ChatHTTP
+from nexus.core.extensions.http import ExtensionHTTP
+from nexus.core.extensions.service import ExtensionService
+from nexus.core.extensions.skills import SkillService
+from nexus.core.extensions.tools import ToolService
+from nexus.core.link.sandbox import SandboxLink
+from nexus.core.models.extensions import DeepSeekExtensionProvider
 from nexus.core.security.http import SecurityHTTP, TransportPolicy
 from nexus.core.security.service import SecurityService
 from nexus.core.security.types import AccessDenied
@@ -40,8 +46,10 @@ def create_app(config: CoreConfig) -> FastAPI:
     link = NodeLink(guards, config)
     harness = Harness(link)
     clients = ClientLink(harness, guards)
+    sandbox_link = SandboxLink(guards, config)
     provider = None
     chat_provider = None
+    extension_provider = None
     if config.models.enabled:
         key = os.environ.get("DEEPSEEK_API_KEY", "")
         if not key or len(key) > 256 or any(c.isspace() for c in key):
@@ -49,8 +57,14 @@ def create_app(config: CoreConfig) -> FastAPI:
         provider = DeepSeekProvider(SecretStr(key), config.models)
         if config.models.chat_enabled:
             chat_provider = DeepSeekChatProvider(SecretStr(key), config.models)
+        extension_provider = DeepSeekExtensionProvider(SecretStr(key), config.models.timeout_seconds)
     language = LanguageService(harness, provider)
     chat = ChatService(harness, chat_provider, language.owner)
+    extensions = ExtensionService(harness, extension_provider)
+    tools = ToolService(extensions, sandbox_link, config.extensions)
+    extensions.sandbox = tools
+    skills = SkillService(harness, extensions, tools)
+    extensions.skills = skills
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -59,27 +73,28 @@ def create_app(config: CoreConfig) -> FastAPI:
         scheduler = None
         interpreter = None
         chatter = None
+        generator = None
+        skill_runner = None
         try:
             await database.initialize()
             await harness.executions.resume_verification()
             await language.recover()
             await chat.recover()
+            await extensions.recover()
             scheduler = asyncio.create_task(harness.run())
             interpreter = asyncio.create_task(language.run())
             chatter = asyncio.create_task(chat.run())
+            generator = asyncio.create_task(extensions.run())
+            skill_runner = asyncio.create_task(skills.run())
             yield
         finally:
             try:
-                if chatter is not None:
-                    chatter.cancel()
-                    await asyncio.gather(chatter, return_exceptions=True)
-                if interpreter is not None:
-                    interpreter.cancel()
-                    await asyncio.gather(interpreter, return_exceptions=True)
-                if scheduler is not None:
-                    scheduler.cancel()
-                    await asyncio.gather(scheduler, return_exceptions=True)
+                for task in (skill_runner, generator, chatter, interpreter, scheduler):
+                    if task is not None:
+                        task.cancel()
+                await asyncio.gather(*(task for task in (skill_runner, generator, chatter, interpreter, scheduler) if task is not None), return_exceptions=True)
                 await link.close()
+                await sandbox_link.close()
                 await clients.close()
             finally:
                 lock.close()
@@ -92,12 +107,17 @@ def create_app(config: CoreConfig) -> FastAPI:
     app.include_router(RecordsHTTP(guards).router)
     app.include_router(LanguageHTTP(language, guards).router)
     app.include_router(ChatHTTP(chat, guards).router)
+    app.include_router(ExtensionHTTP(extensions, guards).router)
+    app.include_router(sandbox_link.router)
     app.state.node_link = link
     app.state.harness = harness
     app.state.client_link = clients
     app.state.model_provider = provider or DisabledProvider()
     app.state.language = language
     app.state.chat = chat
+    app.state.extensions = extensions
+    app.state.skills = skills
+    app.state.sandbox_link = sandbox_link
     app.state.decision_model = DisabledDecisionModel()
     web = files("nexus.web")
     app.mount("/static", StaticFiles(directory=str(web)), name="static")

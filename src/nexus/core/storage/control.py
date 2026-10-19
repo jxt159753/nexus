@@ -97,6 +97,10 @@ class ControlRepository:
                 affected += chats.rowcount
                 language = await conn.execute("UPDATE language_requests SET status='cancelled' WHERE owner_id=? AND status IN ('queued','interpreting','proposed')", (str(principal.identity_id),))
                 affected += language.rowcount
+                extensions = await conn.execute("UPDATE extension_requests SET status='cancelled',updated_at=?,revision=revision+1 WHERE owner_id=? AND status IN ('draft','queued','generating')", (timestamp(now), str(principal.identity_id)))
+                affected += extensions.rowcount
+                skills = await conn.execute("UPDATE skill_runs SET status='cancelling',cancel_requested=1,revision=revision+1,updated_at=? WHERE owner_id=? AND status IN ('running','cancelling')", (timestamp(now), str(principal.identity_id)))
+                affected += skills.rowcount
                 rows = await conn.execute_fetchall("SELECT task_id FROM tasks WHERE owner_id=? AND status NOT IN ('succeeded','failed','cancelled','timed_out') LIMIT 100", (str(principal.identity_id),))
                 for row in rows:
                     task = await expire_task(conn, await load_task(conn, UUID(row[0])), now)

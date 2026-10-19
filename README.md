@@ -16,6 +16,8 @@ M2 已支持 DeepSeek 与受约束自然语言任务：先解释、展示动作�
 
 自由聊天支持多轮上下文、历史、实际增量回复、停止、首轮自动命名、重命名和归档；会话内可建议已有只读工具，确认及审批后展示真实结果。结果可选择字段、预览并同意外发，再生成最终回答，两次调用共用本轮预算。默认需在 Core 显式启用。使用见 [聊天说明](docs/m3-chat.md)；本地与生产版本及验证状态仍以 ROADMAP 为准。
 
+M4 首版自扩展增加了受约束的 Tool/Skill 候选：显式外发预览、不可变版本摘要、受控测试、owner 逐版批准/启用、声明式最多 3 步 Skill、停用/修订和“能力”页面。默认关闭；生成与测试不会自动变成可执行授权。流程见 [M4 使用说明](docs/m4-usage.md)，v2 Sandbox 门槛见 [协议规格](docs/m4-extension-protocol.md)。专用 runsc 主机尚未验证，因此生成 Tool 的实际隔离验收仍未完成，不能以普通子进程替代。
+
 阶段授权、进度、用户验收状态及后续批准要求统一见 [ROADMAP.md](docs/ROADMAP.md)；本 README 不授予后续阶段实施权限。
 
 早期实验文件已清理。当前仅执行两个固定只读动作，不接受任意工具或自报任务终态；未知执行必须有旧执行已停止的证据才能在预算内重试。M1 技术交付及原 S7 真机检查已完成，最终用户验收状态见 ROADMAP；新部署的跨主机和真机证据单独记录。
@@ -57,6 +59,8 @@ M2 已支持 DeepSeek 与受约束自然语言任务：先解释、展示动作�
 | [s7-deployment.md](docs/s7-deployment.md) | 首次启动、直接 HTTPS/WSS、Android 验收步骤及停机一致备份恢复 |
 | [S7-VERIFICATION.md](docs/S7-VERIFICATION.md) | 最终本机回归、真实 TLS、恢复演练、故障矩阵及未验收项 |
 | [protocol-v1.md](docs/protocol-v1.md) | 已实现的消息字段、编解码入口、错误分类和字节限额 |
+| [m4-extension-protocol.md](docs/m4-extension-protocol.md) | M4 候选/批准生命周期、v2 Sandbox 协议与宿主机检查清单 |
+| [m4-usage.md](docs/m4-usage.md) | 能力生成、审阅、批准、使用、停用与限制 |
 
 `ARCHITECTURE.md` 和 `ROADMAP.md` 的规范路径位于 docs/，根目录不维护同名副本。每次开发开始前，完整读取 AGENTS.md 和这两份文档。
 

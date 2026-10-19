@@ -385,7 +385,7 @@ def test_v6_upgrade_keeps_nonempty_ledger_and_consistent_backup(tmp_path):
         conn.commit()
     asyncio.run(Database(path).initialize())
     with closing(sqlite3.connect(path)) as conn:
-        assert conn.execute("SELECT * FROM model_calls").fetchone() == (*expected,None,0)
+        assert conn.execute("SELECT * FROM model_calls").fetchone() == (*expected,None,0,None)
         assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
     backups = list(tmp_path.glob("core.sqlite3.before-v7-*.sqlite3"))
     assert len(backups) == 1

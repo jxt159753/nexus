@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/chat.js" defer></script>
   <script src="/static/app.js" defer></script>
+  <script src="/static/extensions.js" defer></script>
 </head>
 <body>
   <header class="topbar"><a class="brand" href="/" aria-label="NEXUS 首页"><span class="brand-mark">N</span>NEXUS<span class="brand-sub">ONE MIND, MANY BODIES</span></a><span id="connection" class="connection" role="status">尚未登录</span><button id="logout" class="quiet" hidden>退出</button></header>
@@ -26,7 +27,7 @@
           <section class="panel usage"><p class="eyebrow">MODEL USAGE</p><div class="usage-value" id="model-calls">0 <small>次调用</small></div><p id="model-cost" class="hint">费用 0 · 模型成功率不适用</p></section>
         </aside>
         <div class="content">
-          <nav class="tabs" aria-label="控制台视图"><button class="active" data-tab="chat" aria-pressed="true">聊天</button><button data-tab="tasks" aria-pressed="false">任务</button><button data-tab="memories" aria-pressed="false">记忆与项目</button><button data-tab="routes" aria-pressed="false">路由记录</button></nav>
+          <nav class="tabs" aria-label="控制台视图"><button class="active" data-tab="chat" aria-pressed="true">聊天</button><button data-tab="tasks" aria-pressed="false">任务</button><button data-tab="extensions" aria-pressed="false">能力</button><button data-tab="memories" aria-pressed="false">记忆与项目</button><button data-tab="routes" aria-pressed="false">路由记录</button></nav>
           <section id="chat-view" class="panel">
             <div class="section-heading"><h2>和 NEXUS 聊聊</h2><button id="chat-new">新建会话</button></div>
             <p id="chat-availability" class="hint">正在读取聊天配置</p>
@@ -41,6 +42,35 @@
             <section class="panel"><div class="section-heading"><h2>新建只读任务</h2><span class="hint">单步 · 有界执行</span></div><label for="task-project">关联项目</label><select id="task-project"><option value="">不关联项目</option></select><div class="task-actions"><button id="system-info" class="action-card"><span class="action-icon" aria-hidden="true">◎</span><strong>读取系统信息</strong><span>操作系统、架构与 Python 版本</span></button><div class="action-card directory"><span class="action-icon" aria-hidden="true">▤</span><strong>列出 workspace 目录</strong><label for="limit">最多条目数</label><div class="button-row"><input id="limit" type="number" value="100" min="1" max="200" aria-label="目录最多条目数"><button id="list-directory">提交审批</button></div></div></div></section>
             <section class="panel"><h2>用自然语言创建任务</h2><p class="hint">目前支持系统信息或 workspace 目录。先解释并展示动作，确认后进入权限检查；目录仍需审批。</p><form id="language-form"><label for="language-text">你希望执行什么？</label><textarea id="language-text" rows="3" maxlength="2000" required placeholder="例如：请帮我看看这台电脑的系统信息"></textarea><label class="checkbox"><input id="language-consent" type="checkbox">允许将本次输入与可用动作说明发送给 DeepSeek（每次最多 1 次调用，每天 $1、每任务 $0.05）</label><p class="hint">不上传历史、记忆或工具结果。费用未知时保留预留额度，取消不能撤回已发送的数据或费用。</p><button type="submit" class="primary">解释任务</button></form><div class="section-heading history-heading"><h3>解释与确认</h3><button id="refresh-language" class="quiet">刷新</button></div><div id="language-requests" class="record-list"></div><button id="older-language" class="quiet full" hidden>加载更早请求</button></section>
             <section><div class="section-heading history-heading"><h2>任务历史</h2><button id="refresh-tasks" class="quiet">刷新</button></div><p class="hint">页面最多保留 100 条，可继续加载更早任务；刷新回到最近任务。</p><p id="empty-tasks" class="empty">还没有任务。选择上方操作开始。</p><div id="tasks" class="task-list"></div><button id="older-tasks" class="quiet full" hidden>加载更早任务</button></section>
+          </section>
+          <section id="extensions-view" hidden>
+            <section class="panel">
+              <div class="section-heading"><h2>自扩展能力</h2><span id="extension-status" class="badge">读取中</span></div>
+              <p class="hint">候选由模型或开发夹具生成，先测试、再由你批准具体版本并启用。生成、测试、批准和启用是分开的状态；候选不会自动执行。</p>
+              <form id="extension-form">
+                <div class="form-grid">
+                  <div><label for="extension-kind">类型</label><select id="extension-kind"><option value="skill">Skill（声明式步骤）</option><option value="tool">Tool（显式 JSON 输入）</option></select></div>
+                  <div><label for="extension-capability">能力 ID（可选）</label><input id="extension-capability" maxlength="70" placeholder="user.my_capability"></div>
+                  <div><label for="extension-parent">父版本 ID（修订时）</label><input id="extension-parent" placeholder="可选"></div>
+                  <div><label for="extension-node">目标节点（可选）</label><select id="extension-node"><option value="">不绑定节点</option></select></div>
+                </div>
+                <label for="extension-need">你希望它完成什么？</label><textarea id="extension-need" rows="3" maxlength="4000" required placeholder="例如：读取系统信息，再列出 workspace 的直接条目"></textarea>
+                <div class="button-row"><button id="extension-preview" type="button">预览将外发的内容</button></div>
+                <div id="extension-outbound" class="record-list"></div>
+                <label class="checkbox"><input id="extension-consent" type="checkbox" disabled>我已核对上方内容，同意创建这次扩展请求（生成默认关闭；开发夹具不发往模型）</label>
+                <button id="extension-generate" type="submit" class="primary" disabled>生成候选</button>
+              </form>
+            </section>
+            <section>
+              <div class="section-heading history-heading"><h2>候选版本</h2><button id="extension-refresh" class="quiet">刷新</button></div>
+              <p class="hint">测试失败、测试不可用、等待批准和已启用会分别显示。Tool 只有在合格沙箱测试通过后才能批准。</p>
+              <div id="extension-versions" class="record-list"></div>
+            </section>
+            <section>
+              <div class="section-heading history-heading"><h2>Skill 运行</h2></div>
+              <p class="hint">运行仍需每步权限；目录步骤继续使用原任务审批。停用版本会阻止后续步骤。</p>
+              <div id="extension-runs" class="record-list"></div>
+            </section>
           </section>
           <section id="memories-view" hidden>
             <section class="panel"><h2>项目</h2><form id="project-form" class="project-form"><label for="project-name">项目名称</label><input id="project-name" required maxlength="100" placeholder="例如：NEXUS 开发"><label for="project-description">项目说明</label><input id="project-description" maxlength="500" placeholder="可选"><button type="submit">创建项目</button></form><div id="projects" class="tags"></div></section>

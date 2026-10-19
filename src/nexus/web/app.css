@@ -591,3 +591,23 @@ footer span{
 .chat-action{border:1px solid rgba(91,145,255,.3);border-radius:10px;padding:14px;margin-top:16px;min-width:0}
 .chat-action pre{white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:600px){.chat-messages{max-height:52vh}.chat-user,.chat-assistant{padding:12px;margin-left:0;margin-right:0}#chat-title-form{flex-wrap:wrap}.tabs{overflow-x:auto}}
+/* Capability view: long candidate JSON must wrap inside the grid track. */
+.record-list>*{min-width:0}
+#extension-outbound{min-width:0}
+#extension-outbound>*{min-width:0}
+#extension-outbound pre,#extension-versions pre,#extension-runs pre{
+  max-width:100%;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+  overflow:auto;
+  font:12px/1.7 Consolas,monospace;
+  border-radius:7px;
+  padding:13px;
+  background:#0c1420;
+  border:1px solid #1d2a3d;
+  margin:12px 0 0
+}
+#extensions-view .panel,#extensions-view section{min-width:0}
+#extensions-view details{min-width:0}
+#extensions-view summary{cursor:pointer;margin-top:12px}
+@media(max-width:600px){.notice{max-width:calc(100vw - 32px);box-sizing:border-box}}

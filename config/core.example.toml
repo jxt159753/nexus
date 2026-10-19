@@ -21,6 +21,23 @@ input_price = 300000
 output_price = 1200000
 price_valid_until = '2026-10-25'
 
+# M4 is off by default. fixture_generation is a development-only substitute and
+# never proves sandbox isolation. Tool approval always requires a qualified
+# Sandbox Node whose runsc image digest matches the version environment.
+[extensions]
+enabled = false
+generation_enabled = false
+fixture_generation = false
+max_output_tokens = 4096
+approval_ttl_hours = 168
+
+# Register a dedicated Linux Sandbox Node only after runsc and the image digest
+# have been verified on that host. The Core never executes candidate code.
+# [sandbox_nodes.'<sandbox-node-uuid>']
+# runtime = 'runsc'
+# image_digest = '<64-hex image tree digest>'
+# verification_profiles = ['directory_entry_stats_v1']
+
 [nodes.'6909ccbe-2f7c-42ec-ab97-9fe1b03c425d']
 tools = ['system.info@1', 'filesystem.list@1']
 roots = ['workspace']

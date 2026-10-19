@@ -162,7 +162,7 @@ def test_forward_migration_makes_verified_backup(tmp_path):
         assert conn.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 1
     with closing(sqlite3.connect(path)) as conn:
         assert conn.execute("SELECT count(*) FROM identities").fetchone()[0] == 1
-        assert conn.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 10
+        assert conn.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 11
 
 
 @pytest.mark.parametrize("kind", ["unversioned", "newer", "checksum"])
@@ -230,7 +230,7 @@ def test_s3_database_upgrade_preserves_task_events_approvals_and_backup(tmp_path
     with closing(sqlite3.connect(path)) as conn, closing(sqlite3.connect(backups[0])) as backup:
         assert backup.execute("PRAGMA quick_check").fetchone()[0] == "ok"
         assert backup.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 2
-        assert conn.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 10
+        assert conn.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 11
         for table, rows in before.items():
             assert conn.execute(f"SELECT * FROM {table}").fetchall() == rows
             assert backup.execute(f"SELECT * FROM {table}").fetchall() == rows

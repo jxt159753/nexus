@@ -38,6 +38,7 @@ function loggedOut() {
   memoryRetry = null;
   languageRetry = null; languageBefore = null;
   chatReset();
+  if (typeof extensionReset === "function") extensionReset();
   $("language-form").reset(); $("language-requests").replaceChildren();
   state.controlRevision = -1;
   ["tasks", "memories", "routes", "projects", "capabilities"].forEach(id => $(id).replaceChildren());
@@ -310,7 +311,7 @@ async function languagePage(older = false) {
 async function enter(session) {
   state.csrf = session.csrf_token; state.logged = true;
   $("login-panel").hidden = true; $("console").hidden = false; $("logout").hidden = false;
-  try {await Promise.all([nodes(), loadProjects(), usage(), languagePage(), chatList()]);}
+  try {await Promise.all([nodes(), loadProjects(), usage(), languagePage(), chatList(), typeof extensionStatus === "function" ? extensionStatus() : Promise.resolve()]);}
   catch (error) {loggedOut(); throw error;}
   connect();
 }
@@ -354,10 +355,11 @@ $("more-memories").onclick = action(async () => records("memories", false));
 $("more-routes").onclick = action(async () => records("routes", false));
 $("refresh-routes").onclick = action(async () => {await Promise.all([records("routes"), usage()]);});
 document.querySelectorAll("[data-tab]").forEach(button => {button.onclick = action(async () => {
-  for (const tab of ["chat", "tasks", "memories", "routes"]) $(tab + "-view").hidden = tab !== button.dataset.tab;
+  for (const tab of ["chat", "tasks", "extensions", "memories", "routes"]) $(tab + "-view").hidden = tab !== button.dataset.tab;
   document.querySelector(".workspace").classList.toggle("chat-mode",button.dataset.tab==="chat");
   document.querySelectorAll("[data-tab]").forEach(b => {b.classList.toggle("active", b === button); b.setAttribute("aria-pressed", String(b === button));});
   if (button.dataset.tab === "chat") await Promise.all([chatList(),usage()]);
+  else if (button.dataset.tab === "extensions") { if (typeof extensionPage === "function") await extensionPage(); }
   else if (button.dataset.tab !== "tasks") await records(button.dataset.tab);
 });});
 setInterval(() => {if (state.logged) nodes().catch(error => notify(error.message, true));}, 5000);

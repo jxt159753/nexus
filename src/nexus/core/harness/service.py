@@ -70,14 +70,14 @@ class Harness:
         policy = self.link.config.nodes[node_id]
         return NodeScope(node_id, policy.tools, policy.roots, policy.tools, policy.roots, policy.resource_version)
 
-    async def submit(self, principal: Principal, node_id: UUID, request: TaskRequest, *, language_id: UUID | None = None, chat_turn_id: UUID | None = None):
+    async def submit(self, principal: Principal, node_id: UUID, request: TaskRequest, *, language_id: UUID | None = None, chat_turn_id: UUID | None = None, rate_limit: bool = True):
         if self.failed:
             raise AccessDenied("BUSY")
         await self.security.validate_principal(principal)
         if principal.role != "owner" or principal.identity_id != self.link.config.owner_id:
             raise AccessDenied()
         scope = self.scope(node_id)
-        task = await self.tasks.create(principal.identity_id, request, node_id, rate_limit=True, language_id=language_id,chat_turn_id=chat_turn_id)
+        task = await self.tasks.create(principal.identity_id, request, node_id, rate_limit=rate_limit, language_id=language_id,chat_turn_id=chat_turn_id)
         if task.status in {"queued", "awaiting_approval", "ready"} and task.expires_at > utc_now():
             try:
                 await self.security.prepare(task.task_id, principal, scope)
