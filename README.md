@@ -61,6 +61,7 @@ M4 首版自扩展增加了受约束的 Tool/Skill 候选：显式外发预览�
 | [protocol-v1.md](docs/protocol-v1.md) | 已实现的消息字段、编解码入口、错误分类和字节限额 |
 | [m4-extension-protocol.md](docs/m4-extension-protocol.md) | M4 候选/批准生命周期、v2 Sandbox 协议与宿主机检查清单 |
 | [m4-usage.md](docs/m4-usage.md) | 能力生成、审阅、批准、使用、停用与限制 |
+| [M4-VERIFICATION.md](docs/M4-VERIFICATION.md) | M4 实际测试、A01–A18 证据索引、未验证项与复现步骤 |
 
 `ARCHITECTURE.md` 和 `ROADMAP.md` 的规范路径位于 docs/，根目录不维护同名副本。每次开发开始前，完整读取 AGENTS.md 和这两份文档。
 

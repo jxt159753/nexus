@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-19T16:45:00+08:00",
+  "delivery": {
+    "status": "partial_development_delivery",
+    "implementation_commit": "9220281a91b3dd37bdacccda8e0f8dbf77e3388f",
+    "baseline_commit": "a8baa7710eb84c14b54d15fbdeb1532184625eee",
+    "branch": "main",
+    "codex_review": "pending",
+    "user_acceptance": "not_claimed"
+  },
+  "platform": {
+    "os": "Windows 11 10.0.26200",
+    "python": "3.13.9",
+    "powershell": "5.1.26100.9711",
+    "node": "24.14.0",
+    "edge": "155.0.4283.62"
+  },
+  "schema": {
+    "before": 10,
+    "after": 11,
+    "migration": "011_self_extension.sql",
+    "backup_verified": true,
+    "quick_check": "ok",
+    "foreign_key_errors": 0
+  },
+  "tests": {
+    "focused_m4": {"passed": 20, "skipped": 0, "command": "pytest tests/test_extensions_m4.py tests/test_extensions_http.py tests/test_sandbox_m4.py tests/test_extension_migration.py"},
+    "source_windows": {"passed": 657, "skipped": 0, "seconds": 303.3, "warnings_as_errors": true},
+    "installed_wheel_windows": {"passed": 657, "skipped": 0, "seconds": 267.53, "pythonpath_disabled": true, "pip_check": "ok"}
+  },
+  "package": {
+    "wheel": "nexus-0.1.0-py3-none-any.whl",
+    "sha256": "d3605c7e887750fbefb20edcd1bc241fc02ea7134ab5a2644dd2c26c4d06c1a5",
+    "files_compared": 102,
+    "source_resource_mismatches": 0,
+    "migrations_and_web_assets_included": true
+  },
+  "ui": {
+    "browser": "headless Edge via CDP",
+    "viewports": [390, 1280],
+    "js_errors": 0,
+    "horizontal_overflow": false,
+    "flow": "preview->generate->skill test->approve->enable",
+    "screenshots": [
+      {"path": "docs/assets/m4-capability-desktop.png", "sha256": "611432d415ed9601eadcedadae3ff31d6ea70ad5fd52ed292775850e41a8f94f"},
+      {"path": "docs/assets/m4-capability-mobile.png", "sha256": "1b3667b49f6b0ead184e537e569b613e32610de02290d7be4c96b01146a7bedc"}
+    ],
+    "android_real_device": false
+  },
+  "skill_runs": {
+    "two_step_workspace_overview": {
+      "evidence": "temporary database through normal task/attempt/directory approval; node evidence injected by test",
+      "real_windows_node": false,
+      "status": "tested_with_controller"
+    },
+    "three_step_composition": {
+      "evidence": "test double sandbox transport; structure/reference/truncation/dependency gate",
+      "real_sandbox": false,
+      "status": "not_real_sandbox_executed"
+    }
+  },
+  "sandbox": {
+    "runtime": "runsc",
+    "host_verified": false,
+    "runsc_present_on_windows": false,
+    "wsl_ubuntu": "stopped; not used as a sandbox",
+    "image_digest_verified": false,
+    "network_files_devices_secrets_tested": false,
+    "resource_limits_tested": false,
+    "process_cleanup_tested": false,
+    "reason": "no dedicated Linux/runsc host, image or resource authorization"
+  },
+  "models": {
+    "real_calls": 0,
+    "real_cost_microunits": 0,
+    "fixture_generation_used": true,
+    "simulated_provider_used_in_tests": true,
+    "price_snapshot": "2026-10-25"
+  },
+  "not_verified": [
+    "real runsc isolation and host limits",
+    "generated Tool real sandbox test/approval/execution",
+    "three-step statistics against a real directory",
+    "real DeepSeek extension generation and cost",
+    "real Windows Node Skill two-step run",
+    "Android real device and production deployment",
+    "crash/reconciliation injection for extension runs",
+    "Linux/Python 3.12 wheel regression"
+  ]
+}
