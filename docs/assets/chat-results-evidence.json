@@ -1,23 +1,25 @@
 {
-  "wheel_sha256": "1fb3492b6f1e3afb9e3bfb004c4f40519fcc95a7d1b4192fd9039a47b498dba7",
+  "wheel_sha256": "59b1b81df12f827c31f8b01917af8a5cdb0243130735b1d45f173d9e7524273c",
   "source_resource_files_matched": 84,
   "python_syntax": "passed",
   "local_document_links_checked": 130,
   "new_dependencies": 0,
-  "actual_deepseek_calls": 1,
+  "actual_deepseek_calls": 3,
   "production_changed": true,
   "source_tests": {
     "passed": 613,
     "seconds": 158.8,
     "warnings_as_errors": true,
-    "skipped": 0
+    "skipped": 0,
+    "candidate_wheel_sha256": "1fb3492b6f1e3afb9e3bfb004c4f40519fcc95a7d1b4192fd9039a47b498dba7"
   },
   "installed_tests": {
     "passed": 613,
     "seconds": 159.91,
     "source_pythonpath_disabled": true,
     "warnings_as_errors": true,
-    "skipped": 0
+    "skipped": 0,
+    "candidate_wheel_sha256": "1fb3492b6f1e3afb9e3bfb004c4f40519fcc95a7d1b4192fd9039a47b498dba7"
   },
   "browser": {
     "browser": "real headless Edge",
@@ -50,7 +52,7 @@
   "linux": {
     "python": "3.12.3",
     "passed": 512,
-    "seconds": 45.05,
+    "seconds": 45.43,
     "modules": 20,
     "dependency_pins": 25,
     "warnings_as_errors": true,
@@ -58,21 +60,20 @@
     "source_pythonpath_disabled": true,
     "non_login_nexus_user": true,
     "production_service_active": true,
-    "deployed": false
+    "deployed": true
   },
   "deployment": {
-    "source_commit": "1c200676f7090545925ec8dae8f59af85908ddef",
-    "schema": 9,
-    "old_tables_preserved": true,
+    "backup_sha256": "a9f771e585ed030dec4a44bd02ca309f6f9006cb19385f142d76b9bc62651b41",
     "historical_tasks": 13,
-    "historical_conversations": 5,
-    "historical_chat_turns": 10,
-    "historical_model_calls": 12,
-    "historical_cost_microunits": 2776,
-    "backup_sha256": "8b7302cbd17139ede6bac88625f4bc7c40a63da287e9ff703289060b32dd8476",
-    "service_active": true,
+    "historical_model_calls": 13,
+    "old_tables_preserved": true,
+    "schema": 9,
     "paused": false,
-    "node_online": true
+    "service_active": "active",
+    "stopped_at": "2026-10-19T02:22:34.150592+00:00",
+    "started_at": "2026-10-19T02:22:34.956875+00:00",
+    "deployed": true,
+    "source_commit": "4996158730dd0df833cf7fd491dc4e710ee639fa"
   },
   "initial_real_attempt": {
     "turn_id": "c0d7e32d-ab12-4260-af84-32f10338bbfb",
@@ -103,8 +104,131 @@
       "warnings_as_errors": true,
       "skipped": 0
     },
-    "deployed": false,
-    "real_test_passed": false,
-    "automatic_deployment_review": "rejected: later modified candidate needs explicit deployment approval"
+    "deployed": true,
+    "real_test_passed": true,
+    "automatic_deployment_review": "initially rejected; subsequently explicitly approved by user and completed"
+  },
+  "initial_wheel_sha256": "1fb3492b6f1e3afb9e3bfb004c4f40519fcc95a7d1b4192fd9039a47b498dba7",
+  "initial_deployment": {
+    "source_commit": "1c200676f7090545925ec8dae8f59af85908ddef",
+    "schema": 9,
+    "old_tables_preserved": true,
+    "historical_tasks": 13,
+    "historical_conversations": 5,
+    "historical_chat_turns": 10,
+    "historical_model_calls": 12,
+    "historical_cost_microunits": 2776,
+    "backup_sha256": "8b7302cbd17139ede6bac88625f4bc7c40a63da287e9ff703289060b32dd8476",
+    "service_active": true,
+    "paused": false,
+    "node_online": true
+  },
+  "real_result": {
+    "conversation_id": "b7d60b4f-52cb-455e-94e6-6c68e4278a70",
+    "turn_id": "d87e8ba7-8920-435d-9f69-b07461e30c3e",
+    "task_id": "702e145c-e7fc-44fa-93a0-990b6b59aac5",
+    "title": "查看电脑系统信息",
+    "tool": "system.info@1",
+    "real_native_tool_call": true,
+    "confirmation_required": true,
+    "repeat_confirmation_same_task": true,
+    "result_fields": [
+      "architecture",
+      "os_name",
+      "os_version"
+    ],
+    "preview_zero_model_calls": true,
+    "explicit_result_consent": true,
+    "final_answer_from_result": true,
+    "tool_attempts": 1,
+    "verification": "node_report_schema_checked",
+    "model_calls": 2,
+    "repeat_consent_no_extra_call": true,
+    "new_cost_upper_microunits": 553,
+    "usage": {
+      "enabled": true,
+      "calls": 15,
+      "cost_microunits": 3621,
+      "unknown_cost_calls": 0,
+      "model_success_rate": null,
+      "chat_enabled": true
+    }
+  },
+  "online_backup": {
+    "backup_sha256": "8e53e78d032c2f9e9acfcf069a1e715f9b8f88e3c08fe36c6635541b906258ed",
+    "backup_mode": "online SQLite backup",
+    "database_check": "ok",
+    "foreign_key_errors": 0,
+    "schema": 9,
+    "model_calls": 15,
+    "total_cost_microunits": 3621,
+    "tasks": 14,
+    "conversations": 7,
+    "turns": 12,
+    "real_result_calls": [
+      {
+        "stage": 0,
+        "input_tokens": 661,
+        "output_tokens": 56,
+        "cost_microunits": 266,
+        "reserved_microunits": 50000,
+        "cost_status": "calculated",
+        "outcome": "completed"
+      },
+      {
+        "stage": 1,
+        "input_tokens": 383,
+        "output_tokens": 143,
+        "cost_microunits": 287,
+        "reserved_microunits": 49734,
+        "cost_status": "calculated",
+        "outcome": "completed"
+      }
+    ],
+    "core_pid_unchanged": true,
+    "service_interrupted": false,
+    "service_active": true,
+    "actual_restart_performed": false
+  },
+  "deployed_browser": {
+    "browser": "real headless Edge",
+    "trusted_https": true,
+    "viewport": "390x844",
+    "deployed_tool_controls": true,
+    "authenticated_node_selected": true,
+    "generated_title_visible": true,
+    "real_tool_result_visible": true,
+    "final_answer_visible": true,
+    "live_connection": true,
+    "additional_model_calls": 0,
+    "page_errors": [],
+    "android_device": false
+  },
+  "final_checks": {
+    "tasks_preserved": 14,
+    "chat_history_preserved": true,
+    "ledger_unchanged": true,
+    "additional_model_calls": 0,
+    "node_online": true,
+    "paused": false,
+    "actual_restart_performed": false
+  },
+  "extra_production_restart": {
+    "performed": false,
+    "review": "rejected: additional service interruption was not explicitly approved",
+    "safer_alternative": "online consistent SQLite backup and read-only API checks passed"
+  },
+  "initial_linux": {
+    "python": "3.12.3",
+    "passed": 512,
+    "seconds": 45.05,
+    "modules": 20,
+    "dependency_pins": 25,
+    "warnings_as_errors": true,
+    "skipped": 0,
+    "source_pythonpath_disabled": true,
+    "non_login_nexus_user": true,
+    "production_service_active": true,
+    "deployed": false
   }
 }
