@@ -7,6 +7,10 @@
   <title>NEXUS · 控制台</title>
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/chat.js" defer></script>
+  <script src="/static/chat-skills.js" defer></script>
+  <script src="/static/chat-work.js" defer></script>
+  <script src="/static/projects.js" defer></script>
+  <script src="/static/basic-tools.js" defer></script>
   <script src="/static/app.js" defer></script>
   <script src="/static/extensions.js" defer></script>
 </head>
@@ -31,14 +35,58 @@
           <section id="chat-view" class="panel">
             <div class="section-heading"><h2>和 NEXUS 聊聊</h2><button id="chat-new">新建会话</button></div>
             <p id="chat-availability" class="hint">正在读取聊天配置</p>
+            <label for="chat-project">项目（切换后分别查看会话，新会话固定归属该项目）</label><select id="chat-project"><option value="">不关联项目</option></select>
             <label for="chat-conversation">会话</label><select id="chat-conversation"><option value="">新建一个会话开始</option></select>
             <div class="button-row chat-toolbar"><label class="checkbox"><input id="chat-archived" type="checkbox">查看归档</label><button id="chat-more-conversations" class="quiet" hidden>更多会话</button><button id="chat-archive" class="quiet" disabled>归档</button></div>
             <form id="chat-title-form" class="button-row"><input id="chat-title" maxlength="80" aria-label="会话名称" placeholder="会话名称"><button type="submit">重命名</button></form>
             <button id="chat-older" class="quiet full" hidden>加载更早消息</button><button id="chat-latest" class="quiet full" hidden>回到最近消息</button>
             <div id="chat-messages" class="chat-messages" role="log" aria-label="聊天记录" aria-live="polite"></div>
-            <form id="chat-form"><label for="chat-text">消息</label><textarea id="chat-text" rows="3" maxlength="2000" required placeholder="讨论想法、提问，或继续追问上一条回答…"></textarea><label class="checkbox"><input id="chat-context" type="checkbox" checked>附带本会话近期已完成的对话</label><label class="checkbox"><input id="chat-tools" type="checkbox" checked>允许建议系统信息与目录工具（执行前需确认）</label><label for="chat-node">工具目标设备</label><select id="chat-node"><option value="">暂无配置节点；可继续普通聊天</option></select><p id="chat-context-info" class="hint">最多最近 10 轮，超出上下文上限会提示裁剪。</p><p class="hint">点击“发送给 DeepSeek”即同意外发本次输入及所选上下文。工具结果可在确认卡勾选自动回传，或执行后预览确认，再生成最终回答。每天 $1、每轮共用 $0.05，普通聊天 1 次、含结果解读最多 2 次调用。</p><div class="button-row"><button id="chat-send" type="submit" class="primary" disabled>发送给 DeepSeek</button><button id="chat-stop" type="button" class="danger" disabled>停止回复</button></div><p class="hint">停止会关闭正在进行的模型交换；已发送的数据和费用不能撤回。可在会话中确认只读动作，或使用“任务”视图。</p></form>
+            <form id="chat-form">
+              <label for="chat-text">消息</label><textarea id="chat-text" rows="3" maxlength="2000" required placeholder="讨论想法、继续追问，或请已启用流程完成一个目标…"></textarea>
+              <label class="checkbox"><input id="chat-context" type="checkbox" checked>附带本会话近期已完成的对话</label>
+              <details><summary>本轮记忆与明确保存</summary>
+                <button id="chat-memory-load" type="button">查看本项目当前记忆</button><div id="chat-memory-choices" class="record-list"></div>
+                <button id="chat-memory-more" type="button" hidden>更多记忆</button>
+                <button id="chat-memory-preview" type="button">预览本轮选中的记忆</button><pre id="chat-memory-outbound" hidden></pre>
+                <label class="checkbox"><input id="chat-memory-consent" type="checkbox" disabled>本次同意把以上具体记忆发送给 DeepSeek（保存同意与外发同意分别记录）</label>
+                <div id="chat-memory-editor" hidden>
+                  <label for="chat-memory-content">要保存的内容</label><textarea id="chat-memory-content" maxlength="2000" rows="3"></textarea>
+                  <label for="chat-memory-kind">类型</label><select id="chat-memory-kind"><option value="fact">事实</option><option value="inference">推测</option><option value="plan">计划</option></select>
+                  <p id="chat-memory-source" class="hint"></p><label for="chat-memory-until">有效至（可选，本地时间）</label><input id="chat-memory-until" type="datetime-local">
+                  <label class="checkbox"><input id="chat-memory-save-consent" type="checkbox">我确认以上内容、来源、类型与有效期，明确同意保存到当前项目</label>
+                  <button id="chat-memory-save" type="button">确认保存记忆</button>
+                </div>
+              </details>
+              <label class="checkbox"><input id="chat-tools" type="checkbox" checked>允许建议系统信息与目录工具（执行前需确认）</label>
+              <label for="chat-node">工具目标设备</label><select id="chat-node"><option value="">暂无配置节点；可继续普通聊天</option></select>
+              <details class="chat-catalog"><summary>会话工作权限</summary>
+                <p>授权仅对当前会话、所选设备的 workspace 生效，30 分钟、最多 20 次操作。状态/读取/查找和已批准启用的 Tool/Skill 可直接调用；文件写入先展示差异，再用聊天确认。</p>
+                <label for="chat-work-profile">固定命令权限</label><select id="chat-work-profile"><option value="standard">允许自动执行已批准的固定命令</option><option value="read">固定命令也逐次用聊天确认</option></select>
+                <div class="button-row"><button id="chat-work-grant" type="button">按上述范围授权当前会话</button><button id="chat-work-revoke" type="button" class="danger">撤销会话授权并停止工作</button></div>
+                <p id="chat-work-status" class="hint"></p><pre id="chat-work-catalog"></pre>
+              </details>
+              <label class="checkbox"><input id="chat-work-enabled" type="checkbox" disabled>本轮使用会话授权，并允许实际工具结果（含读取正文/固定命令输出）及可用能力目录发送给 DeepSeek</label>
+              <p class="hint">会话工作每轮最多 4 个动作、5 次模型交换，共用原每轮 $0.05 和每日 $1。超限、授权失效或结果未知会停止；新能力版本仍需单独批准启用。</p>
+              <button id="chat-skill-load" type="button" class="quiet">查看此设备可用流程</button>
+              <div id="chat-skills-catalog" class="chat-catalog"></div>
+              <label class="checkbox"><input id="chat-skills" type="checkbox" disabled>本次允许将以上流程目录发送给 DeepSeek 并建议多步流程</label>
+              <p id="chat-context-info" class="hint">最多最近 10 轮，超出上下文上限会提示裁剪。</p>
+              <p id="chat-outbound-notice" class="hint">点击“发送给 DeepSeek”即同意外发本次输入及所选上下文和流程目录。单步工具可在确认卡允许自动回传；多步流程成功后先预览结果，再同意解读。每天 $1、每轮共用 $0.05，普通聊天 1 次、含结果解读最多 2 次调用。</p>
+              <div class="button-row"><button id="chat-send" type="submit" class="primary" disabled>发送给 DeepSeek</button><button id="chat-stop" type="button" class="danger" disabled>停止回复</button></div>
+              <p class="hint">停止回复会关闭模型交换；取消流程使用执行卡，暂停新派发使用全局控制。已发送的数据和费用不能撤回。</p>
+            </form>
           </section>
           <section id="tasks-view" hidden>
+            <section class="panel"><h2>工作区基础工具</h2><p class="hint">只操作设备显式配置的 workspace。每次操作需审批；写入前先运行预览，核对差异后再提交写入审批。命令只允许配置好的程序与固定参数。</p>
+              <form id="basic-tool-form"><label for="basic-tool">操作</label><select id="basic-tool"><option value="read_file">读文本文件</option><option value="find_files">查找文件名</option><option value="preview_file_write">预览并写入文件</option><option value="run_command">受控命令</option></select>
+                <div id="basic-path-fields"><label for="basic-path">工作区内相对路径（使用 /）</label><input id="basic-path" maxlength="240" placeholder="docs/notes.txt"></div>
+                <div id="basic-search-fields" hidden><label for="basic-pattern">文件名模式</label><input id="basic-pattern" maxlength="100" value="*.py"><p class="hint">最多查 2000 个条目、4 层，返回 50 个匹配；截断会明确标记。</p></div>
+                <div id="basic-write-fields" hidden><label for="basic-content">新的完整 UTF-8 内容（最多 12000 字节）</label><textarea id="basic-content" rows="6" maxlength="12000"></textarea></div>
+                <div id="basic-command-fields" hidden><label for="basic-command">已配置命令</label><select id="basic-command"><option value="">此设备暂无受控命令</option></select><p class="hint">固定工作目录、程序及参数，不接受 shell 文本；最多 8 秒，标准输出与错误各最多 8 KiB。命令的实际效果取决于管理员配置。</p></div>
+                <button type="submit" class="primary">提交本次操作审批</button>
+                <div id="basic-write-preview"></div><label class="checkbox"><input id="basic-write-reviewed" type="checkbox">我已核对上方已执行预览的差异与本次完整新内容</label><button id="basic-write-confirm" type="button" disabled>提交本次写入审批</button>
+              </form>
+            </section>
             <section class="panel"><div class="section-heading"><h2>新建只读任务</h2><span class="hint">单步 · 有界执行</span></div><label for="task-project">关联项目</label><select id="task-project"><option value="">不关联项目</option></select><div class="task-actions"><button id="system-info" class="action-card"><span class="action-icon" aria-hidden="true">◎</span><strong>读取系统信息</strong><span>操作系统、架构与 Python 版本</span></button><div class="action-card directory"><span class="action-icon" aria-hidden="true">▤</span><strong>列出 workspace 目录</strong><label for="limit">最多条目数</label><div class="button-row"><input id="limit" type="number" value="100" min="1" max="200" aria-label="目录最多条目数"><button id="list-directory">提交审批</button></div></div></div></section>
             <section class="panel"><h2>用自然语言创建任务</h2><p class="hint">目前支持系统信息或 workspace 目录。先解释并展示动作，确认后进入权限检查；目录仍需审批。</p><form id="language-form"><label for="language-text">你希望执行什么？</label><textarea id="language-text" rows="3" maxlength="2000" required placeholder="例如：请帮我看看这台电脑的系统信息"></textarea><label class="checkbox"><input id="language-consent" type="checkbox">允许将本次输入与可用动作说明发送给 DeepSeek（每次最多 1 次调用，每天 $1、每任务 $0.05）</label><p class="hint">不上传历史、记忆或工具结果。费用未知时保留预留额度，取消不能撤回已发送的数据或费用。</p><button type="submit" class="primary">解释任务</button></form><div class="section-heading history-heading"><h3>解释与确认</h3><button id="refresh-language" class="quiet">刷新</button></div><div id="language-requests" class="record-list"></div><button id="older-language" class="quiet full" hidden>加载更早请求</button></section>
             <section><div class="section-heading history-heading"><h2>任务历史</h2><button id="refresh-tasks" class="quiet">刷新</button></div><p class="hint">页面最多保留 100 条，可继续加载更早任务；刷新回到最近任务。</p><p id="empty-tasks" class="empty">还没有任务。选择上方操作开始。</p><div id="tasks" class="task-list"></div><button id="older-tasks" class="quiet full" hidden>加载更早任务</button></section>
@@ -73,6 +121,9 @@
             </section>
           </section>
           <section id="memories-view" hidden>
+            <section class="panel"><h2>项目工作台</h2><label for="project-workspace">项目</label><select id="project-workspace"><option value="">选择项目</option></select><button id="project-refresh">刷新项目</button><div id="project-overview"></div>
+              <form id="project-todo-form"><label for="project-todo-text">新增待办或建议（不自动执行）</label><input id="project-todo-text" maxlength="1000" required><button type="submit">保存待办</button></form><div id="project-todos" class="record-list"></div><div id="project-tasks" class="task-list"></div><button id="project-older-tasks" hidden>更早的项目任务</button>
+            </section>
             <section class="panel"><h2>项目</h2><form id="project-form" class="project-form"><label for="project-name">项目名称</label><input id="project-name" required maxlength="100" placeholder="例如：NEXUS 开发"><label for="project-description">项目说明</label><input id="project-description" maxlength="500" placeholder="可选"><button type="submit">创建项目</button></form><div id="projects" class="tags"></div></section>
             <section class="panel"><h2>明确保存一条记忆</h2><form id="memory-form"><label for="memory-content">内容</label><textarea id="memory-content" required maxlength="2000" rows="3" placeholder="输入你希望 Core 长期保存的信息"></textarea><div class="form-grid"><div><label for="memory-kind">信息类型</label><select id="memory-kind"><option value="fact">事实</option><option value="inference">推测</option><option value="plan">计划</option></select></div><div><label for="memory-project">关联项目</label><select id="memory-project"><option value="">不关联项目</option></select></div><div><label for="memory-source">来源</label><input id="memory-source" required maxlength="256" value="用户明确输入"></div><div><label for="valid-until">有效至（本地时间）</label><input id="valid-until" type="datetime-local"></div><div><label for="verification">验证状态</label><select id="verification"><option value="unverified">未经验证</option><option value="verified">已有验证依据</option></select></div><div><label for="evidence">验证依据</label><input id="evidence" maxlength="256" placeholder="选择已有验证依据时必填"></div><div><label for="verified-at">验证时间（本地时间）</label><input id="verified-at" type="datetime-local"></div><div><label for="supersedes">替代记忆 ID</label><input id="supersedes" placeholder="可选，替代已有条目"></div></div><label class="checkbox"><input id="consent" type="checkbox" required>我明确同意保存本条内容及其来源、类型和时效</label><button type="submit" class="primary">保存记忆</button></form></section>
             <div class="section-heading history-heading"><h2>已保存记忆</h2><label class="checkbox"><input id="memory-history" type="checkbox">包含过期、撤销及被替代记录</label></div><div id="memories" class="record-list"></div><button id="more-memories" class="quiet full" hidden>加载更多记忆</button>

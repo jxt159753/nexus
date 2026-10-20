@@ -6,9 +6,31 @@ from pathlib import Path
 from typing import Literal, Self
 from uuid import UUID
 
-from pydantic import Field, StrictInt, model_validator
+from pydantic import Field, StrictInt, StrictStr, model_validator
+from nexus.contracts.basic import ToolKey, CommandId
+from nexus.contracts.base import CommandDigest, MAX_RESULT_BYTES, StrictContract
 
-from nexus.contracts.base import MAX_RESULT_BYTES, StrictContract
+
+class CommandTemplate(StrictContract):
+    executable: Path
+    executable_sha256: CommandDigest
+    argv: list[StrictStr] = Field(default_factory=list, max_length=32)
+
+    @model_validator(mode="after")
+    def safe(self):
+        if not self.executable.is_absolute() or not self.executable.is_file():
+            raise ValueError("existing absolute executable required")
+        local_directory(self.executable.parent)
+        if self.executable.suffix.lower() in {".bat", ".cmd", ".ps1", ".sh"} or self.executable.stem.lower() in {"cmd", "powershell", "pwsh", "bash", "sh", "wscript", "cscript"}:
+            raise ValueError("shell templates are not allowed")
+        if sum(len(arg.encode()) for arg in self.argv)>2048 or any("\x00" in arg for arg in self.argv):
+            raise ValueError("bounded literal arguments required")
+        return self
+
+    def digest(self):
+        import hashlib
+        import json
+        return hashlib.sha256(json.dumps(self.model_dump(mode="json"), sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 def local_directory(path: Path) -> Path:
     # Do not resolve() before checking: it would conceal junctions and symlinks.
@@ -32,7 +54,8 @@ def local_directory(path: Path) -> Path:
 class NodeConfig(StrictContract):
     node_id: UUID
     data_dir: Path
-    allowed_tools: frozenset[Literal["system.info@1", "filesystem.list@1"]] = frozenset()
+    allowed_tools: frozenset[ToolKey] = frozenset()
+    commands: dict[CommandId, CommandTemplate] = Field(default_factory=dict, max_length=16)
     roots: dict[Literal["workspace"], Path] = Field(default_factory=dict, max_length=1)
     max_result_bytes: StrictInt = Field(default=MAX_RESULT_BYTES, ge=128, le=MAX_RESULT_BYTES)
     execution_timeout_seconds: StrictInt = Field(default=10, ge=1, le=10)

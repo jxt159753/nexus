@@ -11,6 +11,7 @@ from pydantic import SecretStr
 from nexus.core.security.service import SecurityService
 from nexus.core.storage.database import Database
 from nexus.settings import load_settings
+from nexus.contracts.tools import TOOL_ARGUMENT_MODELS
 
 
 async def manage(args: argparse.Namespace) -> None:
@@ -36,7 +37,7 @@ def main() -> None:
         command = commands.add_parser(operation)
         command.add_argument("identity_id", type=UUID)
         if operation == "grant":
-            command.add_argument("--tool", choices=("system.info", "filesystem.list"), required=True)
+            command.add_argument("--tool", choices=tuple(key.split("@")[0] for key in TOOL_ARGUMENT_MODELS), required=True)
             command.add_argument("--root-id", default="")
             command.add_argument("--disable", action="store_true")
     args = parser.parse_args()

@@ -38,7 +38,7 @@ def test_http_session_csrf_strict_input_and_denied_action_history(world):
             assert client.post("/api/v1/tasks", json=bad, headers=auth).status_code == 400
         unknown = {**item, "request": {**item["request"], "intent": "arbitrary_shell"}}
         assert client.post("/api/v1/tasks", json=unknown, headers=auth).json()["detail"] == "UNSUPPORTED_TASK"
-        assert client.post("/api/v1/tasks", content=b" " * 4097, headers=auth).status_code == 413
+        assert client.post("/api/v1/tasks", content=b" " * 32769, headers=auth).status_code == 413
         accepted = client.post("/api/v1/tasks", json=item, headers=auth)
         assert accepted.status_code == 200
         task = accepted.json()["task"]

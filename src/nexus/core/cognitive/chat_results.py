@@ -33,6 +33,11 @@ def checked_native(value: dict, proposal: dict) -> dict:
 
 
 async def result_source(chat, conn, row) -> tuple[dict, dict]:
+    if row["skill_run_id"]:
+        from nexus.core.cognitive.chat_skills import result_source as skill_result_source
+        if not row["native_tool_call_json"]:
+            raise AccessDenied("RESULT_UNAVAILABLE")
+        return await skill_result_source(chat, conn, row)
     if not row["task_id"] or not row["native_tool_call_json"] or row["action_status"] != "submitted":
         raise AccessDenied("RESULT_UNAVAILABLE")
     task = await load_task(conn, UUID(row["task_id"]))
@@ -53,13 +58,16 @@ async def result_source(chat, conn, row) -> tuple[dict, dict]:
 
 
 async def preview(chat, conn, row, conversation, fields) -> dict:
+    from nexus.core.memory.context import validate_turn
+    await validate_turn(conn, row)
     result, binding = await result_source(chat, conn, row)
     selected = sorted(set(fields if fields is not None else result))
     if not selected or not set(selected) <= result.keys():
         raise AccessDenied("POLICY_DENIED")
     # Metadata stays explicit even when users omit the entries or OS fields.
-    truncated = bool(result.get("truncated", False))
-    selected_result = {key: result[key] for key in selected}
+    skill = bool(row["skill_run_id"])
+    truncated = bool(result.get("truncated", False)) or (skill and any(value.get("truncated", False) for value in result.values()))
+    selected_result = json.loads(canonical({key: result[key] for key in selected}))
     if "entries" in selected_result:
         selected_result["entries"] = list(selected_result["entries"])
         while len(canonical(selected_result).encode()) > 8192:
@@ -68,7 +76,17 @@ async def preview(chat, conn, row, conversation, fields) -> dict:
         if "truncated" in selected_result:
             selected_result["truncated"] = truncated
     data = {"result": selected_result, "omitted_fields": sorted(result.keys()-set(selected)),
-            "truncated": truncated, "verification": "node_report_schema_checked"}
+            "truncated": truncated, "verification": "skill_steps_verified" if skill else "node_report_schema_checked"}
+    if skill:
+        data["confirmed_input"] = json.loads(row["skill_plan_json"])["input"]
+        data["counts_scope"] = "returned_entries_only"
+        while len(canonical(data).encode()) > 8192:
+            directory = next((value for value in selected_result.values() if value.get("entries")), None)
+            if directory is None:
+                raise AccessDenied("MODEL_INPUT_LIMIT")
+            directory["entries"].pop()
+            directory["truncated"] = True
+            data["truncated"] = True
     native = checked_native(json.loads(row["native_tool_call_json"]), json.loads(row["proposal_json"]))
     messages = [*json.loads(row["context_json"]),
                 {"role": "assistant", "content": row["response_text"] or None, "tool_calls": [native]},

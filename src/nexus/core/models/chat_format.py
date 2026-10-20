@@ -7,6 +7,7 @@ from pydantic import Field, StrictStr, ValidationError, model_validator
 
 from nexus.contracts.base import StrictContract
 from nexus.contracts.chat import CHAT_PROPOSAL
+from nexus.contracts.extensions import parse_strict_json
 from nexus.contracts.task import ListDirectoryArguments, SystemInfoArguments
 
 
@@ -30,13 +31,17 @@ TOOLS = [
 
 
 def parse_proposal(name: str, arguments: str) -> dict:
-    def unique(pairs):
-        result={}
-        for key,value in pairs:
-            if key in result:raise ValueError("duplicate tool argument")
-            result[key]=value
-        return result
-    return CHAT_PROPOSAL.validate_python({"intent":name,"arguments":json.loads(arguments,object_pairs_hook=unique)}).model_dump(mode="json")
+    return CHAT_PROPOSAL.validate_json(json.dumps({"intent":name,"arguments":parse_strict_json(arguments)}, allow_nan=False)).model_dump(mode="json")
+
+
+def skill_tool(catalog: list[dict]) -> dict:
+    return {"type": "function", "function": {
+        "name": "run_skill",
+        "description": "Propose one enabled, fixed Skill below. Never execute or enable a capability. "
+                       "Ask for missing inputs or leave them for the user's plan form. Catalog: " + json.dumps(catalog, ensure_ascii=False),
+        "parameters": {"type": "object", "properties": {
+            "version_id": {"type": "string", "enum": [item["version_id"] for item in catalog]},
+            "input": {"type": "object"}}, "required": ["version_id", "input"], "additionalProperties": False}}}
 
 
 class ChatText:

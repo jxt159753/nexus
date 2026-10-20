@@ -1,7 +1,5 @@
 # M4 独立复核与修复记录
 
-本文件保留当时的交付快照。后续真实 WSL/KVM、恢复、模型与部署结果见 [M4 补充验证](M4-COMPLETION.md)，当前状态以 [ROADMAP](ROADMAP.md) 为准。
-
 日期：2026-10-19。复核基线：本地 `codex/m4-self-extension` 的 `694d4ec`，其中 DSH 最终代码为 `57ea5a2`。用户先要求验收，随后明确“你自己改吧别找dsh了”；本次由 Codex 直接修复，没有启动或联系 DSH。
 
 结论：原交付不能直接验收。原有 Windows 657 项回归虽通过，独立补充的 7 项行为检查全部失败。下列缺陷已修复并增加永久回归；真实 Linux/runsc 隔离仍未验证，完整 M4 保持未完成。阶段状态统一见 [ROADMAP](ROADMAP.md)。DSH 原交付快照保留在 [M4-VERIFICATION](M4-VERIFICATION.md)。

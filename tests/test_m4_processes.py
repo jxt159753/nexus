@@ -69,7 +69,9 @@ workspace={json.dumps(str(workspace))}
             post("/requests/" + request["request_id"] + "/generate", {"preview_digest": request["preview_digest"], "allow_model": True})
             candidate = wait_for(lambda: (item if (item := browser.get("/api/v1/extensions/requests/" + request["request_id"]).json()["request"])["status"] == "candidate" else None))
             version_path = "/versions/" + candidate["candidate_version_id"]
-            tested = post(version_path + "/test", {})["version"]
+            # Generation already schedules its bounded test. Wait for that
+            # evidence instead of racing a duplicate manual test request.
+            tested = wait_for(lambda: (item if (item := browser.get("/api/v1/extensions" + version_path).json()["version"])["test_status"] == "passed" else None))
             post(version_path + "/approve", {"decision": "approve", "artifact_digest": tested["artifact_digest"], "test_id": tested["test"]["test_id"]})
             post(version_path + "/enable", {})
             run = post("/runs", {"request_id": str(uuid4()), "version_id": tested["version_id"], "node_id": str(world.node_id), "input": {}})["run"]

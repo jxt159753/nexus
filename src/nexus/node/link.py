@@ -53,7 +53,7 @@ class NodeClient:
     async def _connected(self, ws) -> None:
         hello = NodeHello(node_id=self.config.node_id, node_version="0.1.0", boot_id=self.runtime.boot_id,
             tools=[ToolCapability(tool=key.split("@")[0], tool_version=1) for key in sorted(self.runtime.config.allowed_tools)],
-            roots=sorted(self.runtime.config.roots))
+            roots=sorted(self.runtime.config.roots), command_digests={key: value.digest() for key,value in self.runtime.config.commands.items()})
         # Only actual local configuration is advertised; claims never grant rights.
         await self._send(ws, "node.hello", hello)
         async with asyncio.timeout(5):

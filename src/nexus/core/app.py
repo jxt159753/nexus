@@ -65,6 +65,7 @@ def create_app(config: CoreConfig) -> FastAPI:
     extensions.sandbox = tools
     skills = SkillService(harness, extensions, tools)
     extensions.skills = skills
+    chat.skills = skills
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):

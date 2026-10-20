@@ -38,6 +38,7 @@ function loggedOut() {
   memoryRetry = null;
   languageRetry = null; languageBefore = null;
   chatReset();
+  projectReset(); basicReset();
   if (typeof extensionReset === "function") extensionReset();
   $("language-form").reset(); $("language-requests").replaceChildren();
   state.controlRevision = -1;
@@ -94,6 +95,7 @@ async function nodes() {
   $("node-status").textContent = node ? (node.online ? "在线 · 已认证" : "离线 · 任务会等待节点") : "请先在 Core 配置节点";
   $("capabilities").replaceChildren(...(node ? node.tools : []).map(t => el("span", t)));
   chatNodes(value.nodes);
+  basicNodes(value.nodes);
 }
 function putTask(task, detail) {
   const previous = state.tasks.get(task.task_id);
@@ -105,11 +107,12 @@ function putTask(task, detail) {
   }
   renderTasks();
   chatRender();
+  basicUpdatePreview();
 }
 function taskCard({task, detail}) {
     const card = el("article", undefined, "task"); card.dataset.taskId = task.task_id;
     const heading = el("div", undefined, "section-heading");
-    heading.append(el("h3", task.request.intent === "get_system_info" ? "读取系统信息" : "列出 workspace 目录"));
+    heading.append(el("h3", toolLabels[task.request.intent] || task.request.intent));
     heading.append(el("span", statuses[task.status] || task.status, "badge " + (task.status === "succeeded" ? "success" : task.status === "awaiting_approval" ? "pending" : ["failed", "timed_out"].includes(task.status) ? "failed" : "")));
     card.append(heading, el("p", `${new Date(task.created_at).toLocaleString()} · ${task.task_id}`, "meta"));
     const project = state.projects.find(p => p.project_id === task.project_id);
@@ -235,7 +238,7 @@ async function loadProjects() {
   }
   if (!state.logged) return;
   state.projects = projects;
-  for (const id of ["task-project", "memory-project"]) {
+  for (const id of ["task-project", "memory-project", "chat-project", "project-workspace"]) {
     const selected = $(id).value; $(id).replaceChildren(new Option("不关联项目", ""));
     for (const project of projects) $(id).add(new Option(project.name, project.project_id));
     if (projects.some(p => p.project_id === selected)) $(id).value = selected;
@@ -367,4 +370,6 @@ setInterval(() => {if (state.logged && languagePolling && !$("tasks-view").hidde
 window.addEventListener("pagehide", () => {state.generation++; clearTimeout(state.timer); if (state.socket) state.socket.close();});
 window.addEventListener("pageshow", event => {if (event.persisted && state.logged) connect();});
 initChat();
+initProjects();
+initBasicTools();
 api("/api/v1/session").then(enter).catch(error => {loggedOut(); if (error.message !== "AUTH_REQUIRED") notify(error.message, true);});

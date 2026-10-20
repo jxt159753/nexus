@@ -47,7 +47,7 @@ def main() -> int:
     except PermissionError:
         value.update(outcome="failed", error=create_error(ErrorCode.POLICY_DENIED, "Local resource access denied").model_dump(mode="json"))
     except (OSError, ValueError):
-        value.update(outcome="failed", error=create_error(ErrorCode.RESULT_INVALID, "Read-only tool observation failed").model_dump(mode="json"))
+        value.update(outcome="failed", error=create_error(ErrorCode.RESULT_INVALID, "Tool execution or evidence validation failed").model_dump(mode="json"))
     value["observed_at"] = datetime.now(UTC).isoformat()
     encoded = RESULT.validate_json(json.dumps(value)).model_dump_json().encode("utf-8")
     if len(encoded) > MAX_MESSAGE_BYTES:

@@ -31,5 +31,3 @@ Node 重启将未结算回执标为未知，按其容器 ID 调用固定 runsc �
 完整测试使用专用身份、临时目录和受控程序；不得对生产 Core 做逃逸或资源压力测试。用户批准能力版本和批准具体设备动作仍是两回事，目录审批继续有效。
 
 官方依据：[gVisor 安装](https://gvisor.dev/docs/user_guide/install/)、[运行平台](https://gvisor.dev/docs/user_guide/platforms/)、[rootless 模式](https://gvisor.dev/docs/user_guide/rootless/)。实际是否隔离有效以本项目列明的宿主和执行证据为准。
-
-本机部署的隐藏 WSL 保持会话由 Git 忽略的 `var/cloud/Start-Sandbox.ps1` 启动，`Stop-Sandbox.ps1` 只停止该沙箱服务及保存 PID/启动时刻匹配的会话。没有新增 Windows 登录自启动任务；重启电脑后需运行启动脚本。升级镜像或 runsc 安装树前应先停止 Node，重新计算两项摘要并审阅环境变化；旧批准不可沿用。

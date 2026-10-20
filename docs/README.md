@@ -9,6 +9,8 @@
 | 文档 | 能解决什么问题 |
 | --- | --- |
 | [聊天使用说明](m3-chat.md) | 多轮聊天、停止回复、工具确认、结果回传、历史和费用 |
+| [聊天中的多步流程](m5-chat-skills.md) | 可用流程目录、参数与计划确认、步骤审批/取消及结果解读 |
+| [项目、可控记忆与基础工具](m6-projects-tools.md) | 项目会话与待办、记忆保存/逐轮外发、受限文件读写/查找和固定命令 |
 | [任务、记忆与项目页面](s6-browser-records.md) | 提交只读任务、审批、暂停、保存或撤销记忆、关联项目 |
 | [单条自然语言任务](m2-language.md) | 把一句操作请求解释为已有工具，确认后执行 |
 | [自定义工具与流程](m4-usage.md) | 创建、测试、批准、启用、使用和停用能力；使用前先核对路线图中的限制 |
@@ -27,7 +29,7 @@
 | [前端与 App 开发](ROADMAP.md#前端与-app-开发) | 网页体验、页面与交互任务、Android App 首版及手机执行端的区别 |
 | [版本与部署记录](ROADMAP.md#版本与部署记录) | 线上版本、本地候选版本、验证与部署的区别 |
 
-以上状态和计划均回到 ROADMAP 查询。M5 以后的内容是建议，不表示已批准开发。
+以上状态和计划均回到 ROADMAP 查询；本次 M6 与基础工具已有用户实施授权，后续阶段仍需明确批准。
 
 ## 开发与技术参考
 
@@ -60,9 +62,14 @@ Core、Node、Tool、Skill 等词的解释见 [架构文档的名词说明](ARCH
 | M3 聊天及补充功能 | [聊天首版](assets/m3-evidence.json)、[会话工具](assets/chat-tools-evidence.json)、[结果回传](assets/chat-results-evidence.json)、[自动回传](assets/chat-auto-results-evidence.json) |
 | M4 补充实现与部署 | [本轮验证](M4-COMPLETION.md)、[脱敏摘要](assets/m4-completion-evidence.json) |
 | M4 首版与后续独立复核 | [原交付验证](M4-VERIFICATION.md)、[独立复核与修复](M4-CODEX-REVIEW.md)、[脱敏复核汇总](assets/m4-codex-evidence.json) |
+| M5 实现与获批上线 | [验证与限制](M5-VERIFICATION.md)、[脱敏摘要](assets/m5-evidence.json) |
+| M6 本地实现与基础工具 | [验证与限制](M6-VERIFICATION.md) |
+| M6 会话工作与上线 | [验证与限制](M6-WORK-VERIFICATION.md)、[脱敏摘要](assets/m6-work-evidence.json) |
 | 历次交付、上线、批准与中间失败 | [2026 年 10 月历史记录](history/2026-10-delivery.md)，固定历史快照，不更新进度 |
 
 ## 设计决定与旧工作单
+
+聊天自动工作与自然语言权限答复见 [使用说明](chat-work.md)及 [ADR 0018](decisions/0018-scoped-chat-work.md)。
 
 重要技术决定保存在 [decisions 目录](decisions/)。主要包括 [单活云端部署](decisions/0008-self-hosted-core-ip-tls.md)、[模型接入](decisions/0009-m2-deepseek-language.md)、[聊天](decisions/0010-m3-chat.md)、[工具结果回传](decisions/0012-chat-result-feedback.md)、[自动回传同意](decisions/0013-chat-auto-result-consent.md)和 [自扩展](decisions/0014-m4-self-extension.md)。
 

@@ -6,7 +6,8 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from nexus.contracts.base import StrictContract
-from nexus.contracts.records import MemoryCreate, ProjectCreate
+from nexus.contracts.records import MemoryCreate, ProjectCreate, TodoCreate, TodoUpdate
+from nexus.core.memory.projects import Projects
 from nexus.core.harness.http import body
 from nexus.core.memory.service import Records
 from nexus.core.security.http import SecurityHTTP
@@ -17,6 +18,7 @@ class RecordsHTTP:
     def __init__(self, guards: SecurityHTTP):
         self.guards = guards
         self.records = Records(guards.service.database)
+        self.projects = Projects(guards.service.database)
         self.router = APIRouter()
         self.router.add_api_route("/api/v1/projects", self.create_project, methods=["POST"])
         self.router.add_api_route("/api/v1/memories", self.save, methods=["POST"])
@@ -24,6 +26,22 @@ class RecordsHTTP:
         self.router.add_api_route("/api/v1/records/{kind}", self.page, methods=["GET"])
         self.router.add_api_route("/api/v1/memories", self.memories, methods=["GET"])
         self.router.add_api_route("/api/v1/models/usage", self.usage, methods=["GET"])
+        self.router.add_api_route("/api/v1/projects/{project_id}", self.overview, methods=["GET"])
+        self.router.add_api_route("/api/v1/projects/{project_id}/todos", self.todo_create, methods=["POST"])
+        self.router.add_api_route("/api/v1/projects/{project_id}/todos/{todo_id}", self.todo_update, methods=["PATCH"])
+        self.router.add_api_route("/api/v1/projects/{project_id}/todos/{todo_id}/history", self.todo_history, methods=["GET"])
+
+    async def overview(self, project_id: UUID, request: Request, before: int = Query(2**63-1, ge=1, le=2**63-1)):
+        return await self.projects.overview(await self.guards.owner_http(request), project_id, before=before)
+
+    async def todo_create(self, project_id: UUID, request: Request):
+        return {"todo": await self.projects.create_todo(await self.guards.owner_http(request), project_id, await body(request, TodoCreate))}
+
+    async def todo_update(self, project_id: UUID, todo_id: UUID, request: Request):
+        return {"todo": await self.projects.update_todo(await self.guards.owner_http(request), project_id, todo_id, await body(request, TodoUpdate))}
+
+    async def todo_history(self, project_id: UUID, todo_id: UUID, request: Request):
+        return {"events": await self.projects.history(await self.guards.owner_http(request), project_id, todo_id)}
 
     async def create_project(self, request: Request) -> dict:
         principal = await self.guards.owner_http(request)

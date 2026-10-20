@@ -122,7 +122,7 @@ class NodeRuntime:
         key = f"{command.tool}@{command.tool_version}"
         if key not in REGISTRY or key not in self.config.allowed_tools:
             raise ProtocolError(ErrorCode.POLICY_DENIED, "Tool is not locally allowed")
-        if command.tool == "filesystem.list":
+        if command.tool != "system.info":
             root = self.config.roots.get(command.arguments.root_id)
             if root is None:
                 raise ProtocolError(ErrorCode.POLICY_DENIED, "Resource is not configured")

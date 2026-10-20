@@ -27,6 +27,9 @@ class RoutingDecision:
 def route_task(
     request: TaskRequest,
 ) -> RoutingDecision:
+    tools = {"read_file": "filesystem.read", "find_files": "filesystem.search", "preview_file_write": "filesystem.write_preview", "write_file": "filesystem.write", "run_command": "command.run"}
+    if getattr(request, "intent", None) in tools:
+        return RoutingDecision("rule", "KNOWN_WORKSPACE_TOOL", 1, tools[request.intent], 1, request.arguments.model_dump(mode="json"))
     if isinstance(request, SystemInfoRequest):
         return RoutingDecision(
             mode="rule",

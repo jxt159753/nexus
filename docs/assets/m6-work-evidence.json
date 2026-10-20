@@ -1,0 +1,134 @@
+{
+  "recorded_on": "2026-10-20",
+  "package": {
+    "sha256": "36e2066ab60167c4350f24bde6326e82ee350d102f2f7ab4d2e329944d8b9c77",
+    "app_files": 124,
+    "bytes": 247802
+  },
+  "schema": 16,
+  "windows_fixed_package": {
+    "passed": 185,
+    "seconds": 119.64
+  },
+  "final_affected_checks": {
+    "passed": 15,
+    "seconds": 32.93
+  },
+  "linux_fixed_package": {
+    "passed": 179,
+    "seconds": 33.45
+  },
+  "source_full_initial": {
+    "passed": 750,
+    "failed": 5,
+    "environment_errors": 2,
+    "all_failures_corrected_and_targeted_rechecked": true
+  },
+  "browser": {
+    "passed": true,
+    "real_node": true,
+    "synthetic_native_sse": true,
+    "natural_write_approval": true,
+    "refresh_recovery": true,
+    "viewports": [
+      "1440x1000",
+      "390x844"
+    ],
+    "errors": [],
+    "real_model_calls": 0
+  },
+  "production": {
+    "passed": true,
+    "old_tasks_preserved": 20,
+    "old_conversations_preserved": 13,
+    "old_turns_preserved": 23,
+    "ledger_unchanged": true,
+    "usage": {
+      "enabled": true,
+      "calls": 31,
+      "cost_microunits": 10234,
+      "unknown_cost_calls": 0,
+      "model_success_rate": null,
+      "chat_enabled": true
+    },
+    "tls_verified": true,
+    "windows_node_online": true,
+    "sandbox_online": true,
+    "workspace_unchanged": true,
+    "tools": [
+      "system.info@1",
+      "filesystem.list@1",
+      "filesystem.read@1",
+      "filesystem.search@1",
+      "filesystem.write_preview@1",
+      "filesystem.write@1",
+      "command.run@1"
+    ],
+    "native_catalog": [
+      "find_files",
+      "get_node_status",
+      "get_system_info",
+      "list_directory",
+      "read_file",
+      "run_command",
+      "run_tool",
+      "write_file"
+    ],
+    "existing_tool_rebound_same_artifact": "e3aca15c-439b-4d0a-98e8-bb1345c9ec2c",
+    "smoke_tasks": [
+      {
+        "intent": "preview_file_write",
+        "task_id": "dd27ae95-3426-4984-9986-4e37abe3e051",
+        "attempts": 1,
+        "verification": "node_report_schema_checked"
+      },
+      {
+        "intent": "write_file",
+        "task_id": "56f302a4-fae9-4732-9e31-3af8a6222172",
+        "attempts": 1,
+        "verification": "node_report_schema_checked"
+      },
+      {
+        "intent": "read_file",
+        "task_id": "26bc3352-1bbf-4405-b74f-537aaf774829",
+        "attempts": 1,
+        "verification": "node_report_schema_checked"
+      },
+      {
+        "intent": "find_files",
+        "task_id": "799df0c1-c766-4504-ab46-4ffe96372a12",
+        "attempts": 1,
+        "verification": "node_report_schema_checked"
+      },
+      {
+        "intent": "run_command",
+        "task_id": "5c902f80-cc35-4a1e-989a-ecfa09833210",
+        "attempts": 1,
+        "verification": "node_report_schema_checked"
+      }
+    ],
+    "smoke_file": "nexus-deploy-check-49c5327e-ac8f-4673-8517-a12e9ea86954.txt",
+    "paused": false,
+    "real_model_calls": 0
+  },
+  "single_core": true,
+  "integrity": "ok",
+  "production_counts": {
+    "tasks": 25,
+    "conversations": 13,
+    "chat_turns": 23,
+    "model_calls": 31,
+    "identities": 3,
+    "grants": 14,
+    "skill_runs": 0
+  },
+  "original_workspace_preserved": true,
+  "smoke_file_cleaned_after_content_check": true,
+  "real_external_model_calls": 0,
+  "new_dependencies": 0,
+  "not_verified": [
+    "new workflow with real DeepSeek exchange",
+    "Android physical device",
+    "final user acceptance"
+  ]
+}

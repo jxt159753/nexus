@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import Field, StrictInt
 
 from nexus.contracts.base import StrictContract
+from nexus.contracts.basic import FileReadArguments, FileSearchArguments, FilePreviewArguments, FileWriteArguments, CommandRunArguments
 
 
 TaskStatus = Literal[
@@ -38,7 +39,32 @@ class ListDirectoryRequest(TaskMetadata):
     arguments: ListDirectoryArguments
 
 
+class FileReadRequest(TaskMetadata):
+    intent: Literal["read_file"]
+    arguments: FileReadArguments
+
+
+class FileSearchRequest(TaskMetadata):
+    intent: Literal["find_files"]
+    arguments: FileSearchArguments
+
+
+class FilePreviewRequest(TaskMetadata):
+    intent: Literal["preview_file_write"]
+    arguments: FilePreviewArguments
+
+
+class FileWriteRequest(TaskMetadata):
+    intent: Literal["write_file"]
+    arguments: FileWriteArguments
+
+
+class CommandRunRequest(TaskMetadata):
+    intent: Literal["run_command"]
+    arguments: CommandRunArguments
+
+
 TaskRequest = Annotated[
-    SystemInfoRequest | ListDirectoryRequest,
+    SystemInfoRequest | ListDirectoryRequest | FileReadRequest | FileSearchRequest | FilePreviewRequest | FileWriteRequest | CommandRunRequest,
     Field(discriminator="intent"),
 ]

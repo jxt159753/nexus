@@ -39,6 +39,10 @@ async def skill_run_allowed(conn, run, now):
         return False
     try:
         approval = await approved_version(conn, version, now)
+        work = await one(conn,"SELECT step_id FROM chat_work_steps WHERE skill_run_id=?",(run["run_id"],))
+        if work:
+            from nexus.core.security.work import allowed_step
+            await allowed_step(conn,work[0],now)
     except AccessDenied:
         return False
     return (approval["approval_id"] == run["approval_id"]

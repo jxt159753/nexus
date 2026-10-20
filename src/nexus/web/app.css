@@ -590,6 +590,14 @@ footer span{
 #chat-view textarea{resize:vertical;min-height:96px}
 .chat-action{border:1px solid rgba(91,145,255,.3);border-radius:10px;padding:14px;margin-top:16px;min-width:0}
 .chat-action pre{white-space:pre-wrap;overflow-wrap:anywhere}
+.chat-skill .button-row{flex-wrap:wrap}
+.skill-steps{padding-left:24px}
+.skill-steps>li{padding:12px 0;border-bottom:1px solid #1d2a3d;min-width:0}
+.chat-skill details,.chat-catalog details{min-width:0;margin:10px 0}
+.chat-skill summary,.chat-catalog summary{cursor:pointer}
+.chat-catalog pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:280px;overflow:auto}
+.skill-parameters{margin:14px 0}
+.skill-parameters input,.skill-parameters select,.skill-parameters textarea{max-width:100%}
 @media(max-width:600px){.chat-messages{max-height:52vh}.chat-user,.chat-assistant{padding:12px;margin-left:0;margin-right:0}#chat-title-form{flex-wrap:wrap}.tabs{overflow-x:auto}}
 /* Capability view: long candidate JSON must wrap inside the grid track. */
 .record-list>*{min-width:0}

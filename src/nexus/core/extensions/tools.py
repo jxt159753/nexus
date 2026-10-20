@@ -86,7 +86,7 @@ class ToolService:
         return self.transport.status(node)
 
     async def _call(self, node: UUID, version, input_value: dict, timeout: int, *,
-                    execution_id=None, skill_run_id=None, cancel_cursor=None, test_run_id=None) -> dict:
+                    execution_id=None, skill_run_id=None, cancel_cursor=None, test_run_id=None, work_step_id=None) -> dict:
         cancel_event = asyncio.Event()
         try:
             record = await self.executions.prepare(node, version, input_value, timeout,
@@ -121,6 +121,15 @@ class ToolService:
                         return False
                     try:
                         await self.extensions.current_approval(conn, current, now)
+                    except AccessDenied:
+                        return False
+                if work_step_id is not None:
+                    from nexus.core.security.work import allowed_step
+                    try:
+                        step,grant = await allowed_step(conn,work_step_id,now)
+                        await allowed_step(conn,work_step_id,now,scope=self.extensions.harness.scope(UUID(grant["node_id"])))
+                        current = await one(conn,"SELECT * FROM extension_versions WHERE version_id=?",(version["version_id"],))
+                        await self.extensions.current_approval(conn,current,now)
                     except AccessDenied:
                         return False
                 return True
@@ -230,7 +239,7 @@ class ToolService:
         return result, "passed" if passed else "failed"
 
     async def execute_skill_step(self, *, owner_id: str, version,
-                                 input_value: dict, skill_run_id: str, step_index: int) -> str:
+                                 input_value: dict, skill_run_id: str | None = None, step_index: int | None = None, work_step_id: str | None = None) -> str:
         node_id, image = self._environment_node(version)
         status = self.status(node_id)
         if not status.get("available") or status.get("image_digest") != image:
@@ -245,7 +254,11 @@ class ToolService:
             now = utc_now()
             from nexus.core.extensions.authorization import skill_run_allowed
             run = await one(conn, "SELECT * FROM skill_runs WHERE run_id=?", (skill_run_id,))
-            if not await skill_run_allowed(conn, run, now) or (await one(conn, "SELECT paused FROM system_state WHERE singleton=1"))[0]:
+            if work_step_id is not None:
+                from nexus.core.cognitive.chat_work import validate_extension
+                from nexus.core.security.work import operation
+                await validate_extension(conn,work_step_id,owner_id,version["version_id"],node_id,input_value,now,"tool")
+            if (work_step_id is None and not await skill_run_allowed(conn, run, now)) or (await one(conn, "SELECT paused FROM system_state WHERE singleton=1"))[0]:
                 return "failed"
             try:
                 approval = await self.extensions.current_approval(conn, version, now)
@@ -254,6 +267,8 @@ class ToolService:
             if approval["node_id"] is not None and approval["node_id"] != str(node_id):
                 return "failed"
             existing = await one(conn, "SELECT * FROM extension_tool_runs WHERE skill_run_id=? AND step_index=?", (skill_run_id, step_index))
+            if work_step_id is not None:
+                existing = await one(conn,"SELECT * FROM extension_tool_runs WHERE work_step_id=?",(work_step_id,))
             if existing is not None:
                 return existing["status"]
             tool_run_id = uuid4()
@@ -263,6 +278,15 @@ class ToolService:
                 canonical(input_value), digest_value(input_value), timestamp(now), timestamp(now),
             ))
             await audit(conn, owner_id, None, "extension.tool_dispatched", now)
+            if work_step_id is not None:
+                await operation(conn,work_step_id,"tool:"+str(tool_run_id),now)
+                await conn.execute("UPDATE extension_tool_runs SET work_step_id=? WHERE tool_run_id=?",(work_step_id,str(tool_run_id)))
+                await conn.execute("UPDATE chat_work_steps SET tool_run_id=?,status='waiting' WHERE step_id=?",(str(tool_run_id),work_step_id))
+            elif skill_run_id is not None:
+                work = await one(conn,"SELECT step_id FROM chat_work_steps WHERE skill_run_id=?",(skill_run_id,))
+                if work:
+                    from nexus.core.security.work import operation
+                    await operation(conn,work[0],"tool:"+str(tool_run_id),now)
             step = await one(conn, "SELECT * FROM skill_run_steps WHERE run_id=? AND step_index=?", (skill_run_id, step_index))
             if step is not None:
                 await conn.execute("UPDATE skill_run_steps SET tool_run_id=?,status='running',updated_at=? WHERE run_id=? AND step_index=?", (
@@ -270,7 +294,7 @@ class ToolService:
         timeout = min(self.config.sandbox_test_timeout_seconds, 10)
         try:
             reply = await self._call(node_id, version, input_value, timeout,
-                                     execution_id=UUID(str(tool_run_id)), skill_run_id=skill_run_id)
+                                     execution_id=UUID(str(tool_run_id)), skill_run_id=skill_run_id, work_step_id=work_step_id)
         except BaseException:
             async with self.database.transaction() as conn:
                 await conn.execute("UPDATE extension_tool_runs SET status='unknown',error_json=?,updated_at=? WHERE tool_run_id=?", (json.dumps({"code": "CORE_INTERRUPTED"}), timestamp(utc_now()), str(tool_run_id)))

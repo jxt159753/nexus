@@ -16,6 +16,8 @@ from nexus.contracts.base import (
     Version1,
 )
 from nexus.contracts.errors import ErrorPayload
+from nexus.contracts.basic import ToolName, CommandId
+from nexus.contracts.tools import FileReadCall, FileSearchCall, FilePreviewCall, FileWriteCall, CommandRunCall, FileReadResult, FileSearchResult, FilePreviewResult, FileWriteResult, CommandRunResult
 from nexus.contracts.task import ExecutionOutcome, TaskStatus
 from nexus.contracts.tools import (
     ListDirectoryCall,
@@ -92,14 +94,15 @@ class ControlUpdated(StrictContract):
 
 
 class ToolCapability(StrictContract):
-    tool: Literal["system.info", "filesystem.list"]
+    tool: ToolName
     tool_version: Version1
 
 
 class NodeHello(StrictContract):
     node_id: UUID
     node_version: StrictStr = Field(min_length=1, max_length=50)
-    tools: list[ToolCapability] = Field(max_length=2)
+    tools: list[ToolCapability] = Field(max_length=7)
+    command_digests: dict[CommandId, CommandDigest] = Field(default_factory=dict, max_length=16)
     roots: list[Literal["workspace"]] = Field(max_length=1)
     boot_id: UUID
 
@@ -161,8 +164,28 @@ class ListDirectoryExecute(CommandExecuteBase, ListDirectoryCall):
     pass
 
 
+class FileReadExecute(CommandExecuteBase, FileReadCall):
+    pass
+
+
+class FileSearchExecute(CommandExecuteBase, FileSearchCall):
+    pass
+
+
+class FilePreviewExecute(CommandExecuteBase, FilePreviewCall):
+    pass
+
+
+class FileWriteExecute(CommandExecuteBase, FileWriteCall):
+    pass
+
+
+class CommandRunExecute(CommandExecuteBase, CommandRunCall):
+    pass
+
+
 CommandExecute = Annotated[
-    SystemInfoExecute | ListDirectoryExecute, Field(discriminator="tool")
+    SystemInfoExecute | ListDirectoryExecute | FileReadExecute | FileSearchExecute | FilePreviewExecute | FileWriteExecute | CommandRunExecute, Field(discriminator="tool")
 ]
 
 
@@ -207,8 +230,33 @@ class ListDirectoryCommandResult(CommandResultBase):
     result: ListDirectoryResult | None = None
 
 
+class FileReadCommandResult(CommandResultBase):
+    tool: Literal["filesystem.read"]
+    result: FileReadResult | None = None
+
+
+class FileSearchCommandResult(CommandResultBase):
+    tool: Literal["filesystem.search"]
+    result: FileSearchResult | None = None
+
+
+class FilePreviewCommandResult(CommandResultBase):
+    tool: Literal["filesystem.write_preview"]
+    result: FilePreviewResult | None = None
+
+
+class FileWriteCommandResult(CommandResultBase):
+    tool: Literal["filesystem.write"]
+    result: FileWriteResult | None = None
+
+
+class CommandRunCommandResult(CommandResultBase):
+    tool: Literal["command.run"]
+    result: CommandRunResult | None = None
+
+
 CommandResult = Annotated[
-    SystemInfoCommandResult | ListDirectoryCommandResult, Field(discriminator="tool")
+    SystemInfoCommandResult | ListDirectoryCommandResult | FileReadCommandResult | FileSearchCommandResult | FilePreviewCommandResult | FileWriteCommandResult | CommandRunCommandResult, Field(discriminator="tool")
 ]
 
 

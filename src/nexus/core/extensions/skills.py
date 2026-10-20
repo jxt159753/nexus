@@ -138,7 +138,8 @@ class SkillService:
                 raise AccessDenied()
             return Principal(UUID(owner_id), "owner", row["token_hash"])
 
-    async def start(self, principal: Principal, version_id: UUID, node_id: UUID, input_value: dict, *, request_id: UUID | None = None) -> dict:
+    async def start(self, principal: Principal, version_id: UUID, node_id: UUID, input_value: dict, *, request_id: UUID | None = None,
+                    chat_turn_id: UUID | None = None, plan_digest: str | None = None, work_step_id: UUID | None = None) -> dict:
         self.extensions.require_enabled()
         input_value = json.loads(json.dumps(input_value, allow_nan=False))
         if type(input_value) is not dict:
@@ -150,15 +151,27 @@ class SkillService:
             async with self.database.transaction() as conn:
                 now = utc_now()
                 await self.extensions.owner(conn, principal)
+                if work_step_id is not None:
+                    from nexus.core.cognitive.chat_work import validate_extension
+                    await validate_extension(conn,work_step_id,principal.identity_id,version_id,node_id,input_value,now,"skill")
+                if chat_turn_id is not None:
+                    from nexus.core.cognitive.chat_skills import validate_confirmation
+                    await validate_confirmation(self, conn, principal, chat_turn_id, plan_digest, version_id, node_id, input_value)
                 existing = await one(conn, "SELECT run_id,request_digest FROM skill_runs WHERE owner_id=? AND request_id=?", (str(principal.identity_id), str(request_id)))
                 if existing is not None:
                     if existing["request_digest"] != request_digest:
+                        raise Conflict("IDEMPOTENCY_CONFLICT")
+                    if chat_turn_id is not None and not await one(conn, "SELECT 1 FROM chat_turns WHERE turn_id=? AND skill_run_id=?", (str(chat_turn_id), existing["run_id"])):
                         raise Conflict("IDEMPOTENCY_CONFLICT")
                     existing_id = UUID(existing["run_id"])
             if existing_id is not None:
                 return await self.get(principal, existing_id)
             async with self.database.transaction() as conn:
                 await self.extensions.owner(conn, principal)
+                if work_step_id is not None:
+                    await validate_extension(conn,work_step_id,principal.identity_id,version_id,node_id,input_value,utc_now(),"skill")
+                if chat_turn_id is not None:
+                    await validate_confirmation(self, conn, principal, chat_turn_id, plan_digest, version_id, node_id, input_value)
                 version = await one(conn, "SELECT * FROM extension_versions WHERE version_id=? AND owner_id=? AND kind='skill'", (str(version_id), str(principal.identity_id)))
                 if version is None:
                     raise LookupError("skill version not found")
@@ -204,6 +217,13 @@ class SkillService:
                         str(run_id), index, step["id"], timestamp(now), timestamp(now),
                     ))
                 await conn.execute("UPDATE skill_runs SET request_id=?,request_digest=? WHERE run_id=?", (str(request_id), request_digest, str(run_id)))
+                if work_step_id is not None:
+                    await conn.execute("UPDATE chat_work_steps SET skill_run_id=?,status='waiting' WHERE step_id=? AND skill_run_id IS NULL",(str(run_id),str(work_step_id)))
+                if chat_turn_id is not None:
+                    await conn.execute("UPDATE chat_turns SET skill_run_id=?,action_status='submitted',revision=revision+1 WHERE turn_id=?", (str(run_id), str(chat_turn_id)))
+                    await conn.execute("UPDATE conversations SET revision=revision+1 WHERE conversation_id=(SELECT conversation_id FROM chat_turns WHERE turn_id=?)", (str(chat_turn_id),))
+                    await conn.execute("UPDATE model_calls SET skill_run_id=? WHERE chat_turn_id=?", (str(run_id), str(chat_turn_id)))
+                    await audit(conn, str(principal.identity_id), None, "chat.skill_confirmed", now)
                 await audit(conn, str(principal.identity_id), None, "extension.skill_started", now)
         self.wake.set()
         return await self.get(principal, run_id)
@@ -273,6 +293,10 @@ class SkillService:
             request = SystemInfoRequest(request_id=request_id, intent="get_system_info", arguments=SystemInfoArguments())
         else:
             request = ListDirectoryRequest(request_id=request_id, intent="list_directory", arguments=ListDirectoryArguments.model_validate(arguments))
+        async with self.database.transaction(write=False) as conn:
+            project = await one(conn, "SELECT c.project_id FROM chat_turns t JOIN conversations c USING(conversation_id) WHERE t.skill_run_id=? OR t.turn_id IN (SELECT turn_id FROM chat_work_steps WHERE skill_run_id=?)", (run["run_id"],run["run_id"]))
+        if project and project["project_id"]:
+            request = request.model_copy(update={"project_id": UUID(project["project_id"])})
         async with self.harness.operation:
             return await self.harness.submit(principal, UUID(run["node_id"]), request, rate_limit=False,
                                              skill_run_id=UUID(run["run_id"]), skill_step_index=step["step_index"])

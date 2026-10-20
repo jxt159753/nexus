@@ -1,0 +1,80 @@
+{
+  "recorded_date": "2026-10-20",
+  "milestone": "M6",
+  "tasks": [
+    "P29",
+    "P30",
+    "P31",
+    "P32",
+    "P41"
+  ],
+  "authorization": "M6 plus explicit workspace, write approval, fixed command templates",
+  "production_changed": false,
+  "real_model_calls": 0,
+  "git_committed_or_pushed": false,
+  "core_schema": 15,
+  "source_complete_run": {
+    "tests": 745,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 355.584
+  },
+  "source_complete_run_remaining_failure": "Browser test clicked history before async todo refresh; corrected wait and independently passed.",
+  "earlier_installed_targeted_run": {
+    "tests": 180,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 82.485
+  },
+  "browser_after_wait_fix": {
+    "source_passed": true,
+    "installed_passed": true,
+    "source_seconds": 12.33,
+    "installed_seconds": 11.9
+  },
+  "final_wheel_checks": {
+    "tests": 23,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 23.149
+  },
+  "wheel": {
+    "file": "var/m6-dist/nexus-0.1.0-py3-none-any.whl",
+    "bytes": 229401,
+    "sha256": "18be516066142a815ba6ddcdec12594db5fd3046917fdaa8e9b89e77bb5d8ef0",
+    "source_resources_matched": 118
+  },
+  "actual_layers": [
+    "Windows Python 3.13.9",
+    "independent Core and Windows Node",
+    "loopback HTTP and WebSocket",
+    "Windows Job descendant cancellation",
+    "Edge 1440x1000 and 390x844"
+  ],
+  "verified": [
+    "project isolation and restart",
+    "separate storage and outbound memory consent",
+    "expired/retracted memory blocks new calls",
+    "revision history and successful task evidence",
+    "populated v13 to v15 migration and backup",
+    "path traversal/ADS/device/junction/hardlink rejection",
+    "UTF-8 read and bounded search",
+    "write preview, approval, stale hash rejection and readback",
+    "pinned executable and argv, output cap, environment credential exclusion",
+    "actual process effects, cancellation and restart",
+    "browser memory expiry preserved and logout drafts cleared"
+  ],
+  "limitations": [
+    "not deployed to production",
+    "no real DeepSeek request",
+    "not Android hardware",
+    "no new Linux Core run",
+    "new tools explicitly selected on tasks page; chat/Skill automatic catalog unchanged",
+    "fixed cwd is not an OS sandbox",
+    "trusted local editor can race final file check/replacement",
+    "final user acceptance pending"
+  ]
+}

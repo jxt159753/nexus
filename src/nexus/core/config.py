@@ -6,14 +6,16 @@ from uuid import UUID
 from pydantic import Field, StrictBool, StrictInt, model_validator
 from nexus.contracts.base import MAX_MESSAGE_BYTES, MAX_RESULT_BYTES, StrictContract
 from nexus.core.models.config import ModelConfig
+from nexus.contracts.basic import ToolKey, CommandId
+from nexus.contracts.base import CommandDigest
 
-ToolKey = Literal["system.info@1", "filesystem.list@1"]
 
 
 class TrustedNode(StrictContract):
     tools: frozenset[ToolKey] = frozenset()
     roots: frozenset[Literal["workspace"]] = frozenset()
     resource_version: StrictInt = Field(default=1, ge=1)
+    command_digests: dict[CommandId, CommandDigest] = Field(default_factory=dict, max_length=16)
 
 
 class SandboxNodePolicy(StrictContract):

@@ -68,16 +68,16 @@ class Harness:
         if connection is not None:
             return connection.scope
         policy = self.link.config.nodes[node_id]
-        return NodeScope(node_id, policy.tools, policy.roots, policy.tools, policy.roots, policy.resource_version)
+        return NodeScope(node_id, policy.tools, policy.roots, policy.tools, policy.roots, policy.resource_version, policy.command_digests)
 
-    async def submit(self, principal: Principal, node_id: UUID, request: TaskRequest, *, language_id: UUID | None = None, chat_turn_id: UUID | None = None, rate_limit: bool = True, skill_run_id: UUID | None = None, skill_step_index: int | None = None):
+    async def submit(self, principal: Principal, node_id: UUID, request: TaskRequest, *, language_id: UUID | None = None, chat_turn_id: UUID | None = None, rate_limit: bool = True, skill_run_id: UUID | None = None, skill_step_index: int | None = None, work_step_id: UUID | None = None, work_role: str = "execute"):
         if self.failed:
             raise AccessDenied("BUSY")
         await self.security.validate_principal(principal)
         if principal.role != "owner" or principal.identity_id != self.link.config.owner_id:
             raise AccessDenied()
         scope = self.scope(node_id)
-        task = await self.tasks.create(principal.identity_id, request, node_id, rate_limit=rate_limit, language_id=language_id,chat_turn_id=chat_turn_id, skill_run_id=skill_run_id, skill_step_index=skill_step_index)
+        task = await self.tasks.create(principal.identity_id, request, node_id, rate_limit=rate_limit, language_id=language_id,chat_turn_id=chat_turn_id, skill_run_id=skill_run_id, skill_step_index=skill_step_index, work_step_id=work_step_id, work_role=work_role)
         if task.status in {"queued", "awaiting_approval", "ready"} and task.expires_at > utc_now():
             try:
                 await self.security.prepare(task.task_id, principal, scope)
