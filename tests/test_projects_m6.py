@@ -162,7 +162,7 @@ def test_v13_upgrade_preserves_projects_memories_grants_chat_and_tasks(world, tm
             names=','.join(f'"{name}"' for name in columns[table])
             assert target.execute(f'SELECT {names} FROM "{table}" ORDER BY rowid').fetchall()==before[table]
             assert backup.execute(f'SELECT {names} FROM "{table}" ORDER BY rowid').fetchall()==before[table]
-        assert target.execute("SELECT max(version) FROM schema_migrations").fetchone()[0]==16
+        assert target.execute("SELECT max(version) FROM schema_migrations").fetchone()[0]==17
         assert target.execute("SELECT project_id FROM conversations").fetchone()[0] is None
         assert target.execute("SELECT memory_refs_json FROM chat_turns").fetchone()[0]=="[]"
         assert target.execute("PRAGMA foreign_key_check").fetchall()==[]

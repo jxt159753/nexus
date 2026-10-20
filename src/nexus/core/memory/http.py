@@ -76,4 +76,5 @@ class RecordsHTTP:
         language = request.app.state.language
         value["enabled"] = language.config.enabled and not language.failed and not language.harness.failed
         value["chat_enabled"] = value["enabled"] and language.config.chat_enabled and not request.app.state.chat.failed
+        value["web_enabled"] = value["chat_enabled"] and language.config.web_enabled
         return value

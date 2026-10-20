@@ -10,6 +10,8 @@ origins = ['http://127.0.0.1:8000']
 # Optional M2. Keep disabled until DEEPSEEK_API_KEY is safely set on Core.
 [models]
 chat_enabled = false # M3: explicitly enable after configuring Core's existing DeepSeek key
+web_enabled = false # DeepSeek Search/Fetch; reuse Core key and the shared daily/request budget
+web_request_cost_microunits = 750 # USD 0.00075 per billable request; review with price_valid_until
 enabled = false
 daily_cost_microunits = 1000000 # USD 1/day, UTC; outstanding unknowns remain charged
 task_cost_microunits = 50000   # USD 0.05/request; reserved before sending

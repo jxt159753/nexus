@@ -21,6 +21,7 @@ from nexus.core.memory.http import RecordsHTTP
 from nexus.core.models.providers import DisabledDecisionModel, DisabledProvider
 from nexus.core.models.deepseek import DeepSeekProvider
 from nexus.core.models.chat import DeepSeekChatProvider
+from nexus.core.models.web import DeepSeekWebProvider
 from nexus.core.cognitive.language import LanguageService
 from nexus.core.cognitive.http import LanguageHTTP
 from nexus.core.cognitive.chat import ChatService
@@ -60,6 +61,8 @@ def create_app(config: CoreConfig) -> FastAPI:
         extension_provider = DeepSeekExtensionProvider(SecretStr(key), config.models.timeout_seconds)
     language = LanguageService(harness, provider)
     chat = ChatService(harness, chat_provider, language.owner)
+    if config.models.enabled and config.models.chat_enabled and config.models.web_enabled:
+        chat.work.web.provider = DeepSeekWebProvider(SecretStr(key))
     extensions = ExtensionService(harness, extension_provider)
     tools = ToolService(extensions, sandbox_link, config.extensions)
     extensions.sandbox = tools
@@ -95,6 +98,7 @@ def create_app(config: CoreConfig) -> FastAPI:
                     if task is not None:
                         task.cancel()
                 await asyncio.gather(*(task for task in (skill_runner, generator, chatter, interpreter, scheduler) if task is not None), return_exceptions=True)
+                await chat.work.web.close()
                 await link.close()
                 await sandbox_link.close()
                 await clients.close()

@@ -57,15 +57,17 @@
                   <button id="chat-memory-save" type="button">确认保存记忆</button>
                 </div>
               </details>
-              <label class="checkbox"><input id="chat-tools" type="checkbox" checked>允许建议系统信息与目录工具（执行前需确认）</label>
+              <label class="checkbox"><input id="chat-tools" type="checkbox" checked>本轮使用已配置的工具与工作区</label>
               <label for="chat-node">工具目标设备</label><select id="chat-node"><option value="">暂无配置节点；可继续普通聊天</option></select>
-              <details class="chat-catalog"><summary>会话工作权限</summary>
-                <p>授权仅对当前会话、所选设备的 workspace 生效，30 分钟、最多 20 次操作。状态/读取/查找和已批准启用的 Tool/Skill 可直接调用；文件写入先展示差异，再用聊天确认。</p>
+              <details class="chat-catalog"><summary>工作区工具范围</summary>
+                <p>已配置的 workspace 内文件读写和查找默认可用，无需额外授权；路径、文件变更检查及执行记录保留。命令仅限预先配置的固定模板，新能力版本仍须单独批准。</p>
+                <div id="chat-work-controls">
                 <label for="chat-work-profile">固定命令权限</label><select id="chat-work-profile"><option value="standard">允许自动执行已批准的固定命令</option><option value="read">固定命令也逐次用聊天确认</option></select>
                 <div class="button-row"><button id="chat-work-grant" type="button">按上述范围授权当前会话</button><button id="chat-work-revoke" type="button" class="danger">撤销会话授权并停止工作</button></div>
+                </div>
                 <p id="chat-work-status" class="hint"></p><pre id="chat-work-catalog"></pre>
               </details>
-              <label class="checkbox"><input id="chat-work-enabled" type="checkbox" disabled>本轮使用会话授权，并允许实际工具结果（含读取正文/固定命令输出）及可用能力目录发送给 DeepSeek</label>
+              <label class="checkbox"><input id="chat-work-enabled" type="checkbox" disabled>使用已配置的工作工具和网页搜索/抓取；相关结果及目录随本轮任务发送给 DeepSeek</label>
               <p class="hint">会话工作每轮最多 4 个动作、5 次模型交换，共用原每轮 $0.05 和每日 $1。超限、授权失效或结果未知会停止；新能力版本仍需单独批准启用。</p>
               <button id="chat-skill-load" type="button" class="quiet">查看此设备可用流程</button>
               <div id="chat-skills-catalog" class="chat-catalog"></div>
@@ -77,14 +79,14 @@
             </form>
           </section>
           <section id="tasks-view" hidden>
-            <section class="panel"><h2>工作区基础工具</h2><p class="hint">只操作设备显式配置的 workspace。每次操作需审批；写入前先运行预览，核对差异后再提交写入审批。命令只允许配置好的程序与固定参数。</p>
+            <section class="panel"><h2>工作区基础工具</h2><p class="hint">只操作设备显式配置的 workspace。文件读写和查找无需额外审批；写入前保留预览和变更检查。命令只允许配置好的程序与固定参数。</p>
               <form id="basic-tool-form"><label for="basic-tool">操作</label><select id="basic-tool"><option value="read_file">读文本文件</option><option value="find_files">查找文件名</option><option value="preview_file_write">预览并写入文件</option><option value="run_command">受控命令</option></select>
                 <div id="basic-path-fields"><label for="basic-path">工作区内相对路径（使用 /）</label><input id="basic-path" maxlength="240" placeholder="docs/notes.txt"></div>
                 <div id="basic-search-fields" hidden><label for="basic-pattern">文件名模式</label><input id="basic-pattern" maxlength="100" value="*.py"><p class="hint">最多查 2000 个条目、4 层，返回 50 个匹配；截断会明确标记。</p></div>
                 <div id="basic-write-fields" hidden><label for="basic-content">新的完整 UTF-8 内容（最多 12000 字节）</label><textarea id="basic-content" rows="6" maxlength="12000"></textarea></div>
                 <div id="basic-command-fields" hidden><label for="basic-command">已配置命令</label><select id="basic-command"><option value="">此设备暂无受控命令</option></select><p class="hint">固定工作目录、程序及参数，不接受 shell 文本；最多 8 秒，标准输出与错误各最多 8 KiB。命令的实际效果取决于管理员配置。</p></div>
-                <button type="submit" class="primary">提交本次操作审批</button>
-                <div id="basic-write-preview"></div><label class="checkbox"><input id="basic-write-reviewed" type="checkbox">我已核对上方已执行预览的差异与本次完整新内容</label><button id="basic-write-confirm" type="button" disabled>提交本次写入审批</button>
+                <button type="submit" class="primary">执行本次操作</button>
+                <div id="basic-write-preview"></div><label class="checkbox" hidden><input id="basic-write-reviewed" type="checkbox">核对写入差异</label><button id="basic-write-confirm" type="button" disabled>写入文件</button>
               </form>
             </section>
             <section class="panel"><div class="section-heading"><h2>新建只读任务</h2><span class="hint">单步 · 有界执行</span></div><label for="task-project">关联项目</label><select id="task-project"><option value="">不关联项目</option></select><div class="task-actions"><button id="system-info" class="action-card"><span class="action-icon" aria-hidden="true">◎</span><strong>读取系统信息</strong><span>操作系统、架构与 Python 版本</span></button><div class="action-card directory"><span class="action-icon" aria-hidden="true">▤</span><strong>列出 workspace 目录</strong><label for="limit">最多条目数</label><div class="button-row"><input id="limit" type="number" value="100" min="1" max="200" aria-label="目录最多条目数"><button id="list-directory">提交审批</button></div></div></div></section>

@@ -80,12 +80,14 @@ workspace={json.dumps(str(root))}
                 reply=client.post("/api/v1/tasks",json=request,headers=auth)
                 assert reply.status_code==200,reply.text
                 task=reply.json()["task"]
-                assert task["status"]=="awaiting_approval"
+                assert task["status"]=="awaiting_approval" if intent=="run_command" else task["status"] in {"ready","dispatching","running","verifying","succeeded"}
                 assert client.post("/api/v1/tasks",json=request,headers=auth).json()["task"]["task_id"]==task["task_id"]
                 detail=client.get(f"/api/v1/tasks/{task['task_id']}").json()
-                assert detail["attempts"]==[]
-                return task,detail["approvals"][0]["approval_id"]
+                if intent=="run_command":assert detail["attempts"]==[]
+                else:assert detail["approvals"][0]["decision"]=="approve"
+                return task,detail["approvals"][0]["approval_id"] if intent=="run_command" else None
             def approve(approval):
+                if approval is None:return
                 reply=client.post(f"/api/v1/approvals/{approval}",json={"decision":"approve"},headers=auth)
                 assert reply.status_code==200,reply.text
             def settled(task_id,status="succeeded"):
@@ -99,7 +101,6 @@ workspace={json.dumps(str(root))}
             approve(approval);data=wait_for(lambda:settled(preview["task_id"]))["task"]["result"]
             assert "-before" in data["diff"] and "+after" in data["diff"]
             write,approval=create("write_file",{**args,"expected_sha256":data["previous_sha256"],"preview_task_id":preview["task_id"],"preview_digest":data["preview_digest"]})
-            assert (root/"note.txt").read_text()=="before"
             approve(approval);written=wait_for(lambda:settled(write["task_id"]))
             assert (root/"note.txt").read_bytes()==b"after\n" and len(written["attempts"])==1
             search,approval=create("find_files",{"root_id":"workspace","pattern":"*.txt"})

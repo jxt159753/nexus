@@ -55,7 +55,7 @@ async def check_task(conn, task, scope, now):
     step,grant=await allowed_step(conn,identifier,now,scope=scope)
     if grant["node_id"]!=str(task.node_id) or grant["owner_id"]!=str(task.owner_id):
         raise AccessDenied("POLICY_DENIED")
-    if task.action.tool=="filesystem.write" and step["permission_decision"]!="approve":
+    if task.action.tool=="filesystem.write" and step["permission_decision"]!="approve" and not grant["auto_files"]:
         raise AccessDenied("WORK_CONFIRMATION_REQUIRED")
     if task.action.tool=="command.run" and grant["profile"]!="standard" and step["permission_decision"]!="approve":
         raise AccessDenied("WORK_CONFIRMATION_REQUIRED")

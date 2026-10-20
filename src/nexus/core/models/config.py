@@ -14,6 +14,8 @@ class ModelConfig(StrictContract):
     daily_calls: StrictInt = Field(default=100, ge=0, le=100)
     max_output_tokens: StrictInt = Field(default=512, ge=32, le=512)
     chat_enabled: StrictBool = False
+    web_enabled: StrictBool = False
+    web_request_cost_microunits: StrictInt = Field(default=750, ge=750, le=50_000)
     chat_max_output_tokens: StrictInt = Field(default=2048, ge=32, le=2048)
     timeout_seconds: StrictInt = Field(default=30, ge=1, le=30)
     # USD microunits per million tokens. Peak cache-miss rates are conservative.

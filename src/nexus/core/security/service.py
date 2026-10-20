@@ -260,6 +260,7 @@ class SecurityService:
     async def _prepare(self, conn: aiosqlite.Connection, task: TaskRecord, scope: NodeScope, version: int, now: datetime) -> Authorization:
         from nexus.core.security.work import check_task
         work_allowed = await check_task(conn, task, scope, now)
+        automatic_file = task.action.tool in {"filesystem.read","filesystem.search","filesystem.write_preview","filesystem.write"}
         if task.status == "recovering" and not task.cancel_requested:
             old = await one(conn, "SELECT execution_stopped,phase FROM task_attempts WHERE attempt_id=?", (str(task.current_attempt_id),))
             if old is not None and old["execution_stopped"] and old["phase"] == "completed":
@@ -284,11 +285,11 @@ class SecurityService:
             str(approval_id), str(task.task_id), str(task.owner_id), str(task.node_id), task.action.tool,
             task.action.tool_version, arguments_digest(task), version, scope_digest(scope), timestamp(expires),
         ))
-        if work_allowed:
+        if work_allowed or automatic_file:
             await conn.execute("UPDATE approvals SET decision='approve',decided_by=?,decided_at=? WHERE approval_id=?",(str(task.owner_id),timestamp(now),str(approval_id)))
             if task.status != "ready":
                 await transition(conn,task,"ready",task.owner_id,now)
-            await audit(conn,str(task.owner_id),str(task.task_id),"approval.work_grant",now)
+            await audit(conn,str(task.owner_id),str(task.task_id),"approval.workspace_policy" if automatic_file else "approval.work_grant",now)
             return Authorization("allow",version,approval_id,expires)
         if task.status != "awaiting_approval":
             await transition(conn, task, "awaiting_approval", task.owner_id, now)

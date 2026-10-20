@@ -9,6 +9,7 @@ from nexus.contracts.base import StrictContract
 from nexus.contracts.basic import FileReadArguments, FileSearchArguments, FilePreviewArguments, CommandId
 from nexus.contracts.chat import SkillArguments, SkillProposal
 from nexus.contracts.language import SystemProposal, DirectoryProposal
+from nexus.contracts.web import WebSearchArguments, WebFetchArguments
 
 
 class WorkGrantCreate(StrictContract):
@@ -68,4 +69,14 @@ class ToolProposal(StrictContract):
     arguments: SkillArguments
 
 
-WORK_PROPOSAL = TypeAdapter(Annotated[SystemProposal | DirectoryProposal | ReadProposal | SearchProposal | WriteProposal | CommandProposal | StatusProposal | SkillProposal | ToolProposal, Field(discriminator="intent")])
+class WebSearchProposal(StrictContract):
+    intent: Literal["web_search"]
+    arguments: WebSearchArguments
+
+
+class WebFetchProposal(StrictContract):
+    intent: Literal["web_fetch"]
+    arguments: WebFetchArguments
+
+
+WORK_PROPOSAL = TypeAdapter(Annotated[SystemProposal | DirectoryProposal | ReadProposal | SearchProposal | WriteProposal | CommandProposal | StatusProposal | SkillProposal | ToolProposal | WebSearchProposal | WebFetchProposal, Field(discriminator="intent")])

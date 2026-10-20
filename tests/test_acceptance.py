@@ -12,6 +12,7 @@ import socket
 import sqlite3
 import ssl
 import subprocess
+import time
 from contextlib import closing
 from pathlib import Path
 from uuid import uuid4
@@ -20,6 +21,8 @@ import httpx2
 import pytest
 from websockets.exceptions import InvalidStatus
 from websockets.sync.client import connect
+
+from nexus.contracts.protocol import parse_message
 
 from test_browser_processes import receive, send
 from test_link_processes import spawn, stop, wait_for
@@ -164,8 +167,21 @@ def test_https_wss_real_tools_and_certificate_rejection(world, tmp_path, tls_fil
                 assert conflict.status_code == 409
                 send(ws, "task.submit", {"request_id": str(uuid4()), "intent": "list_directory",
                                          "arguments": {"root_id": "workspace", "limit": 1}})
-                receive(ws, "task.accepted")
-                approval = receive(ws, "approval.required")
+                # The scheduler can publish approval.required before the submit
+                # acknowledgement. Do not discard it while waiting for accepted.
+                accepted = approval = None
+                deadline = time.monotonic()+5
+                for _ in range(100):
+                    message = parse_message(ws.recv(timeout=max(.01,deadline-time.monotonic())))
+                    assert message.type != "error", message
+                    if message.type == "task.accepted":
+                        accepted = message.payload
+                    elif message.type == "approval.required":
+                        approval = message.payload
+                    if accepted is not None and approval is not None:
+                        break
+                    assert time.monotonic()<deadline
+                assert accepted is not None and approval is not None and accepted.task_id==approval.task_id
                 pending = browser.get(f"/api/v1/tasks/{approval.task_id}").json()
                 assert pending["task"]["status"] == "awaiting_approval" and not pending["attempts"]
                 send(ws, "approval.decide", {"approval_id": str(approval.approval_id), "decision": "approve"})

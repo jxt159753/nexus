@@ -94,12 +94,15 @@ class ChatSubmission(StrictContract):
     work_grant_id: UUID | None = None
     work_digest: StrictStr | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     allow_work_results: StrictBool = False
+    workspace_work: StrictBool = False
 
     @model_validator(mode="after")
     def bounded(self):
-        if self.work_grant_id and (not self.allow_tools or not self.allow_work_results or not self.work_digest):
+        if self.work_grant_id and self.workspace_work:
+            raise ValueError("select one work scope")
+        if (self.work_grant_id or self.workspace_work) and (not self.allow_tools or not self.allow_work_results or not self.work_digest):
             raise ValueError("work requires a grant, catalog preview and outbound result consent")
-        if not self.work_grant_id and (self.work_digest or self.allow_work_results):
+        if not (self.work_grant_id or self.workspace_work) and (self.work_digest or self.allow_work_results):
             raise ValueError("work consent requires a grant")
         if len(set(self.memory_ids)) != len(self.memory_ids):
             raise ValueError("duplicate memory selection")
