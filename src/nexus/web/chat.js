@@ -1,11 +1,11 @@
 "use strict";
 const chatState = {conversation:null, conversations:new Map(), turns:new Map(), previews:new Map(), actionConsents:new Set(), confirming:null, active:null, retry:null, createRequest:null, before:null, listBefore:null, latest:true, loading:false, enabled:false, epoch:0};
-const chatLabels = {queued:"�ȴ��ظ�",generating:"���ڻظ�",completed:"�����",incomplete:"�ﵽ������ޣ��ظ�δ��������",stopping:"����ֹͣ",stopped:"��ֹͣ",interrupted:"�����жϣ�δ�Զ��ط�",failed:"�ظ�ʧ��",expired:"�����ѹ���"};
+const chatLabels = {queued:"等待回复",generating:"正在回复",completed:"已完成",incomplete:"达到输出上限，回复未完整结束",stopping:"正在停止",stopped:"已停止",interrupted:"服务中断，未自动重发",failed:"回复失败",expired:"请求已过期"};
 function chatNodes(nodes) {
   chatWorkState.nodes=new Map(nodes.map(node=>[node.node_id,node]));
   const selected=$("chat-node").value;
-  $("chat-node").replaceChildren(...nodes.map(n=>new Option(`${n.node_id} �� ${n.online ? "����" : "����"}`,n.node_id)));
-  if (!nodes.length) $("chat-node").add(new Option("�������ýڵ㣻�ɼ�����ͨ����",""));
+  $("chat-node").replaceChildren(...nodes.map(n=>new Option(`${n.node_id} · ${n.online ? "在线" : "离线"}`,n.node_id)));
+  if (!nodes.length) $("chat-node").add(new Option("暂无配置节点；可继续普通聊天",""));
   if (nodes.some(n=>n.node_id===selected)) $("chat-node").value=selected;
   if (chatSkillState.node && chatSkillState.node!==$("chat-node").value) chatSkillsInvalidate();
 }
@@ -13,13 +13,13 @@ function chatReset() {
   chatWorkReset();
   chatMemoryReset();
   chatState.epoch++; chatState.conversation=null; chatState.conversations.clear(); chatState.turns.clear(); chatState.previews.clear(); chatState.actionConsents.clear(); chatState.confirming=null; chatState.active=null; chatState.retry=null; chatState.createRequest=null; chatState.before=null; chatState.listBefore=null; chatState.latest=true;
-  $("chat-messages").replaceChildren(); $("chat-conversation").replaceChildren(new Option("�½�һ���Ự��ʼ", "")); $("chat-form").reset(); $("chat-title-form").reset(); $("chat-send").disabled=true; $("chat-stop").disabled=true;
+  $("chat-messages").replaceChildren(); $("chat-conversation").replaceChildren(new Option("新建一个会话开始", "")); $("chat-form").reset(); $("chat-title-form").reset(); $("chat-send").disabled=true; $("chat-stop").disabled=true;
   chatSkillsReset();
 }
 function chatAvailability(enabled,webEnabled=false) {
   chatState.enabled=enabled;
   chatWorkState.webEnabled=webEnabled;
-  $("chat-availability").textContent=enabled ? "DeepSeek �� ������׷�ʣ������¼������ Core" : "����ģ����δ���ã����лỰ�Կɲ鿴������ Core ��ʽ�����������á�";
+  $("chat-availability").textContent=enabled ? "DeepSeek · 可连续追问，聊天记录保存在 Core" : "聊天模型尚未启用；已有会话仍可查看。请在 Core 显式启用聊天配置。";
   $("chat-send").disabled=!enabled || !chatState.conversation || !!chatState.conversation.archived || !!chatState.active || !!chatState.confirming;
 }
 async function chatList(older=false) {
@@ -99,20 +99,20 @@ function chatContent(text) {
 }
 function chatResultPreview(turn, card, canContinue) {
   const value=chatState.previews.get(turn.turn_id), box=el("section",undefined,"chat-result-preview");
-  const load=el("button",value ? "������ѡ�ֶ�Ԥ��" : "Ԥ���ɷ��͵Ľ��","quiet");
+  const load=el("button",value ? "更新所选字段预览" : "预览可发送的结果","quiet");
   const choices=[];
-  const send=el("button","ͬ�ⷢ����Щ����� DeepSeek ���������ջش�","primary");
+  const send=el("button","同意发送这些结果给 DeepSeek 并生成最终回答","primary");
   send.disabled=!canContinue || !value || value.expected_revision!==chatState.conversation?.revision || new Date(value.expires_at)<=new Date();
   load.disabled=!canContinue;
-  if (!canContinue) box.append(el("p","���ν����δ���͸�ģ�͡����к�����Ϣ���ִΣ����ֲ�����׷�ӻش�","hint"));
+  if (!canContinue) box.append(el("p","本次结果尚未发送给模型。已有后续消息或活动轮次，本轮不能再追加回答。","hint"));
   if (value) {
-    const labels={os_name:"����ϵͳ",os_version:"ϵͳ�汾",architecture:"�������ܹ�",python_version:"Python �汾",root_id:"����������",entries:"Ŀ¼��Ŀ���ƺ�����",truncated:"�Ƿ�ض�"};
-    box.append(el("p","ѡ�񱾴��ⷢ�ֶΣ���ѡ�������Ԥ����ԭ���뼰��ʱ��ѡ������Ҳ���ٴη��͡�","hint"));
+    const labels={os_name:"操作系统",os_version:"系统版本",architecture:"处理器架构",python_version:"Python 版本",root_id:"工作区别名",entries:"目录条目名称和类型",truncated:"是否截断"};
+    box.append(el("p","选择本次外发字段；改选后请更新预览。原输入及当时所选上下文也将再次发送。","hint"));
     for (const field of value.available_fields) {
       const label=el("label",undefined,"checkbox"), input=document.createElement("input"); input.type="checkbox"; input.checked=value.fields.includes(field); input.value=field;
-      input.onchange=()=>{send.disabled=true;}; choices.push(input); label.append(input,document.createTextNode(labels[field] || `���� ${field} �İ��������`)); box.append(label);
+      input.onchange=()=>{send.disabled=true;}; choices.push(input); label.append(input,document.createTextNode(labels[field] || `步骤 ${field} 的白名单结果`)); box.append(label);
     }
-    box.append(el("pre",JSON.stringify(value.data,null,2)),el("p",`����Ϊʵ���ⷢ�������Ч�� ${new Date(value.expires_at).toLocaleTimeString()}������ٵ���һ�Σ��뱾�����÷��ù��� $0.05 ���ޡ�`,"hint"));
+    box.append(el("pre",JSON.stringify(value.data,null,2)),el("p",`以上为实际外发结果；有效至 ${new Date(value.expires_at).toLocaleTimeString()}。最多再调用一次，与本轮已用费用共用 $0.05 上限。`,"hint"));
   }
   load.onclick=action(async()=>{
     load.disabled=true;
@@ -145,80 +145,80 @@ function chatRender() {
     if (article.dataset.revision!==revision) {
       article.dataset.revision=revision;
       const question=el("div",undefined,"chat-user"), answer=el("div",undefined,"chat-assistant");
-      question.append(el("strong","��"),el("div",turn.text,"chat-prose"));
-      answer.append(el("strong","NEXUS"),chatContent(turn.phase==="summary" ? (turn.initial_response_text || "��ȷ��ֻ��������") : turn.response_text || (turn.work_status==="waiting" ? "����ִ�б��ֹ�������鿴�·�ʵ�ʽ��ȡ�" : turn.work_status==="permission" ? "��Ҫ��Ĵ𸴣���鿴�·���������" : turn.proposal ? "�����ֻ���������ȴ���ľ�����" : turn.status==="queued" ? "�ȴ�ģ�͡�" : turn.status==="generating" ? "�������ɡ�" : "���޻ظ�����")));
-      const cost=turn.cost_status==="unknown" ? " �� ����δ֪������Ԥ��" : turn.cost_microunits!=null ? ` �� �����Ͻ� $${turn.cost_microunits/1000000}` : "";
-      const replyStatus=turn.work_status==="waiting" ? "����������" : turn.work_status==="permission" ? "�ȴ���Ĵ�" : turn.skill_plan && turn.phase==="reply" ? "���̽���������" : chatLabels[turn.status];
-      answer.append(el("p",`${replyStatus}${turn.error_code ? " �� "+turn.error_code : ""}${cost}${turn.web_call_count ? ` �� ��ҳ���� ${turn.web_call_count} �Σ�������ã�` : ""}${turn.context_truncated ? " �� ���ֽ����������Ѳü�" : ""}`,"hint"));
-      const inspect=el("button","�鿴���ַ�������","quiet");
+      question.append(el("strong","你"),el("div",turn.text,"chat-prose"));
+      answer.append(el("strong","NEXUS"),chatContent(turn.phase==="summary" ? (turn.initial_response_text || "已确认只读动作。") : turn.response_text || (turn.work_status==="waiting" ? "正在执行本轮工作，请查看下方实际进度。" : turn.work_status==="permission" ? "需要你的答复，请查看下方具体请求。" : turn.proposal ? "已提出只读动作，等待你的决定。" : turn.status==="queued" ? "等待模型…" : turn.status==="generating" ? "正在生成…" : "尚无回复内容")));
+      const cost=turn.cost_status==="unknown" ? " · 费用未知，保留预留" : turn.cost_microunits!=null ? ` · 费用上界 $${turn.cost_microunits/1000000}` : "";
+      const replyStatus=turn.work_status==="waiting" ? "工作进行中" : turn.work_status==="permission" ? "等待你的答复" : turn.skill_plan && turn.phase==="reply" ? "流程建议已生成" : chatLabels[turn.status];
+      answer.append(el("p",`${replyStatus}${turn.error_code ? " · "+turn.error_code : ""}${cost}${turn.web_call_count ? ` · 网页请求 ${turn.web_call_count} 次（计入费用）` : ""}${turn.context_truncated ? " · 本轮较早上下文已裁剪" : ""}`,"hint"));
+      const inspect=el("button","查看本轮发送内容","quiet");
       inspect.onclick=action(async()=>{const value=await api(`/api/v1/chat/turns/${turn.turn_id}`); const details=el("pre",JSON.stringify({messages:value.turn.context_messages,skill_catalog:value.turn.skill_catalog,work_catalog:value.turn.work_catalog,work_messages:value.turn.work_messages,result_messages:value.turn.result_context_messages},null,2)); inspect.replaceWith(details);});
       answer.append(inspect);
-      const failureHints={MODEL_RESPONSE_INVALID:"ģ�ͷ��صĸ�ʽ�޷�У�飬������ֹͣ��",MODEL_TOOL_CALL_LIMIT:"ģ������Ķ�����������ʣ���ȣ�δִ������������",MODEL_REQUEST_FAILED:"ģ�����ӻ���Ӧ����ʧ�ܣ�������ֹͣ��",MODEL_TIMEOUT:"�ȴ�ģ����Ӧ��ʱ��������ֹͣ��",MODEL_OUTCOME_UNKNOWN:"δ�յ�����ģ����Ӧ��������ʵ�ʷ����޷�ȷ�ϣ��ⲻ��ʾ�豸�Ѿ�ִ�С�"};
+      const failureHints={MODEL_RESPONSE_INVALID:"模型返回的格式无法校验，本轮已停止。",MODEL_TOOL_CALL_LIMIT:"模型提出的动作超过本轮剩余额度，未执行这批动作。",MODEL_REQUEST_FAILED:"模型连接或响应解析失败，本轮已停止。",MODEL_TIMEOUT:"等待模型响应超时，本轮已停止。",MODEL_OUTCOME_UNKNOWN:"未收到完整模型响应或用量，实际费用无法确认；这不表示设备已经执行。"};
       if (failureHints[turn.error_code]) answer.append(el("p",failureHints[turn.error_code],"hint"));
-      if (turn.error_code?.startsWith("WEB_")) answer.append(el("p","��ҳ����δ��ɣ�δ�Զ����ԣ�����ȷ���Ʒ�ʱ�����ô�Ԥ����","hint"));
+      if (turn.error_code?.startsWith("WEB_")) answer.append(el("p","网页请求未完成，未自动重试；不能确定计费时保留该次预留。","hint"));
       if (turn.work_grant_id) answer.append(chatWorkCards(turn));
-      if (turn.allow_skills && turn.status==="completed" && !turn.proposal) answer.append(el("p","����û��ѡ����ִ�����̣�δ�����豸ִ�С��ɺ˶Կ��������򲹳�Ŀ�ꡣ","hint"));
+      if (turn.allow_skills && turn.status==="completed" && !turn.proposal) answer.append(el("p","本轮没有选出可执行流程，未创建设备执行。可核对可用能力或补充目标。","hint"));
       if (turn.skill_plan) answer.append(chatSkillCard(turn,!chatState.active && turn===turns.at(-1)));
       else if (turn.proposal) {
         const card=el("section",undefined,"chat-action");
-        card.append(el("h3",turn.proposal.intent==="get_system_info" ? "��ȡϵͳ��Ϣ" : "�г� workspace Ŀ¼"),el("pre",JSON.stringify({node_id:turn.node_id,action:turn.proposal,tool_version:1,expires_at:turn.expires_at},null,2)));
+        card.append(el("h3",turn.proposal.intent==="get_system_info" ? "读取系统信息" : "列出 workspace 目录"),el("pre",JSON.stringify({node_id:turn.node_id,action:turn.proposal,tool_version:1,expires_at:turn.expires_at},null,2)));
         if (task) {
           card.append(taskCard(task));
-          if (turn.auto_result_status==="waiting") card.append(el("p","���������ΰ���������ش������ڵȴ�������ɣ��ɹ�����Զ��������ջش�","hint"));
-          else if (turn.phase==="reply" && task.task.status==="succeeded") card.append(el("p",turn.auto_result_status==="stopped" ? "��ֹͣ�Զ��ش�����������ɣ������δ���͸�ģ�͡�" : "��������ɣ������δ���͸�ģ�͡���Ԥ����ͬ��ش���ģ�Ͳ��ܾݴ˻ش�","hint"));
-          if (turn.auto_result_status==="unavailable") card.append(el("p","�Զ��ش�δ��ɣ�δ����ģ�͵��á���鿴����״̬�͹��߽����","hint"));
+          if (turn.auto_result_status==="waiting") card.append(el("p","已允许本次白名单结果回传，正在等待工具完成；成功后会自动生成最终回答。","hint"));
+          else if (turn.phase==="reply" && task.task.status==="succeeded") card.append(el("p",turn.auto_result_status==="stopped" ? "已停止自动回传。工具已完成，结果尚未发送给模型。" : "工具已完成，结果尚未发送给模型。请预览并同意回传，模型才能据此回答。","hint"));
+          if (turn.auto_result_status==="unavailable") card.append(el("p","自动回传未完成，未增加模型调用。请查看本轮状态和工具结果。","hint"));
         }
         else if (turn.action_status==="proposed" && new Date(turn.expires_at)>new Date() && !chatState.conversation?.archived) {
           const buttons=el("div",undefined,"button-row");
           const label=el("label",undefined,"checkbox"), consent=document.createElement("input");
           consent.type="checkbox"; consent.checked=chatState.actionConsents.has(turn.turn_id); consent.disabled=!turn.result_supported;
-          label.append(consent,document.createTextNode("�������ΰ���������ش� DeepSeek���ɹ����Զ��ش�"));
-          card.append(label,el("p",turn.proposal.intent==="get_system_info" ? "���ش�����ϵͳ��ϵͳ�汾���������ܹ��� Python �汾��������·�����ļ����ݻ�ƾ֤��" : "���ش� workspace ������ֱ����Ŀ���������ͼ��ض�״̬���������ļ����ݡ�����·����ƾ֤��","hint"));
-          const confirm=el("button","ȷ��ִ��","primary");
-          const setConsent=()=>{if (consent.checked) chatState.actionConsents.add(turn.turn_id); else chatState.actionConsents.delete(turn.turn_id); confirm.textContent=consent.checked ? "ȷ��ִ�в��ش����" : "ȷ��ִ��";};
+          label.append(consent,document.createTextNode("允许本次白名单结果回传 DeepSeek，成功后自动回答"));
+          card.append(label,el("p",turn.proposal.intent==="get_system_info" ? "仅回传操作系统、系统版本、处理器架构和 Python 版本；不发送路径、文件内容或凭证。" : "仅回传 workspace 别名、直接条目名称与类型及截断状态；不发送文件内容、绝对路径或凭证。","hint"));
+          const confirm=el("button","确认执行","primary");
+          const setConsent=()=>{if (consent.checked) chatState.actionConsents.add(turn.turn_id); else chatState.actionConsents.delete(turn.turn_id); confirm.textContent=consent.checked ? "确认执行并回传结果" : "确认执行";};
           consent.onchange=setConsent; setConsent();
-          for (const [decision,label] of [["confirm","ȷ��ִ��"],["reject","��ִ��"]]) {
+          for (const [decision,label] of [["confirm","确认执行"],["reject","不执行"]]) {
             const button=decision==="confirm" ? confirm : el("button",label,"quiet");
             button.onclick=action(async()=>{button.disabled=true; if (decision==="confirm" && consent.checked) {chatState.confirming=turn.turn_id; chatRender();} try {const value=await api(`/api/v1/chat/turns/${turn.turn_id}/action`,{method:"POST",body:JSON.stringify({proposal_digest:turn.proposal_digest,decision,allow_result_model:decision==="confirm" && consent.checked})}); chatState.actionConsents.delete(turn.turn_id); if (value.task) await updateTask(value.task.task_id); await chatHistory();} finally {if (chatState.confirming===turn.turn_id) chatState.confirming=null; button.disabled=false; chatRender();}});
             buttons.append(button);
           }
-          card.append(el("p","ȷ�Ϻ��Լ��Ȩ�ޣ�Ŀ¼������������ѡ��ͬ�ⷢ�ͱ��ΰ����������ԭ�����ģ�����ٵ���һ�Σ����ñ��� $0.05��δ��ѡ��ִ�к�Ԥ��ȷ�ϡ�","hint"),buttons);
-        } else if (!turn.task_id) card.append(el("p",turn.action_status==="rejected" ? "���Ѿܾ����������" : "�����ѹ��ڻ�Ự�ѹ鵵���������������","hint"));
+          card.append(el("p","确认后仍检查权限；目录另需审批。勾选即同意发送本次白名单结果及原上下文，最多再调用一次，共用本轮 $0.05；未勾选可执行后预览确认。","hint"),buttons);
+        } else if (!turn.task_id) card.append(el("p",turn.action_status==="rejected" ? "你已拒绝这个动作。" : "动作已过期或会话已归档，请重新提出请求。","hint"));
         if (turn.result_supported && turn.phase==="reply" && turn.status==="completed" && task?.task.status==="succeeded" && turn.auto_result_status!=="waiting" && !chatState.conversation?.archived) chatResultPreview(turn,card,!chatState.active && turn===turns.at(-1));
         answer.append(card);
       }
-      if (turn.phase==="summary") answer.append(el("strong","���ջش�"),chatContent(turn.response_text || (turn.status==="queued" ? "�ȴ�ģ�ͽ�������" : turn.status==="generating" ? "���ڸ��ݽ�����ɻش�" : "���ν��δ��ɣ�����ִ�н���ѱ�����")));
+      if (turn.phase==="summary") answer.append(el("strong","最终回答"),chatContent(turn.response_text || (turn.status==="queued" ? "等待模型解读结果…" : turn.status==="generating" ? "正在根据结果生成回答…" : "本次解读未完成；工具执行结果已保留。")));
       if (turn.memory_references?.length) {
-        const refs=el("details"); refs.append(el("summary","�������õļ�������Դ"),el("pre",JSON.stringify(turn.memory_references,null,2))); answer.append(refs);
+        const refs=el("details"); refs.append(el("summary","本轮引用的记忆与来源"),el("pre",JSON.stringify(turn.memory_references,null,2))); answer.append(refs);
       }
-      const saveMemory=el("button","�ӱ���������ȷ�������","quiet"); saveMemory.onclick=()=>chatMemoryEditor(turn); answer.append(saveMemory);
+      const saveMemory=el("button","从本条输入明确保存记忆","quiet"); saveMemory.onclick=()=>chatMemoryEditor(turn); answer.append(saveMemory);
       article.replaceChildren(question,answer);
     }
     log.append(article);
   }
   for (const [id,node] of existing) if (!keep.has(id)) node.remove();
-  if (!turns.length && !log.querySelector(".chat-empty")) log.append(el("p","�½��Ự���� NEXUS ����һ���뷨��","empty chat-empty"));
+  if (!turns.length && !log.querySelector(".chat-empty")) log.append(el("p","新建会话，和 NEXUS 讨论一个想法。","empty chat-empty"));
   if (nearBottom && chatState.latest) log.scrollTop=log.scrollHeight;
   const conversation=chatState.conversation;
   if (document.activeElement!==$("chat-title")) $("chat-title").value=conversation?.title || "";
-  $("chat-archive").disabled=!conversation; $("chat-archive").textContent=conversation?.archived ? "ȡ���鵵" : "�鵵";
+  $("chat-archive").disabled=!conversation; $("chat-archive").textContent=conversation?.archived ? "取消归档" : "归档";
   const flowRunning=!!chatState.turns.get(chatState.active)?.skill_run && chatState.turns.get(chatState.active)?.phase!=="summary";
   $("chat-stop").disabled=!chatState.active || flowRunning;
   const waiting=chatState.turns.get(chatState.active)?.auto_result_status==="waiting";
-  $("chat-stop").textContent=waiting ? "ֹͣ�Զ��ش�" : "ֹͣ�ظ�";
+  $("chat-stop").textContent=waiting ? "停止自动回传" : "停止回复";
   $("chat-send").disabled=!chatState.enabled || !conversation || !!conversation.archived || !!chatState.active || !!chatState.confirming;
   chatWorkRender();
   const permission=chatState.turns.get(chatState.active)?.work_status==="permission";
   if (permission && !conversation?.archived) $("chat-send").disabled=false;
-  $("chat-send").textContent=permission ? "���ͱ���Ȩ�޴�" : chatWorkActive() ? "���Ͳ��������ֹ��߽���ش� DeepSeek" : "���͸� DeepSeek";
-  $("chat-stop").textContent=chatState.turns.get(chatState.active)?.work_grant_id ? "ֹͣ���ֹ���" : $("chat-stop").textContent;
-  $("chat-text").placeholder=permission ? "�ظ���ͬ�� / ��ͬ�⣨������ģ�ͣ�" : "˵������������Ŀ��";
+  $("chat-send").textContent=permission ? "发送本次权限答复" : chatWorkActive() ? "发送并允许本轮工具结果回传 DeepSeek" : "发送给 DeepSeek";
+  $("chat-stop").textContent=chatState.turns.get(chatState.active)?.work_grant_id ? "停止本轮工作" : $("chat-stop").textContent;
+  $("chat-text").placeholder=permission ? "回复：同意 / 不同意（不调用模型）" : "说出你的问题或工作目标";
   const working=chatWorkActive();
-  $("chat-tools").parentElement.lastChild.textContent=working ? "����ʹ�������õĹ����빤����" : "��������ϵͳ��Ϣ��Ŀ¼���ߣ�ִ��ǰ��ȷ�ϣ�";
+  $("chat-tools").parentElement.lastChild.textContent=working ? "本轮使用已配置的工具与工作区" : "允许建议系统信息与目录工具（执行前需确认）";
   for (const id of ["chat-skill-load","chat-skills-catalog"]) $(id).hidden=working;
   $("chat-skills").parentElement.hidden=working;
-  $("chat-outbound-notice").textContent=working ? "���ͼ�ͬ���ⷢ�������롢��ѡ�����ġ���������Ŀ¼��ʵ�ʹ��߽������ҳ�����ʺ͹���ҳ����ַ�ᷢ�͸� DeepSeek��ÿ����� 4 ��������5 ��ģ�ͽ�������ҳÿ���н���շ� $0.00075���ϼƹ��� $0.05 ��ÿ�� $1��" : "��������͸� DeepSeek����ͬ���ⷢ�������뼰��ѡ�����ĺ�����Ŀ¼���������߿���ȷ�Ͽ������Զ��ش����ಽ���̳ɹ�����Ԥ���������ͬ������ÿ�� $1��ÿ�ֹ��� $0.05����ͨ���� 1 �Ρ������������ 2 �ε��á�";
-  $("chat-context-info").textContent=flowRunning ? "��������ִ�У������Ϸ��鿴���衢������ȡ���������̡���ɺ��Ԥ�������׷�ʡ�" : waiting ? "�ȴ����߽�����Զ��ش���ɺ󼴿�׷�ʡ�ֹͣ�Զ��ش�����ȡ�����ߣ�ȡ��ִ����ʹ�����񿨡�" : chatState.active ? "�����������ѹ̶���ֹͣ����ɺ�ɷ�����һ����" : "ÿ�η�����฽�����Ự��� 10 �������Ի������ް����ֲü���";
+  $("chat-outbound-notice").textContent=working ? "发送即同意外发本轮输入、所选上下文、可用能力目录及实际工具结果；网页搜索词和公开页面网址会发送给 DeepSeek。每轮最多 4 个动作、5 次模型交换；网页每次有结果收费 $0.00075，合计共用 $0.05 和每日 $1。" : "点击“发送给 DeepSeek”即同意外发本次输入及所选上下文和流程目录。单步工具可在确认卡允许自动回传；多步流程成功后先预览结果，再同意解读。每天 $1、每轮共用 $0.05，普通聊天 1 次、含结果解读最多 2 次调用。";
+  $("chat-context-info").textContent=flowRunning ? "流程正在执行，请在上方查看步骤、审批或取消整个流程。完成后可预览结果并追问。" : waiting ? "等待工具结果并自动回答，完成后即可追问。停止自动回传不会取消工具；取消执行请使用任务卡。" : chatState.active ? "本轮上下文已固定；停止或完成后可发送下一条。" : "每次发送最多附带本会话最近 10 轮完整对话，超限按整轮裁剪。";
 }
 function initChat() {
   initChatWork();
@@ -246,10 +246,10 @@ function initChat() {
     try {
     const conversation=chatState.conversation;
     if (chatState.turns.get(chatState.active)?.work_status==="permission") {await chatWorkAnswer(chatState.turns.get(chatState.active));return;}
-    if (!conversation || chatState.active) throw new Error("�����½��Ự��ȴ���ǰ�ظ�����");
+    if (!conversation || chatState.active) throw new Error("请先新建会话或等待当前回复结束");
     const allowTools=$("chat-tools").checked && !!$("chat-node").value, nodeId=allowTools ? $("chat-node").value : null;
     const allowSkills=!chatWorkActive() && $("chat-skills").checked;
-    if (allowSkills && (!allowTools || !chatSkillState.catalog || chatSkillState.node!==nodeId)) throw new Error("�����²鿴����Ŀ¼������������");
+    if (allowSkills && (!allowTools || !chatSkillState.catalog || chatSkillState.node!==nodeId)) throw new Error("请重新查看流程目录后再允许发送");
     const skillsDigest=allowSkills ? chatSkillState.catalog.skills_digest : null;
     const memories=memorySubmission();
     const work=await chatWorkSubmission();
@@ -259,7 +259,7 @@ function initChat() {
     chatState.latest=true; await chatHistory();
     $("chat-skills").checked=false;
     } catch(error) {
-      if (error.message==="IDEMPOTENCY_CONFLICT") {chatState.retry=null; await chatHistory(); notify("�Ự�ѱ仯����˶������ĺ����·���",true);}
+      if (error.message==="IDEMPOTENCY_CONFLICT") {chatState.retry=null; await chatHistory(); notify("会话已变化，请核对上下文后重新发送",true);}
       else notify(error.message,true);
     } finally {chatRender();}
   };

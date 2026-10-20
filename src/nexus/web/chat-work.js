@@ -17,7 +17,7 @@ function chatWorkRender() {
   if (automatic && chatWorkState.defaultNode!==$("chat-node").value) {$("chat-work-enabled").checked=true;chatWorkState.defaultNode=$("chat-node").value;}
   if (!usable && !automatic) $("chat-work-enabled").checked=false;
   $("chat-work-controls").hidden=automatic;
-  $("chat-work-status").textContent=automatic ? "�����õ� workspace �ڶ�д������Ĭ�Ͽ��ã�����Ự��Ȩ��д��ȷ�ϡ�·����顢�ļ������顢ִ�м�¼��Ԥ������Ч��" : usable ? `���Ự��Ȩ��Ч�� ${new Date(grant.expires_at).toLocaleTimeString()}������ ${grant.used_operations}/${grant.max_operations} �β�����` : "��ǰ�豸δ�����������������ߣ����ѵǼǵ��������á�";
+  $("chat-work-status").textContent=automatic ? "已配置的 workspace 内读写、查找默认可用，无需会话授权或写入确认。路径检查、文件变更检查、执行记录和预算仍生效。" : usable ? `本会话授权有效至 ${new Date(grant.expires_at).toLocaleTimeString()}，已用 ${grant.used_operations}/${grant.max_operations} 次操作。` : "当前设备未配置完整工作区工具；仅已登记的能力可用。";
   $("chat-work-grant").disabled=!chatState.conversation || !!chatState.active || !!chatState.conversation?.archived || !$("chat-node").value;
   $("chat-work-revoke").disabled=!grant || !!grant.revoked_at;
 }
@@ -32,20 +32,20 @@ async function chatWorkSubmission() {
 }
 function chatWorkCards(turn) {
   const box=el("section",undefined,"chat-action");
-  box.append(el("h3","���ֹ�����¼"));
-  const labels={get_node_status:"��ѯ�ڵ�״̬",get_system_info:"��ȡϵͳ��Ϣ",list_directory:"�г�������",read_file:"��ȡ�ļ�",find_files:"�����ļ�",write_file:"д���ļ�",run_command:"ִ�й̶�����",run_skill:"���� Skill",run_tool:"���� Tool",web_search:"������ҳ",web_fetch:"ץȡ��ҳ"};
-  const statuses={pending:"׼��ִ��",waiting:"�ȴ�ִ�н��",permission:"��Ҫ���ȷ��",succeeded:"�����",failed:"δ���",stopped:"������ֹͣ��ʵ��ִ��״̬�������¼"};
+  box.append(el("h3","本轮工作记录"));
+  const labels={get_node_status:"查询节点状态",get_system_info:"读取系统信息",list_directory:"列出工作区",read_file:"读取文件",find_files:"查找文件",write_file:"写入文件",run_command:"执行固定命令",run_skill:"运行 Skill",run_tool:"运行 Tool",web_search:"搜索网页",web_fetch:"抓取网页"};
+  const statuses={pending:"准备执行",waiting:"等待执行结果",permission:"需要你的确认",succeeded:"已完成",failed:"未完成",stopped:"工作已停止，实际执行状态见任务记录"};
   for (const step of turn.work_steps || []) {
     const card=el("section",undefined,"chat-result-preview");
-    card.append(el("strong",`${step.step_index}. ${labels[step.proposal.intent] || step.proposal.intent} �� ${statuses[step.status]}`));
+    card.append(el("strong",`${step.step_index}. ${labels[step.proposal.intent] || step.proposal.intent} · ${statuses[step.status]}`));
     const args=step.proposal.arguments,data=step.result?.data,preview=step.result?.preview;
     if (args.path) card.append(el("p",`workspace/${args.path}`));
-    if (args.pattern) card.append(el("p",`�ļ�����${args.pattern}`));
-    if (args.command_id) card.append(el("p",`�̶����${args.command_id}`));
-    if (args.query) card.append(el("p",`������${args.query}`));
+    if (args.pattern) card.append(el("p",`文件名：${args.pattern}`));
+    if (args.command_id) card.append(el("p",`固定命令：${args.command_id}`));
+    if (args.query) card.append(el("p",`搜索：${args.query}`));
     if (preview) {
-      card.append(el("pre",preview.diff || "�ļ�����û�б仯��"));
-      if (preview.truncated) card.append(el("p","�����ѽضϣ�ȷ��ǰ����ִ������˶����������ݡ�","hint"));
+      card.append(el("pre",preview.diff || "文件内容没有变化。"));
+      if (preview.truncated) card.append(el("p","差异已截断；确认前请在执行详情核对完整新内容。","hint"));
     }
     if (data && ["web_search","web_fetch"].includes(step.proposal.intent)) {
       for (const source of data.sources || [data]) {
@@ -53,20 +53,20 @@ function chatWorkCards(turn) {
         if (source.snippet) card.append(el("p",source.snippet));
       }
       if (data.content) card.append(el("pre",data.content));
-      if (data.truncated) card.append(el("p","��ҳ�����ѽضϡ�","hint"));
+      if (data.truncated) card.append(el("p","网页内容已截断。","hint"));
     }
-    else if (data && step.proposal.intent==="get_node_status") card.append(el("p",`${data.online ? "����" : "����"} �� ${data.busy==null ? "æ��δ֪" : data.busy ? "æµ" : "����"}${data.heartbeat_age_seconds==null ? "" : ` �� ${data.heartbeat_age_seconds} ��ǰ�յ�����`} �� �۲��� ${new Date(data.observed_at).toLocaleTimeString()}`));
-    else if (data && "text" in data) card.append(el("pre",data.text),el("p",data.truncated ? "��ȡ����ѽضϡ�" : "�Ѷ�ȡ�ļ���","hint"));
-    else if (data && "stdout" in data) card.append(el("pre",data.stdout || data.stderr || "����û���ı������"),el("p",`�˳��룺${data.exit_code}`,"hint"));
+    else if (data && step.proposal.intent==="get_node_status") card.append(el("p",`${data.online ? "在线" : "离线"} · ${data.busy==null ? "忙闲未知" : data.busy ? "忙碌" : "空闲"}${data.heartbeat_age_seconds==null ? "" : ` · ${data.heartbeat_age_seconds} 秒前收到心跳`} · 观测于 ${new Date(data.observed_at).toLocaleTimeString()}`));
+    else if (data && "text" in data) card.append(el("pre",data.text),el("p",data.truncated ? "读取结果已截断。" : "已读取文件。","hint"));
+    else if (data && "stdout" in data) card.append(el("pre",data.stdout || data.stderr || "命令没有文本输出。"),el("p",`退出码：${data.exit_code}`,"hint"));
     else if (data && step.proposal.intent!=="write_file") card.append(el("pre",JSON.stringify(data,null,2)));
     if (step.request_text) card.append(el("p",step.request_text,"chat-prose"));
-    if (step.result?.error_code) card.append(el("p",`���ι���δ��ɣ�${step.result.error_code}`,"hint"));
-    if (step.permission_text) card.append(el("p",`��Ĵ𸴣�${step.permission_text}`));
-    const details=el("details");details.append(el("summary","�鿴ִ������"),el("pre",JSON.stringify({action:step.proposal,result:step.result},null,2)));
+    if (step.result?.error_code) card.append(el("p",`本次工具未完成：${step.result.error_code}`,"hint"));
+    if (step.permission_text) card.append(el("p",`你的答复：${step.permission_text}`));
+    const details=el("details");details.append(el("summary","查看执行详情"),el("pre",JSON.stringify({action:step.proposal,result:step.result},null,2)));
     for (const id of [step.preview_task_id,step.task_id]) if (id && state.tasks.has(id)) details.append(taskCard(state.tasks.get(id)));
     card.append(details);
     if (step.skill_run_id) {
-      const button=el("button","�鿴����ʵ�ʽ���","quiet");
+      const button=el("button","查看流程实际进度","quiet");
       button.onclick=action(async()=>{const value=await api(`/api/v1/extensions/runs/${step.skill_run_id}`);button.replaceWith(el("pre",JSON.stringify(value,null,2)));});
       card.append(button);
     }
@@ -76,7 +76,7 @@ function chatWorkCards(turn) {
 }
 async function chatWorkAnswer(turn) {
   const step=turn.work_steps.find(s=>s.status==="permission");
-  if (!step) throw new Error("��ȷ�϶����ѱ仯����ˢ�º�����");
+  if (!step) throw new Error("待确认动作已变化，请刷新后重试");
   const signature=JSON.stringify([turn.turn_id,step.step_id,turn.revision,$("chat-text").value]);
   if (chatWorkState.retry?.signature!==signature) chatWorkState.retry={signature,payload:{request_id:crypto.randomUUID(),step_id:step.step_id,expected_revision:turn.revision,text:$("chat-text").value}};
   await api(`/api/v1/chat/turns/${turn.turn_id}/permission`,{method:"POST",body:JSON.stringify(chatWorkState.retry.payload)});

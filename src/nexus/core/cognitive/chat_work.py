@@ -200,11 +200,11 @@ class WorkService:
             step,grant=await permissions.allowed_step(conn,value.step_id,utc_now(),scope=self.chat.harness.scope(UUID(json.loads(turn["request_json"])["node_id"])))
             if not turn or step["turn_id"] != str(turn_id) or turn["revision"] != value.expected_revision or step["status"] != "permission":
                 raise Conflict("IDEMPOTENCY_CONFLICT")
-            text=value.text.strip().rstrip("��.!��")
-            positive={"ͬ��","����","����","ȷ��","ȷ��ִ��","ͬ��д��","ִ�а�","�õ�","��","����","��׼","yes","ok","approve"}
-            negative={"�ܾ�","��ͬ��","������","��ִ��","ȡ��","ֹͣ","��Ҫ","no","reject"}
+            text=value.text.strip().rstrip("。.!！")
+            positive={"同意","允许","可以","确认","确认执行","同意写入","执行吧","好的","好","继续","批准","yes","ok","approve"}
+            negative={"拒绝","不同意","不允许","不执行","取消","停止","不要","no","reject"}
             if text.lower() not in positive | negative:
-                raise ValueError("����ȷ�ظ���ͬ�⡱�򡰲�ͬ�⡱���޸���������ֹͣ���֣������������")
+                raise ValueError("请明确回复“同意”或“不同意”；修改内容请先停止本轮，再提出新请求。")
             decision="approve" if text.lower() in positive else "reject"
             await conn.execute("INSERT INTO chat_work_answers VALUES(?,?,?)",(str(value.request_id),str(value.step_id),encoded))
             await conn.execute("UPDATE chat_work_steps SET permission_decision=?,permission_text=?,status='pending' WHERE step_id=?",(decision,value.text,str(value.step_id)))
@@ -223,7 +223,7 @@ class WorkService:
         await permissions.allowed_step(conn,step["step_id"],now)
         data_json=canonical(data)
         if len(data_json.encode()) > 16384:
-            data_json=canonical({"status":"unavailable","error_code":"WORK_RESULT_LIMIT","notice":"���������鿴ִ�м�¼��"})
+            data_json=canonical({"status":"unavailable","error_code":"WORK_RESULT_LIMIT","notice":"结果过大；请查看执行记录。"})
         messages=json.loads(row["work_messages_json"])
         messages.append({"role":"tool","tool_call_id":json.loads(step["native_json"])["id"],"content":data_json})
         from nexus.core.cognitive.work_catalog import functions
@@ -288,7 +288,7 @@ class WorkService:
             preview=task.result.model_dump(mode="json")
         if not step["task_id"]:
             if intent == "write_file" and preview is not None and not fresh["permission_decision"] and not grant["auto_files"]:
-                text=f"����Ҫд�� workspace/{proposal['arguments']['path']}����鿴�����ʵ�ʲ��죻�ظ���ͬ�⡱��ֻ��׼�������ݣ��ظ�����ͬ�⡱��ֹͣ��"
+                text=f"我需要写入 workspace/{proposal['arguments']['path']}。请查看下面的实际差异；回复“同意”将只批准本次内容，回复“不同意”则停止。"
                 async with self.database.transaction() as conn:
                     await permissions.allowed_step(conn,step["step_id"],utc_now())
                     await conn.execute("UPDATE chat_work_steps SET status='permission',request_text=?,result_json=? WHERE step_id=?",(text,canonical({"preview":preview}),step["step_id"]))
@@ -297,7 +297,7 @@ class WorkService:
             if intent == "run_command" and grant["profile"] != "standard" and not fresh["permission_decision"]:
                 async with self.database.transaction() as conn:
                     await permissions.allowed_step(conn,step["step_id"],utc_now())
-                    await conn.execute("UPDATE chat_work_steps SET status='permission',request_text=? WHERE step_id=?",(f"��Ҫִ�������õĹ̶����� {proposal['arguments']['command_id']}���ظ���ͬ�⡱ִ�У��ظ�����ͬ�⡱ֹͣ��",step["step_id"]))
+                    await conn.execute("UPDATE chat_work_steps SET status='permission',request_text=? WHERE step_id=?",(f"需要执行已配置的固定命令 {proposal['arguments']['command_id']}。回复“同意”执行，回复“不同意”停止。",step["step_id"]))
                     await conn.execute("UPDATE chat_turns SET work_status='permission',revision=revision+1 WHERE turn_id=?",(step["turn_id"],))
                 return
             role="preview" if intent == "write_file" and not preview else "execute"

@@ -90,7 +90,7 @@ class ChatService:
             if (await one(conn, "SELECT count(*) FROM conversations"))[0] >= 100:
                 raise Conflict("BUSY")
             identifier, now = str(uuid4()), utc_now()
-            await conn.execute("INSERT INTO conversations(conversation_id,owner_id,request_id,title,created_at,auto_title) VALUES(?,?,?,'�»Ự',?,1)", (identifier, str(principal.identity_id), str(value.request_id), timestamp(now)))
+            await conn.execute("INSERT INTO conversations(conversation_id,owner_id,request_id,title,created_at,auto_title) VALUES(?,?,?,'新会话',?,1)", (identifier, str(principal.identity_id), str(value.request_id), timestamp(now)))
             await conn.execute("UPDATE conversations SET project_id=? WHERE conversation_id=?", (str(value.project_id) if value.project_id else None, identifier))
             await audit(conn, str(principal.identity_id), None, "chat.created", now)
             return dict(await one(conn, "SELECT * FROM conversations WHERE conversation_id=?", (identifier,)))
