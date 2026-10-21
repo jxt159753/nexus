@@ -5,6 +5,9 @@ design, using NEXUS transactions and its existing model budget/stop lifecycle.
 """
 
 import json
+import sqlite3
+
+import aiosqlite
 
 from nexus.contracts.extensions import canonical, digest_value
 from nexus.core.cognitive.chat_context import estimated_tokens, pressure
@@ -36,6 +39,15 @@ def source_records(rows):
     return [{"turn_id": row["turn_id"], "text": row["text"], "response": row["response_text"]} for row in rows]
 
 
+async def reusable_turn(conn: aiosqlite.Connection, row: sqlite3.Row) -> bool:
+    """A tool scope alone is not private data; actual work results still are."""
+    if json.loads(row["memory_refs_json"]) or json.loads(row["references_json"]):
+        return False
+    return not row["work_grant_id"] or await one(
+        conn, "SELECT 1 FROM chat_work_steps WHERE turn_id=? LIMIT 1", (row["turn_id"],)
+    ) is None
+
+
 async def history(conn, conversation_id):
     """Only previously consented ordinary history, stopping at private boundaries."""
     rows = await conn.execute_fetchall("SELECT * FROM chat_turns WHERE conversation_id=? AND status='completed' ORDER BY rowid DESC LIMIT 200", (str(conversation_id),))
@@ -44,7 +56,7 @@ async def history(conn, conversation_id):
         request = json.loads(row["request_json"])
         if request.get("compact_only"):
             continue
-        if json.loads(row["memory_refs_json"]) or row["work_grant_id"] or json.loads(row["references_json"]):
+        if not await reusable_turn(conn, row):
             break
         eligible.append(row)
     eligible.reverse()
@@ -119,7 +131,7 @@ async def prepare(conn, config, row, messages, options):
     records = []
     for identifier in ids:
         original = await one(conn, "SELECT * FROM chat_turns WHERE turn_id=? AND conversation_id=? AND status='completed'", (identifier,row["conversation_id"]))
-        if original is None or original["work_grant_id"] or json.loads(original["memory_refs_json"]) or json.loads(original["references_json"]):
+        if original is None or not await reusable_turn(conn, original):
             raise AccessDenied("MEMORY_UNAVAILABLE")
         records.extend(source_records([original]))
     return {"messages":[*messages[:selected], {"role":"user","content":INSTRUCTION}], "options":compact_options,

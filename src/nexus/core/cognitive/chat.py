@@ -258,9 +258,7 @@ class ChatService:
                 for row in rows:
                     # Referenced data and model paraphrases are not silently reused
                     # under an old memory consent. Select those memories again.
-                    if json.loads(row["memory_refs_json"]):
-                        break
-                    if row["work_grant_id"] or json.loads(row["references_json"]):
+                    if not await chat_compaction.reusable_turn(conn, row):
                         break
                     if selected >= 10:
                         history_summary.append({"turn_id":row["turn_id"],"user_excerpt":row["text"][:160],"assistant_excerpt":row["response_text"][:240]})

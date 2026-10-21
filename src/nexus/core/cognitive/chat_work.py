@@ -12,11 +12,25 @@ from nexus.core.security import work as permissions
 from nexus.core.security.service import scope_digest
 from nexus.core.security.types import AccessDenied, Principal
 from nexus.core.storage.database import audit, one, timestamp, utc_now
-from nexus.core.storage.tasks import REQUEST, Conflict, TERMINAL, load_task
+from nexus.core.storage.tasks import REQUEST, Conflict, TERMINAL, TaskRecord, load_task
 from nexus.core.storage.control import cancel_task
 
 
 WORK_INTENTS = {"read":"read_file_lines","glob":"glob_files","grep":"search_file_content","edit":"edit_file"}
+
+
+def task_feedback(task: TaskRecord) -> dict:
+    """The same bounded failure evidence for execution and write previews."""
+    data = {"status": task.status, "execution_outcome": task.execution_outcome, "verification": task.verification}
+    if task.status == "succeeded" and task.execution_outcome == "known" and task.verification:
+        data["data"] = task.result.model_dump(mode="json")
+        if task.action.tool == "command.run" and task.result.exit_code != 0:
+            data.update(status="failed", error_code="COMMAND_EXIT_NONZERO")
+    else:
+        data["error_code"] = task.error.code.value if task.error else "EXECUTION_UNKNOWN" if task.execution_outcome == "unknown" else "WORK_ACTION_FAILED"
+        if task.error:
+            data["error"] = task.error.model_dump(mode="json")
+    return data
 
 
 def request_for(step, role, project_id, command_digests, preview=None, interaction_digests=None):
@@ -273,7 +287,23 @@ class WorkService:
                 await self.advance_step(step)
             except (AccessDenied,Conflict,ValueError,LookupError,PermissionError) as exc:
                 async with self.chat.harness.operation, self.database.transaction() as conn:
-                    await self.abort(conn,step["turn_id"],exc.code if isinstance(exc,AccessDenied) else "WORK_ACTION_UNAVAILABLE",utc_now())
+                    error = exc.code if isinstance(exc,AccessDenied) else "WORK_ACTION_UNAVAILABLE"
+                    now = utc_now()
+                    try:
+                        fresh, _ = await permissions.allowed_step(conn, step["step_id"], now,
+                            scope=self.chat.harness.scope(UUID((await one(conn,"SELECT node_id FROM chat_work_grants WHERE grant_id=?",(step["work_grant_id"],)))[0])))
+                    except AccessDenied:
+                        await self.abort(conn,step["turn_id"],error,now)
+                        continue
+                    # Only failures proven to precede all child execution may
+                    # resume. Authorization, conflicts and unknown effects stop.
+                    no_child = not any(fresh[key] for key in ("task_id", "preview_task_id", "skill_run_id", "tool_run_id"))
+                    if no_child and (not isinstance(exc,(AccessDenied,Conflict)) and isinstance(exc,(ValueError,LookupError,PermissionError))
+                                     or error in {"NODE_OFFLINE", "SANDBOX_UNAVAILABLE"}):
+                        await self.result(conn,fresh,{"status":"failed","execution_outcome":"not_started",
+                            "phase":"prepare","error_code":error},now)
+                    else:
+                        await self.abort(conn,step["turn_id"],error,now)
 
     async def advance_step(self,step):
         now=utc_now()
@@ -341,7 +371,17 @@ class WorkService:
             if task.status not in TERMINAL:
                 return
             if task.status != "succeeded" or task.execution_outcome != "known" or not task.verification:
-                raise AccessDenied("WRITE_PREVIEW_REQUIRED")
+                data = task_feedback(task)
+                data.update(phase="preview", write_executed=False)
+                if data["status"] == "succeeded":
+                    data.update(status="failed", error_code="WRITE_PREVIEW_REQUIRED")
+                async with self.database.transaction() as conn:
+                    if task.execution_outcome == "unknown":
+                        await conn.execute("UPDATE chat_work_steps SET result_json=? WHERE step_id=?",(canonical(data),step["step_id"]))
+                        await self.abort(conn,step["turn_id"],"EXECUTION_UNKNOWN",utc_now())
+                    else:
+                        await self.result(conn,step,data,utc_now())
+                return
             preview=task.result.model_dump(mode="json")
         if not step["task_id"]:
             if intent in {"write_file","edit"} and preview is not None and not fresh["permission_decision"] and not grant["auto_files"]:
@@ -373,13 +413,7 @@ class WorkService:
             task=await load_task(conn,UUID(step["task_id"]))
             if task.status not in TERMINAL:
                 return
-            data={"status":task.status,"execution_outcome":task.execution_outcome,"verification":task.verification}
-            if task.status == "succeeded" and task.execution_outcome == "known" and task.verification:
-                data["data"]=task.result.model_dump(mode="json")
-                if task.action.tool=="command.run" and task.result.exit_code!=0:
-                    data.update(status="failed",error_code="COMMAND_EXIT_NONZERO")
-            else:
-                data["error_code"] = task.error.code if task.error else "EXECUTION_UNKNOWN" if task.execution_outcome == "unknown" else "WORK_ACTION_FAILED"
+            data = task_feedback(task)
             if task.execution_outcome == "unknown":
                 await conn.execute("UPDATE chat_work_steps SET result_json=? WHERE step_id=?",(canonical(data),step["step_id"]))
                 await self.abort(conn,step["turn_id"],"EXECUTION_UNKNOWN",utc_now())
@@ -414,5 +448,8 @@ class WorkService:
             if run["status"] == "dispatching":
                 return
             data={"status":run["status"],"verification":"trusted_controller_checked" if run["status"] == "succeeded" else None,"data":json.loads(run["output_json"]) if run["output_json"] else None}
+            if run["error_json"]:
+                data["error"] = json.loads(run["error_json"])
+                data["error_code"] = data["error"]["code"]
         async with self.database.transaction() as conn:
             await self.result(conn,step,data,utc_now())
