@@ -38,6 +38,7 @@ def scope_digest(scope: NodeScope) -> str:
         "tools": sorted(scope.tools), "roots": sorted(scope.roots),
         "local_tools": sorted(scope.local_tools), "local_roots": sorted(scope.local_roots),
         **({"command_digests": scope.command_digests} if scope.command_digests else {}),
+        **({"interaction_digests": scope.interaction_digests} if scope.interaction_digests else {}),
     }))
 
 
@@ -130,7 +131,7 @@ class SecurityService:
                 and "workspace" in scope.roots & scope.local_roots
             ))
             roots = frozenset({"workspace"}) if tools-{"system.info@1"} else frozenset()
-            return NodeScope(scope.node_id, tools, roots, scope.local_tools, scope.local_roots, scope.resource_version, scope.command_digests)
+            return NodeScope(scope.node_id, tools, roots, scope.local_tools, scope.local_roots, scope.resource_version, scope.command_digests, scope.interaction_digests)
 
     async def login(self, token: SecretStr, *, now: datetime | None = None) -> BrowserSession:
         now = now or utc_now()
@@ -220,6 +221,8 @@ class SecurityService:
             raise AccessDenied("POLICY_DENIED")
         if task.action.tool == "command.run" and scope.command_digests.get(task.action.arguments.command_id) != task.action.arguments.template_digest:
             raise AccessDenied("POLICY_DENIED")
+        if task.action.tool.startswith("interaction.") and scope.interaction_digests.get(task.action.arguments.target_id)!=task.action.arguments.template_digest:
+            raise AccessDenied("POLICY_DENIED")
         root = getattr(task.action.arguments, "root_id", "")
         if root and (root not in scope.roots or root not in scope.local_roots):
             raise AccessDenied("POLICY_DENIED")
@@ -260,7 +263,7 @@ class SecurityService:
     async def _prepare(self, conn: aiosqlite.Connection, task: TaskRecord, scope: NodeScope, version: int, now: datetime) -> Authorization:
         from nexus.core.security.work import check_task
         work_allowed = await check_task(conn, task, scope, now)
-        automatic_file = task.action.tool in {"filesystem.read","filesystem.search","filesystem.write_preview","filesystem.write"}
+        automatic_file = task.action.tool in {"filesystem.read","filesystem.search","filesystem.write_preview","filesystem.write","filesystem.read_lines","filesystem.glob","filesystem.grep","filesystem.edit_preview","filesystem.edit"}
         if task.status == "recovering" and not task.cancel_requested:
             old = await one(conn, "SELECT execution_stopped,phase FROM task_attempts WHERE attempt_id=?", (str(task.current_attempt_id),))
             if old is not None and old["execution_stopped"] and old["phase"] == "completed":

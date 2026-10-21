@@ -4,8 +4,9 @@ from uuid import UUID
 
 from pydantic import Field, StrictInt
 
+from nexus.contracts.interaction import ObserveArguments, InteractArguments
 from nexus.contracts.base import StrictContract
-from nexus.contracts.basic import FileReadArguments, FileSearchArguments, FilePreviewArguments, FileWriteArguments, CommandRunArguments
+from nexus.contracts.basic import FileLinesArguments, FileGlobArguments, FileGrepArguments, FileEditPreviewArguments, FileEditArguments, FileReadArguments, FileSearchArguments, FilePreviewArguments, FileWriteArguments, CommandRunArguments
 
 
 TaskStatus = Literal[
@@ -64,7 +65,42 @@ class CommandRunRequest(TaskMetadata):
     arguments: CommandRunArguments
 
 
+class FileLinesRequest(TaskMetadata):
+    intent: Literal["read_file_lines"]
+    arguments: FileLinesArguments
+
+
+class FileGlobRequest(TaskMetadata):
+    intent: Literal["glob_files"]
+    arguments: FileGlobArguments
+
+
+class FileGrepRequest(TaskMetadata):
+    intent: Literal["search_file_content"]
+    arguments: FileGrepArguments
+
+
+class FileEditPreviewRequest(TaskMetadata):
+    intent: Literal["preview_file_edit"]
+    arguments: FileEditPreviewArguments
+
+
+class FileEditRequest(TaskMetadata):
+    intent: Literal["edit_file"]
+    arguments: FileEditArguments
+
+
+class ObserveRequest(TaskMetadata):
+    intent: Literal["observe_target"]
+    arguments: ObserveArguments
+
+
+class InteractRequest(TaskMetadata):
+    intent: Literal["interact_target"]
+    arguments: InteractArguments
+
+
 TaskRequest = Annotated[
-    SystemInfoRequest | ListDirectoryRequest | FileReadRequest | FileSearchRequest | FilePreviewRequest | FileWriteRequest | CommandRunRequest,
+    SystemInfoRequest | ListDirectoryRequest | FileReadRequest | FileSearchRequest | FilePreviewRequest | FileWriteRequest | CommandRunRequest | FileLinesRequest | FileGlobRequest | FileGrepRequest | FileEditPreviewRequest | FileEditRequest | ObserveRequest | InteractRequest,
     Field(discriminator="intent"),
 ]

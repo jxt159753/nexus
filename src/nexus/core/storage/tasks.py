@@ -161,17 +161,22 @@ class TaskRepository:
                     raise Conflict("chat project binding changed")
                 if chat["auto_result_json"] and await one(conn, "SELECT 1 FROM chat_turns WHERE conversation_id=? AND rowid>(SELECT rowid FROM chat_turns WHERE turn_id=?)", (chat["conversation_id"], str(chat_turn_id))):
                     raise Conflict("chat automatic result context changed")
-            if request.intent == "write_file":
+            if request.intent in {"write_file","edit_file"}:
                 from nexus.contracts.basic import text_digest
                 preview = await one(conn, "SELECT * FROM tasks WHERE task_id=? AND owner_id=? AND node_id=?", (str(request.arguments.preview_task_id), str(owner_id), str(node_id)))
                 if preview is None or preview["status"] != "succeeded" or preview["execution_outcome"] != "known" or not preview["verification"] or not preview["result_json"]:
                     raise Conflict("WRITE_PREVIEW_REQUIRED")
                 data = json.loads(preview["result_json"])
-                if (json.loads(preview["action_json"])["tool"] != "filesystem.write_preview" or preview["project_id"] != (str(request.project_id) if request.project_id else None)
+                if (json.loads(preview["action_json"])["tool"] != ("filesystem.write_preview" if request.intent == "write_file" else "filesystem.edit_preview") or preview["project_id"] != (str(request.project_id) if request.project_id else None)
                         or data["root_id"] != request.arguments.root_id or data["path"] != request.arguments.path
-                        or data["content_sha256"] != text_digest(request.arguments.content) or data["previous_sha256"] != request.arguments.expected_sha256
+                        or data["content_sha256"] != (text_digest(request.arguments.content) if request.intent == "write_file" else request.arguments.content_sha256) or data["previous_sha256"] != request.arguments.expected_sha256
                         or data["preview_digest"] != request.arguments.preview_digest):
                     raise Conflict("WRITE_PREVIEW_REQUIRED")
+                if request.intent == "edit_file":
+                    original = json.loads(preview["action_json"])["arguments"]
+                    actual = request.arguments.model_dump(mode="json")
+                    if any(actual.get(key) != value for key,value in original.items()) or data["bytes_written"] != request.arguments.bytes_written:
+                        raise Conflict("WRITE_PREVIEW_REQUIRED")
             if rate_limit:
                 recent = await one(conn, "SELECT count(*) FROM tasks WHERE owner_id=? AND created_at>?", (str(owner_id), timestamp(now - timedelta(minutes=1))))
                 if recent[0] >= 10:

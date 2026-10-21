@@ -1,0 +1,58 @@
+{
+  "date": "2026-10-21",
+  "scope": "M6 P46-P48 local candidate",
+  "dsh_commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+  "schema": 19,
+  "wheel_sha256": "b9f2b8e0d84b3e7f781295a4a53fe89235d74f42c5538b94650e5b7469ae8e8e",
+  "resources_equal_to_source": 139,
+  "tests": {
+    "full-release": {
+      "passed": 833,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 2,
+      "seconds": 283.705
+    },
+    "recovery-final": {
+      "passed": 89,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 35.46
+    },
+    "package-tests": {
+      "passed": 57,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 27.97
+    },
+    "package-browser": {
+      "passed": 2,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 28.563
+    }
+  },
+  "real_browser_kinds": [
+    "edge",
+    "chrome"
+  ],
+  "real_configured_test_app": true,
+  "independent_core_node_browser_execution": true,
+  "browser_ui_queue_steer_references_journal": true,
+  "production_deployed": false,
+  "git_committed_or_pushed": false,
+  "real_model_calls": 0,
+  "real_web_api_calls": 0,
+  "new_runtime_dependencies": false,
+  "remaining": [
+    "production and Linux Core deployment",
+    "actual user targets configuration",
+    "Android device",
+    "real Search/Fetch supplier",
+    "new real runsc combination",
+    "final user acceptance"
+  ]
+}

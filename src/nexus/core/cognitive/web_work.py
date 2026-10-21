@@ -7,6 +7,8 @@ from uuid import uuid4
 from nexus.contracts.extensions import canonical
 from nexus.core.models.budget import budget_error
 from nexus.core.models.web import WebReply
+from nexus.core.models.web import web_request
+from nexus.core.cognitive import chat_journal
 from nexus.core.security import work as permissions
 from nexus.core.security.types import AccessDenied
 from nexus.core.storage.database import audit, one, timestamp, utc_now
@@ -46,18 +48,22 @@ class WebWork:
                 raise AccessDenied("WEB_OUTCOME_UNKNOWN")
             if (await one(conn,"SELECT paused FROM system_state WHERE singleton=1"))[0] or await one(conn,"SELECT 1 FROM model_calls WHERE outcome='started' LIMIT 1"):
                 return
-            calls = await conn.execute_fetchall("SELECT * FROM model_calls WHERE work_root_turn_id=?",(step["turn_id"],))
+            from nexus.core.cognitive.chat_compaction import root_calls
+            calls = await root_calls(conn,step["turn_id"])
             charge = chat.config.web_request_cost_microunits
             if any(call["cost_status"]!="calculated" for call in calls) or sum(call["cost_microunits"] for call in calls)+charge>chat.config.task_cost_microunits:
                 raise AccessDenied("BUDGET_EXCEEDED")
             error = await budget_error(conn,chat.config,now,reservation=charge)
             if error:
                 raise AccessDenied(error)
+            if not await chat_journal.capacity(conn):
+                raise AccessDenied("BUSY")
             await permissions.operation(conn,step["step_id"],"web:"+step["step_id"],now)
             call_id = str(uuid4())
             await conn.execute("INSERT INTO model_calls(call_id,provider,model,cost_status,created_at,owner_id,reserved_microunits,pricing_json,outcome,work_root_turn_id,web_step_id) VALUES(?,'deepseek-web',?,'reserved',?,?,?,?,'started',?,?)",(
                 call_id,proposal["intent"],timestamp(now),step["owner_id"],charge,canonical({"per_successful_request":charge,"currency":"USD","valid_until":chat.config.price_valid_until.isoformat()}),step["turn_id"],step["step_id"]))
             await conn.execute("UPDATE chat_work_steps SET status='waiting' WHERE step_id=?",(step["step_id"],))
+            await chat_journal.begin_payload(conn,step["turn_id"],call_id,canonical(web_request(proposal["intent"],proposal["arguments"])[1]),now)
             await audit(conn,step["owner_id"],None,"web.reserved",now)
         # The committed ledger entry precedes the external request.
         self.active = step,call_id,asyncio.create_task(self.provider.invoke(proposal["intent"],proposal["arguments"]))
@@ -89,6 +95,7 @@ class WebWork:
                 await conn.execute("UPDATE model_calls SET cost_microunits=?,cost_status=?,outcome=?,finished_at=? WHERE call_id=? AND outcome='started'",(
                     cost,"unknown" if cost is None else "calculated","unknown" if cost is None else "completed",timestamp(now),call_id))
                 await audit(conn,step["owner_id"],None,"web.unknown" if cost is None else "web.settled",now)
+                await chat_journal.finish(conn,call_id,reply,"","unknown" if cost is None else "failed" if reply.error else "completed",now)
                 try:
                     await permissions.allowed_step(conn,step["step_id"],now)
                 except AccessDenied:

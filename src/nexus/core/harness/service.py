@@ -68,7 +68,7 @@ class Harness:
         if connection is not None:
             return connection.scope
         policy = self.link.config.nodes[node_id]
-        return NodeScope(node_id, policy.tools, policy.roots, policy.tools, policy.roots, policy.resource_version, policy.command_digests)
+        return NodeScope(node_id, policy.tools, policy.roots, policy.tools, policy.roots, policy.resource_version, policy.command_digests, policy.interaction_digests)
 
     async def submit(self, principal: Principal, node_id: UUID, request: TaskRequest, *, language_id: UUID | None = None, chat_turn_id: UUID | None = None, rate_limit: bool = True, skill_run_id: UUID | None = None, skill_step_index: int | None = None, work_step_id: UUID | None = None, work_role: str = "execute"):
         if self.failed:

@@ -1,5 +1,7 @@
 """Durable single-step dispatch and evidence settlement. No network I/O."""
 
+from nexus.contracts.basic import MUTATING_TOOLS
+
 from datetime import timedelta
 from uuid import UUID, uuid4
 
@@ -48,7 +50,7 @@ class ExecutionRepository:
             if task.cancel_requested or (await one(conn, "SELECT paused FROM system_state WHERE singleton=1"))[0]:
                 return None
             count = (await one(conn, "SELECT count(*) FROM task_attempts WHERE task_id=?", (str(task_id),)))[0]
-            if count >= (1 if task.action.tool in {"filesystem.write", "command.run"} else 2):
+            if count >= (1 if task.action.tool in MUTATING_TOOLS else 2):
                 return None
             if task.current_attempt_id is not None:
                 previous = await one(conn, "SELECT * FROM task_attempts WHERE attempt_id=?", (str(task.current_attempt_id),))
@@ -174,7 +176,7 @@ class ExecutionRepository:
             return
         if task.cancel_requested:
             await transition(conn, task, "cancelled", task.owner_id, now, execution=True)
-        elif retry and row["attempt_no"] < 2 and task.action.tool not in {"filesystem.write", "command.run"}:
+        elif retry and row["attempt_no"] < 2 and task.action.tool not in MUTATING_TOOLS:
             if task.status != "recovering":
                 await transition(conn, task, "recovering", task.owner_id, now, execution=True)
             else:

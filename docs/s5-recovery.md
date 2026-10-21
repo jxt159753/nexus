@@ -2,6 +2,8 @@
 
 S5 在 [S4 后端闭环](s4-harness.md)上实现恢复、限额和用户控制。授权及状态以 [ROADMAP](ROADMAP.md)为准，实际验证见 [S5 验证](S5-VERIFICATION.md)，决定见 [ADR 0005](decisions/0005-s5-recovery-controls.md)。沿用原启动配置，无新依赖或模型密钥。
 
+阅读范围：下文第二次尝试与原目录审批描述 M1 只读入口；M6 写入、固定命令及生成 Tool 不自动新建尝试，聊天/网页交换也不因重启自动重发。当前工作范围与取消语义另见[聊天工作](chat-work.md)，持久化、未知先对账及真实停止要求继续适用。
+
 ## Owner HTTP 接口
 
 写操作继续要求有效 owner 会话、精确 Origin 和 `X-CSRF-Token`。JSON 正文上限 4 KiB、读取期限 2 秒；响应 no-store。页面和 client WS 属于 S6。

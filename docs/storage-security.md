@@ -2,17 +2,19 @@
 
 S2 / P03–P04 的实现说明；阶段状态与验收证据分别见 [ROADMAP](ROADMAP.md) 和 [S2 验证记录](S2-VERIFICATION.md)。目标设计见 [ARCHITECTURE](ARCHITECTURE.md)。这里的仓储与管理接口属于可信 Core 内部接口，不是开放的网络 API。
 
+阅读范围：本文以 S2 基础接口为主，S4/S5 已接入执行与恢复，S6 接入会话恢复页面，M2–M6 接入模型、聊天、扩展与工作区默认策略。下文原目录审批仅描述原单步入口，不限制[当前受控文件工具](m6-projects-tools.md)和[聊天工作](chat-work.md)；后续迁移保留旧数据，早期表或接口范围不代表当前能力上限。
+
 ## 数据库与任务
 
-- `Database(Path)` 只接受绝对本地路径；`initialize()` 在离线管理或后续单活 Core 启动期间运行。不得使用网络共享或把同一数据副本交给多个活动 Core；正式进程单例锁将在应用生命周期接入时落实。
+- `Database(Path)` 只接受绝对本地路径；`initialize()` 在离线管理或单活 Core 启动期间运行。不得使用网络共享或把同一数据副本交给多个活动 Core；正式进程在应用生命周期持有数据目录单例锁。
 - `initialize()` 创建版本表并执行包内 SQL；验证版本连续性及摘要，拒绝无版本旧库、未知新版本和被修改的已应用迁移。已有库升级前生成带 UUID 的 `.before-vN-*.sqlite3` 一致备份并做 quick_check，失败保留原库，不重建、不降级。
 - 每次仓储操作使用一个短生命周期 aiosqlite 连接，显式外键、FULL 同步、3 秒 busy_timeout；初始化启用 WAL。写事务使用 BEGIN IMMEDIATE，异常或取消时回滚；返回值只在 commit 成功后交给调用方。
 - `TaskRepository.create(owner_id, request, node_id)` 验证活动身份角色，规则生成不可变单步动作；按 `(owner_id, request_id)` 去重，相同请求和节点返回原任务，变更内容或节点报 `Conflict("IDEMPOTENCY_CONFLICT")`。最多保留 100 个非终态任务作为待处理队列；期限为创建后 5 分钟。
 - `get(task_id, owner_id)` 检查归属；`history(owner_id, after_event_id=0, limit=100)` 按身份过滤并分页，limit 为 1–200。网络调用方仍必须先认证并校验角色，不能把用户提交的 owner_id 直接传入。
-- 任务创建、revision 状态更新、事件和审计同事务提交。当前只实现 queued / awaiting_approval / ready 到派发前合法状态或失败、取消、超时的转移，终态不可覆盖；过期任务不能转 ready。执行状态和 succeeded 只能经 S4 的有效 attempt 与工具证据验证写入，见 [S4 Harness](s4-harness.md)。
-- `TaskRepository.transition` 是可信 Core 持久化原语，不能直接暴露为客户端状态修改接口。权限层调用它完成审批与状态的原子更新；P07 已提供带有效 attempt/工具证据的专用执行仓储；真实取消仍待 P08。
+- 任务创建、revision 状态更新、事件和审计同事务提交。基础仓储处理派发前合法状态及相应终态；过期任务不能转 ready，终态不可覆盖。执行状态和 succeeded 只能经 S4 的有效 attempt 与工具证据验证写入，见 [S4 Harness](s4-harness.md)。
+- `TaskRepository.transition` 是可信 Core 持久化原语，不能直接暴露为客户端状态修改接口。权限层调用它完成审批与状态的原子更新；P07 提供带有效 attempt/工具证据的专用执行仓储；P08 已接入真实取消和恢复。
 
-网络、模型和工具调用不得放在数据库事务内。数据库写入失败会向调用方抛错，不返回“已接受”或“已授权”。当前 Harness 已接入任务调度、首次派发和 verifying 恢复；不清理历史，网络对账与重试尚未实施。
+网络、模型和工具调用不得放在数据库事务内。数据库写入失败会向调用方抛错，不返回“已接受”或“已授权”。Harness 已接入任务调度、持久派发、验证及 [S5 网络对账与有限重试](s5-recovery.md)；不因恢复清理历史，也不将只读重试扩展到副作用未知的工具。
 
 ## 身份和离线管理
 
@@ -49,7 +51,7 @@ rotate 替换凭证并重新启用身份；旧凭证失效。owner 撤销或轮�
 
 会话有效期 8 小时，最多 10 个有效会话；会话和 CSRF 均使用随机令牌摘要。Cookie 为 HttpOnly / Secure / SameSite=strict，响应 no-store。仅显式 `local_http=True` 且仅 loopback 的 HTTP/WS 可关闭 Secure；默认 HTTPS/WSS。远程模式没有证书配置时不能启动后续服务，不关闭 TLS 校验或调整系统安全配置。
 
-P06 已接入守卫和接收接口，并校验消息方向、当前连接/会话与 JSON 中的节点标识，实施帧/速率/连接/队列限制及心跳、重连。S2 的临时 ASGI 证据保留，本轮真实进程通信证据见 [S3 验证](S3-VERIFICATION.md)。后续前端须管理登录响应中的 CSRF 值；当前不提供会话恢复页面或续期 API。
+P06 已接入守卫和接收接口，并校验消息方向、当前连接/会话与 JSON 中的节点标识，实施帧/速率/连接/队列限制及心跳、重连。S2 的临时 ASGI 证据保留，真实进程通信证据见 [S3 验证](S3-VERIFICATION.md)。前端管理登录响应中的 CSRF 值，S6 已提供有效会话恢复及退出；没有据此新增自动续期 API，见 [浏览器会话](s6-browser-records.md#会话与客户端-ws)。
 
 ## 权限和审批
 

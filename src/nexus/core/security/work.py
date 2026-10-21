@@ -23,8 +23,8 @@ async def valid_grant(conn, grant_id, now, *, owner_id=None, node_id=None, scope
 
 
 async def allowed_step(conn, step_id, now, *, scope=None):
-    row = await one(conn,"SELECT s.*,t.owner_id,t.work_grant_id,t.work_status,t.status AS turn_status,t.expires_at FROM chat_work_steps s JOIN chat_turns t USING(turn_id) WHERE step_id=?",(str(step_id),))
-    if row is None or row["turn_status"] in {"stopped","stopping","failed","interrupted","expired"} or row["status"] not in {"pending","waiting","permission"} or row["work_status"] not in {"waiting","permission"} or row["expires_at"]<=timestamp(now):
+    row = await one(conn,"SELECT s.*,t.owner_id,t.work_grant_id,t.work_status,t.recovery_required,t.status AS turn_status,t.expires_at FROM chat_work_steps s JOIN chat_turns t USING(turn_id) WHERE step_id=?",(str(step_id),))
+    if row is None or row["recovery_required"] or row["turn_status"] in {"stopped","stopping","failed","interrupted","expired"} or row["status"] not in {"pending","waiting","permission"} or row["work_status"] not in {"waiting","permission"} or row["expires_at"]<=timestamp(now):
         raise AccessDenied("WORK_STOPPED")
     grant = await valid_grant(conn,row["work_grant_id"],now,owner_id=row["owner_id"],scope=scope)
     return row,grant
@@ -55,8 +55,15 @@ async def check_task(conn, task, scope, now):
     step,grant=await allowed_step(conn,identifier,now,scope=scope)
     if grant["node_id"]!=str(task.node_id) or grant["owner_id"]!=str(task.owner_id):
         raise AccessDenied("POLICY_DENIED")
-    if task.action.tool=="filesystem.write" and step["permission_decision"]!="approve" and not grant["auto_files"]:
+    if task.current_attempt_id is None and not step["skill_run_id"] and await one(conn,"SELECT 1 FROM chat_controls WHERE turn_id=? AND kind='steer' AND applied_call_id IS NULL",(step["turn_id"],)):
+        raise AccessDenied("WORK_STOPPED")
+    if task.action.tool in {"filesystem.write","filesystem.edit"} and step["permission_decision"]!="approve" and not grant["auto_files"]:
         raise AccessDenied("WORK_CONFIRMATION_REQUIRED")
+    if task.action.tool=="interaction.act" and step["permission_decision"]!="approve" and (grant["auto_files"] or grant["profile"]!="standard"):
+        import json
+        prior=await conn.execute_fetchall("SELECT proposal_json FROM chat_work_steps WHERE turn_id=? AND permission_decision='approve'",(step["turn_id"],))
+        if not any(json.loads(item[0])["intent"]=="interact_target" and json.loads(item[0])["arguments"]["target_id"]==task.action.arguments.target_id for item in prior):
+            raise AccessDenied("WORK_CONFIRMATION_REQUIRED")
     if task.action.tool=="command.run" and grant["profile"]!="standard" and step["permission_decision"]!="approve":
         raise AccessDenied("WORK_CONFIRMATION_REQUIRED")
     return True

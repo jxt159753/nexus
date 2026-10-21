@@ -11,13 +11,14 @@
 | [聊天使用说明](m3-chat.md) | 多轮聊天、停止回复、工具确认、结果回传、历史和费用 |
 | [聊天中的多步流程](m5-chat-skills.md) | 可用流程目录、参数与计划确认、步骤审批/取消及结果解读 |
 | [项目、可控记忆与基础工具](m6-projects-tools.md) | 项目会话与待办、记忆保存/逐轮外发、受限文件读写/查找和固定命令 |
+| [新文件工具、会话交互与配置目标](dsh-tools-usage.md) | 分页/内容搜索/精确修改、纠正/排队/日志/历史引用、Edge/Chrome 与明确配置程序 |
 | [聊天工作与网页工具](chat-work.md) | 工作区默认读写、有限工具循环、DeepSeek 搜索/抓取、来源及费用 |
 | [任务、记忆与项目页面](s6-browser-records.md) | 提交只读任务、审批、暂停、保存或撤销记忆、关联项目 |
 | [单条自然语言任务](m2-language.md) | 把一句操作请求解释为已有工具，确认后执行 |
 | [自定义工具与流程](m4-usage.md) | 创建、测试、批准、启用、使用和停用能力；使用前先核对路线图中的限制 |
 | [部署、远程连接与恢复](s7-deployment.md) | 首次配置、可信加密连接、升级、备份及恢复 |
 
-旧使用文档保留 S6、S7 等文件名，避免破坏已有链接。S 表示当时的开发子阶段，不是软件版本号。
+旧使用文档保留 S6、S7 等文件名，避免破坏已有链接。S 表示当时的开发子阶段，不是软件版本号；其中 M1 的零模型、单步、两个只读工具和逐次目录审批只适用于相应历史入口。当前工作区默认权限和有界工具循环先看[聊天工作](chat-work.md)，各能力是否上线仍查路线图。
 
 ## 功能状态与后续规划
 
@@ -26,7 +27,7 @@
 | [功能状态](ROADMAP.md#功能状态) | 已实现、部分实现和未实现的功能，及证据范围 |
 | [里程碑总览](ROADMAP.md#里程碑总览) | M1–M8 的目标和阶段状态 |
 | [M4 待完成项](ROADMAP.md#m4-待完成项) | 当前收尾工作、环境条件和验收要求 |
-| [后续规划](ROADMAP.md#后续规划) | M5 多步任务、M6 项目与记忆，以及更远期方向 |
+| [后续规划](ROADMAP.md#后续规划) | M5/M6 的演进记录与 M7/M8 等后续方向 |
 | [前端与 App 开发](ROADMAP.md#前端与-app-开发) | 网页体验、页面与交互任务、Android App 首版及手机执行端的区别 |
 | [版本与部署记录](ROADMAP.md#版本与部署记录) | 线上版本、本地候选版本、验证与部署的区别 |
 
@@ -39,12 +40,13 @@
 | [开发规范](../AGENTS.md) | 必读材料、授权范围、质量和交付要求 |
 | [架构设计](ARCHITECTURE.md) | 中心服务与设备的分工、任务状态、权限、恢复、模型与扩展设计 |
 | [Web 与 App 设计边界](ARCHITECTURE.md#17-web-前端与-app-设计边界) | 页面职责、共享数据、App 接入、离线行为和客户端权限 |
+| [Windows / Android 前端 DSH 工作说明](FRONTEND-DSH-WORKORDER.md) | 用户直接指挥 DSH 的首轮提示、方案决策、开发边界与交付验收方式 |
 | [存储与权限](storage-security.md) | 数据保存、身份、会话、审批及相关接口 |
 | [Windows 执行端](node-runtime.md) | 目录范围、本地工具、执行记录和进程管理 |
 | [设备连接](s3-link.md) | Core/Node 配置、身份认证、连接与重连 |
 | [任务执行](s4-harness.md) | 提交、派发、验证结果和历史查询 |
 | [恢复与全局控制](s5-recovery.md) | 超时、取消、暂停和执行结果未知的处理 |
-| [原有设备协议 v1](protocol-v1.md) | 固定两工具的通信格式与限制 |
+| [设备协议 v1](protocol-v1.md) | 消息信封、原两工具基线及 M6 基础工具扩展说明 |
 | [扩展与隔离执行协议 v2](m4-extension-protocol.md) | 生成工具的版本、测试、隔离环境与通信要求 |
 | [WSL2 沙箱部署](m4-sandbox-wsl.md) | 固定 runsc、非特权用户、宿主资源限制、运行与恢复 |
 
@@ -67,6 +69,8 @@ Core、Node、Tool、Skill 等词的解释见 [架构文档的名词说明](ARCH
 | M6 本地实现与基础工具 | [验证与限制](M6-VERIFICATION.md) |
 | M6 会话工作与上线 | [验证与限制](M6-WORK-VERIFICATION.md)、[脱敏摘要](assets/m6-work-evidence.json) |
 | M6 文件默认权限与网页工具 | [追加验证与限制](M6-WORK-FIX-VERIFICATION.md)、[脱敏摘要](assets/m6-work-fix-evidence.json) |
+| M6 的 DSH 工具与会话机制 | [追加验证、固定包与限制](DSH-TOOLS-VERIFICATION.md) |
+| M6 的 DSH 参考优化 | [本地验证、源码基线与限制](DSH-REFERENCE-VERIFICATION.md) |
 | 历次交付、上线、批准与中间失败 | [2026 年 10 月历史记录](history/2026-10-delivery.md)，固定历史快照，不更新进度 |
 
 ## 设计决定与旧工作单
@@ -74,6 +78,8 @@ Core、Node、Tool、Skill 等词的解释见 [架构文档的名词说明](ARCH
 聊天自动工作与自然语言权限答复见 [使用说明](chat-work.md)及 [ADR 0018](decisions/0018-scoped-chat-work.md)。
 
 工作区免重复审批、批量函数兼容与网页工具见 [ADR 0019](decisions/0019-workspace-defaults-web-tools.md)。
+
+DSH GitHub 架构/Harness 对照、上下文投影、工具清单与按需能力详情见 [ADR 0020](decisions/0020-dsh-context-harness.md)。
 
 重要技术决定保存在 [decisions 目录](decisions/)。主要包括 [单活云端部署](decisions/0008-self-hosted-core-ip-tls.md)、[模型接入](decisions/0009-m2-deepseek-language.md)、[聊天](decisions/0010-m3-chat.md)、[工具结果回传](decisions/0012-chat-result-feedback.md)、[自动回传同意](decisions/0013-chat-auto-result-consent.md)和 [自扩展](decisions/0014-m4-self-extension.md)。
 
@@ -86,3 +92,10 @@ Core、Node、Tool、Skill 等词的解释见 [架构文档的名词说明](ARCH
 - ARCHITECTURE 解释技术设计，不重复维护阶段状态或另一套路线。
 - 使用说明解释操作步骤；验证记录保存实际证据；history 中的历史快照不再追加当前进度。
 - 新功能先同步相关设计和使用说明，再在 ROADMAP 记录实际完成情况。原有文件不因分类整理而批量改名。
+
+新增文件工具、逐次请求记录与可控连续工作见 [ADR 0021](decisions/0021-dsh-tools-session-journal.md)；它与 ADR 0020 的参考分析相衔接，不替换旧交付记录。
+
+- [上下文与压缩](context-compaction.md)：自动压缩、`/compact`、原始记录与费用边界。
+- [DSH 压缩设计](decisions/0022-dsh-context-compaction.md)：参考来源、容量、记录与恢复。
+
+- [DSH 上下文压缩验证](CONTEXT-COMPACTION-VERIFICATION.md)：固定版本、测试、上线与限制。

@@ -86,6 +86,8 @@ class ChatSubmission(StrictContract):
     memory_digest: StrictStr | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     allow_memory_model: StrictBool = False
     include_context: StrictBool = True
+    allow_compaction: StrictBool = False
+    compact_only: StrictBool = False
     allow_model: StrictBool = False
     allow_tools: StrictBool = False
     allow_skills: StrictBool = False
@@ -95,9 +97,20 @@ class ChatSubmission(StrictContract):
     work_digest: StrictStr | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     allow_work_results: StrictBool = False
     workspace_work: StrictBool = False
+    enqueue: StrictBool = False
+    reference_turn_ids: list[UUID] = Field(default_factory=list, max_length=3)
+    references_digest: StrictStr | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    allow_reference_model: StrictBool = False
 
     @model_validator(mode="after")
     def bounded(self):
+        if self.compact_only and (not self.allow_compaction or not self.include_context or self.text.strip() != "/compact"
+                                 or self.allow_tools or self.memory_ids or self.reference_turn_ids):
+            raise ValueError("/compact requires context and compaction consent without tools or selected private references")
+        if len(set(self.reference_turn_ids)) != len(self.reference_turn_ids):
+            raise ValueError("duplicate references")
+        if bool(self.reference_turn_ids) != bool(self.references_digest) or bool(self.reference_turn_ids) != self.allow_reference_model:
+            raise ValueError("references require preview and separate outbound consent")
         if self.work_grant_id and self.workspace_work:
             raise ValueError("select one work scope")
         if (self.work_grant_id or self.workspace_work) and (not self.allow_tools or not self.allow_work_results or not self.work_digest):
@@ -117,3 +130,30 @@ class ChatSubmission(StrictContract):
         if self.allow_skills and (not self.allow_tools or self.skills_digest is None):
             raise ValueError("Skill suggestions require tool consent and a previewed catalog")
         return self
+
+
+class ChatSteering(StrictContract):
+    request_id: UUID
+    text: StrictStr = Field(min_length=1, max_length=2000)
+    allow_model: StrictBool
+
+    @model_validator(mode="after")
+    def confirmed(self):
+        if not self.allow_model or not self.text.strip() or len(self.text.encode()) > 6000:
+            raise ValueError("bounded correction and explicit outbound consent required")
+        return self
+
+
+class ChatResume(StrictContract):
+    request_id: UUID
+    consent: StrictBool
+
+    @model_validator(mode="after")
+    def confirmed(self):
+        if not self.consent:
+            raise ValueError("explicit resume required")
+        return self
+
+
+class ChatReferences(StrictContract):
+    turn_ids: list[UUID] = Field(min_length=1, max_length=3)

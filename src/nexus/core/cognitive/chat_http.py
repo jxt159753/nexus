@@ -8,7 +8,7 @@ from nexus.contracts.base import StrictContract
 from nexus.contracts.records import MemorySelection
 from nexus.contracts.work import WorkGrantCreate, WorkPermissionReply
 from nexus.core.cognitive import work_catalog
-from nexus.contracts.chat import ChatActionDecision, ChatPlanPreview, ChatResultConsent, ChatResultPreview, ChatSubmission, ConversationCreate, ConversationUpdate
+from nexus.contracts.chat import ChatSteering, ChatResume, ChatReferences, ChatActionDecision, ChatPlanPreview, ChatResultConsent, ChatResultPreview, ChatSubmission, ConversationCreate, ConversationUpdate
 from nexus.core.harness.http import body
 
 
@@ -32,8 +32,26 @@ class ChatHTTP:
             ("/conversations/{conversation_id}/work-grant", "POST", self.work_grant),
             ("/conversations/{conversation_id}/work-grant", "DELETE", self.work_revoke),
             ("/turns/{turn_id}/permission", "POST", self.work_permission),
+            ("/turns/{turn_id}/journal", "GET", self.journal),
+            ("/turns/{turn_id}/steer", "POST", self.steer),
+            ("/turns/{turn_id}/resume", "POST", self.resume),
+            ("/conversations/{conversation_id}/reference-preview", "POST", self.reference_preview),
         ]:
             self.router.add_api_route(path, handler, methods=[method])
+
+    async def journal(self,turn_id: UUID,request: Request):
+        return await self.service.journal.detail(await self.guards.owner_http(request),turn_id)
+
+    async def steer(self,turn_id: UUID,request: Request):
+        await self.service.journal.steer(await self.guards.owner_http(request),turn_id,await body(request,ChatSteering))
+        return {"queued":True}
+
+    async def resume(self,turn_id: UUID,request: Request):
+        await self.service.journal.resume(await self.guards.owner_http(request),turn_id,await body(request,ChatResume))
+        return {"resumed":True}
+
+    async def reference_preview(self,conversation_id: UUID,request: Request):
+        return await self.service.journal.preview_references(await self.guards.owner_http(request),conversation_id,await body(request,ChatReferences))
 
     async def work_catalog(self, request: Request, node_id: UUID):
         principal=await self.guards.owner_http(request)

@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from types import MappingProxyType
 
+from nexus.contracts.basic import MUTATING_TOOLS
+from nexus.node.tools.workspace import read_lines, glob_files, grep_files, preview_edit, edit_file
 from nexus.contracts.messages import CommandExecute
 from nexus.contracts.tools import (
     ListDirectoryCall, ToolResult, TOOL_ARGUMENT_MODELS, validate_result,
@@ -20,7 +22,7 @@ class ToolSpec:
     verification: str = "node_report_schema_checked"
 
 
-REGISTRY = MappingProxyType({key: ToolSpec(key, read_only=key not in {"filesystem.write@1","command.run@1"}, retry_safe=key not in {"filesystem.write@1","command.run@1"}) for key in TOOL_ARGUMENT_MODELS})
+REGISTRY = MappingProxyType({key: ToolSpec(key, read_only=key.rsplit("@",1)[0] not in MUTATING_TOOLS, retry_safe=key.rsplit("@",1)[0] not in MUTATING_TOOLS) for key in TOOL_ARGUMENT_MODELS})
 
 
 def execute_tool(command: CommandExecute, config: NodeConfig) -> ToolResult:
@@ -31,12 +33,19 @@ def execute_tool(command: CommandExecute, config: NodeConfig) -> ToolResult:
         root = config.roots.get(command.arguments.root_id)
         if root is None:
             raise PermissionError("resource not configured")
-        if command.tool == "filesystem.list":
+        if command.tool.startswith("interaction."):
+            target=config.interaction_targets.get(command.arguments.target_id)
+            if target is None:
+                raise PermissionError("interaction target not configured")
+            from nexus.node.tools.browser import browser_operation
+            from nexus.node.tools.apps import app_operation
+            result=(app_operation if target.kind=="windows_app" else browser_operation)(command.arguments,target)
+        elif command.tool == "filesystem.list":
             result = list_directory(command.arguments, root, config.max_result_bytes)
         elif command.tool == "command.run":
             result = run_command(command.arguments, root, config.commands)
         else:
-            result = {"filesystem.read":read_file,"filesystem.search":find_files,"filesystem.write_preview":preview_write,"filesystem.write":write_file}[command.tool](command.arguments, root)
+            result = {"filesystem.read_lines":read_lines,"filesystem.glob":glob_files,"filesystem.grep":grep_files,"filesystem.edit_preview":preview_edit,"filesystem.edit":edit_file,"filesystem.read":read_file,"filesystem.search":find_files,"filesystem.write_preview":preview_write,"filesystem.write":write_file}[command.tool](command.arguments, root)
     else:
         result = system_info()
     return validate_result(command, result, config.max_result_bytes)

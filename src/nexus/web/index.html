@@ -9,6 +9,7 @@
   <script src="/static/chat.js" defer></script>
   <script src="/static/chat-skills.js" defer></script>
   <script src="/static/chat-work.js" defer></script>
+  <script src="/static/chat-controls.js" defer></script>
   <script src="/static/projects.js" defer></script>
   <script src="/static/basic-tools.js" defer></script>
   <script src="/static/app.js" defer></script>
@@ -42,8 +43,11 @@
             <button id="chat-older" class="quiet full" hidden>加载更早消息</button><button id="chat-latest" class="quiet full" hidden>回到最近消息</button>
             <div id="chat-messages" class="chat-messages" role="log" aria-label="聊天记录" aria-live="polite"></div>
             <form id="chat-form">
+              <select id="chat-input-mode" aria-label="中途输入方式" hidden><option value="queue">后续任务排队</option><option value="steer">纠正当前任务（下一步生效）</option></select>
               <label for="chat-text">消息</label><textarea id="chat-text" rows="3" maxlength="2000" required placeholder="讨论想法、继续追问，或请已启用流程完成一个目标…"></textarea>
               <label class="checkbox"><input id="chat-context" type="checkbox" checked>附带本会话近期已完成的对话</label>
+              <label class="checkbox"><input id="chat-compaction" type="checkbox" checked>允许将所选会话历史压成摘要（每轮最多额外一次调用，共用原费用上限；原文保留）</label>
+              <button id="chat-compact" type="button" class="quiet">压缩上下文 /compact</button>
               <details><summary>本轮记忆与明确保存</summary>
                 <button id="chat-memory-load" type="button">查看本项目当前记忆</button><div id="chat-memory-choices" class="record-list"></div>
                 <button id="chat-memory-more" type="button" hidden>更多记忆</button>
@@ -56,6 +60,11 @@
                   <label class="checkbox"><input id="chat-memory-save-consent" type="checkbox">我确认以上内容、来源、类型与有效期，明确同意保存到当前项目</label>
                   <button id="chat-memory-save" type="button">确认保存记忆</button>
                 </div>
+              </details>
+              <details><summary>按需引用同项目的历史会话资料</summary>
+                <label for="chat-reference-ids">历史轮次 ID（最多 3 个，逗号分隔；在逐次记录中查看）</label><input id="chat-reference-ids" maxlength="120">
+                <button id="chat-reference-preview" type="button">预览选定资料</button><pre id="chat-reference-outbound" hidden></pre>
+                <label class="checkbox"><input id="chat-reference-consent" type="checkbox" disabled>本次同意将以上具体历史资料发送给 DeepSeek</label>
               </details>
               <label class="checkbox"><input id="chat-tools" type="checkbox" checked>本轮使用已配置的工具与工作区</label>
               <label for="chat-node">工具目标设备</label><select id="chat-node"><option value="">暂无配置节点；可继续普通聊天</option></select>

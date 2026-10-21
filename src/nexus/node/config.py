@@ -55,6 +55,7 @@ class NodeConfig(StrictContract):
     node_id: UUID
     data_dir: Path
     allowed_tools: frozenset[ToolKey] = frozenset()
+    interaction_targets: dict[CommandId, "InteractionTarget"] = Field(default_factory=dict, max_length=16)
     commands: dict[CommandId, CommandTemplate] = Field(default_factory=dict, max_length=16)
     roots: dict[Literal["workspace"], Path] = Field(default_factory=dict, max_length=1)
     max_result_bytes: StrictInt = Field(default=MAX_RESULT_BYTES, ge=128, le=MAX_RESULT_BYTES)
@@ -66,4 +67,10 @@ class NodeConfig(StrictContract):
         local_directory(self.data_dir)
         for path in self.roots.values():
             local_directory(path)
+        if len(self.model_dump_json().encode("utf-8"))>24576:
+            raise ValueError("local tool policy exceeds 24 KiB worker budget")
         return self
+
+
+from nexus.node.tools.interaction_config import InteractionTarget
+NodeConfig.model_rebuild()

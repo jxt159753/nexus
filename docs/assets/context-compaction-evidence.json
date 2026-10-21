@@ -1,0 +1,49 @@
+{
+  "date": "2026-10-21",
+  "scope": "M6 P49 and required P45-P48 Core support",
+  "schema": 20,
+  "wheel": {
+    "sha256": "5f6393a98352df0ea4311dbc636cab9e8e3a4a566b77ebbadefd8bdc2732a84f",
+    "app_files": 141,
+    "bytes": 291452
+  },
+  "tests": {
+    "full-final": {
+      "tests": 844,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2,
+      "time": 306.423
+    },
+    "final-focused": {
+      "tests": 98,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time": 33.517
+    },
+    "package-final": {
+      "tests": 47,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time": 16.67
+    },
+    "package-browser": {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time": 38.378
+    }
+  },
+  "linux_final": {
+    "passed": 259,
+    "failed": 0,
+    "seconds": 53.93
+  },
+  "real_provider_calls": 0,
+  "production_deployed": false,
+  "app_frontend_changes_excluded": true,
+  "windows_node_updated": false
+}

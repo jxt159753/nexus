@@ -136,7 +136,9 @@ def test_permission_changes_never_dispatch_pending_work(world,monkeypatch,mode):
         else:await app.state.harness.control(world.owner,"cancel_all",uuid4())
         await chat.process_one()
         assert not await rows(world,"tasks") and len(await rows(world)) == 1
-        assert (await chat.get(world.owner,turn["turn_id"]))["work_status"] == ""
+        current=await chat.get(world.owner,turn["turn_id"])
+        assert current["recovery_required"] == (mode=="restart")
+        assert current["work_status"] == ("waiting" if mode=="restart" else "")
     asyncio.run(run())
 
 

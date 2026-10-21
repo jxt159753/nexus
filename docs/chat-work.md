@@ -18,6 +18,10 @@ Core 启用 `models.web_enabled=true` 后，可自行调用 `web_search` 与 `we
 
 每轮最多 4 个动作、5 次模型交换，共用 USD 0.05；每日额度仍为 USD 1、100 次 API。默认工作范围由已有配置产生，内部最长 5 分钟、20 次底层操作，不是新的用户确认。派发前重查版本、范围和权限；未知结果、失效或超限停止。
 
+已启用的 Tool/Skill 先以简介展示给模型；不熟悉输入契约时可调用 `inspect_capability` 查看该固定版本详情，再决定是否执行。查看详情本身不运行工具、不启用版本，但占用一个工作动作，后续模型交换也计入上述上限。复杂契约按需加载可减少重复上下文，简单能力则可能多用一次交换。
+
+上下文接近完整请求大小上限时，Core 先裁剪较旧的完整问答，再把较长工具数据转为有明确标记的首尾摘录；当前输入、选定记忆和实际调用关系保留。页面会提示裁剪，完整工具结果仍可在工作记录查看。摘录不能作为完整文件或全量统计；最小上下文仍超限时停止后续模型交换，保留实际已执行结果。该过程不自动保存记忆，也不额外调用摘要模型。
+
 “停止本轮工作”关闭模型/网页交换并请求取消真实关联执行；暂停使用原全局控制。Core 重启不重发旧付费请求。原显式授权接口仍可撤销，旧待确认写入不会因升级自动执行；这些旧操作可以用“同意”“不同意”答复。
 
 节点状态展示 Core 观察到的在线/离线、忙闲、心跳年龄、工具与资源别名及观测时间。离线时忙闲不可确定；此工具不提供 CPU、内存、传感器或系统负载采样。
@@ -30,4 +34,9 @@ Core 启用 `models.web_enabled=true` 后，可自行调用 `web_search` 与 `we
 - 默认聊天提交 `workspace_work=true`、`work_digest`、`allow_work_results=true`，使用已有配置及本轮外发同意；不能同时指定 `work_grant_id`。
 - `POST /api/v1/chat/turns/{id}/permission`：绑定步骤、轮次 revision、幂等请求号及自然语言答复。
 
-当前设计见 [ADR 0019](decisions/0019-workspace-defaults-web-tools.md)，原显式会话基线见 [ADR 0018](decisions/0018-scoped-chat-work.md)。实际状态与部署证据统一见 [路线图](ROADMAP.md)。
+默认权限与网页设计见 [ADR 0019](decisions/0019-workspace-defaults-web-tools.md)，上下文与能力详情见 [ADR 0020](decisions/0020-dsh-context-harness.md)，原显式会话基线见 [ADR 0018](decisions/0018-scoped-chat-work.md)。实际状态与部署证据统一见 [路线图](ROADMAP.md)。
+
+
+## 新增的工具和中途交互
+
+分页 read、glob、字面 grep、精确 edit、预配置浏览器/应用，以及逐次请求日志、中途纠正、后续排队、历史资料预览与重启核对继续，统一见 [追加使用说明](dsh-tools-usage.md)。它们复用本页的原授权与预算边界；上线状态由 ROADMAP 分别记录，不由文档入口推定已启用。

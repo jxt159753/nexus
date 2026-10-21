@@ -10,8 +10,9 @@ from uuid import UUID, uuid4
 
 from nexus.contracts.chat import CHAT_PROPOSAL, ChatActionDecision, ChatPlanPreview, ChatResultConsent, ChatResultPreview, ChatSubmission, ConversationCreate, ConversationUpdate
 from nexus.contracts.extensions import digest_value
-from nexus.core.cognitive import chat_skills
+from nexus.core.cognitive import chat_skills, chat_journal, chat_compaction
 from nexus.core.cognitive.chat_work import WorkService
+from nexus.core.cognitive.chat_context import request_size, history_message, pressure, prune_tools
 from nexus.core.memory import context as memory_context
 from nexus.core.memory.service import project_owned
 from nexus.core.cognitive.chat_results import RESULT_FIELDS, checked_native, preview, public_preview, queue_summary, validate_preview
@@ -24,21 +25,26 @@ from nexus.core.models.providers import ModelReply
 from nexus.core.storage.database import audit, one, timestamp, utc_now
 from nexus.core.storage.tasks import REQUEST, Conflict, canonical
 
-ACTIVE = "(status IN ('queued','generating','stopping') OR work_status!='' OR auto_result_status='waiting' OR skill_run_id IN (SELECT run_id FROM skill_runs WHERE status IN ('running','cancelling')))"
-TURN_SELECT = """SELECT t.rowid AS cursor,t.*,m.cost_status,m.cost_microunits,coalesce(m.model_call_count,0) AS model_call_count,coalesce(m.web_call_count,0) AS web_call_count
+ACTIVE = "(status IN ('queued','generating','stopping') OR recovery_required=1 OR work_status!='' OR auto_result_status='waiting' OR skill_run_id IN (SELECT run_id FROM skill_runs WHERE status IN ('running','cancelling')))"
+TURN_SELECT = """SELECT t.rowid AS cursor,t.*,m.cost_status,m.cost_microunits,coalesce(m.model_call_count,0) AS model_call_count,coalesce(m.web_call_count,0) AS web_call_count,
+(SELECT outcome FROM chat_compactions p WHERE p.turn_id=t.turn_id) AS context_compaction_status
 FROM chat_turns t LEFT JOIN (
- SELECT coalesce(chat_turn_id,work_root_turn_id) AS chat_turn_id,CASE WHEN sum(cost_status='unknown')>0 THEN 'unknown'
+ SELECT coalesce(m.chat_turn_id,m.work_root_turn_id,p.turn_id) AS chat_turn_id,CASE WHEN sum(cost_status='unknown')>0 THEN 'unknown'
  WHEN sum(cost_status='reserved')>0 THEN 'reserved' ELSE 'calculated' END AS cost_status,
  sum(cost_microunits) AS cost_microunits,sum(web_step_id IS NULL) AS model_call_count,sum(web_step_id IS NOT NULL) AS web_call_count
- FROM model_calls WHERE coalesce(chat_turn_id,work_root_turn_id) IS NOT NULL GROUP BY coalesce(chat_turn_id,work_root_turn_id)
+ FROM model_calls m LEFT JOIN chat_compactions p USING(call_id) WHERE coalesce(m.chat_turn_id,m.work_root_turn_id,p.turn_id) IS NOT NULL GROUP BY coalesce(m.chat_turn_id,m.work_root_turn_id,p.turn_id)
 ) m ON m.chat_turn_id=t.turn_id"""
 
 
 def public_turn(row: sqlite3.Row, *, detail: bool = False) -> dict:
     value = dict(row)
+    value["history_summary"] = json.loads(value.pop("history_summary_json"))
+    value["references"] = json.loads(value.pop("references_json"))
     value["memory_references"] = json.loads(value.pop("memory_refs_json"))
     request = json.loads(value.pop("request_json"))
     context = json.loads(value.pop("context_json"))
+    surface = value.pop("context_surface_json")
+    value.pop("context_sources_json")
     proposal=value.pop("proposal_json")
     value["result_supported"] = bool(value.pop("native_tool_call_json"))
     result_preview = value.pop("result_preview_json")
@@ -56,6 +62,7 @@ def public_turn(row: sqlite3.Row, *, detail: bool = False) -> dict:
         value["work_catalog"] = work_catalog
         value["work_messages"] = json.loads(work_messages) if work_messages else None
         value["context_messages"] = context
+        value["effective_context_messages"] = json.loads(surface) if surface else context
         value["skill_catalog"] = catalog
         if result_preview and value["summary_consented_at"]:
             value["result_context_messages"] = json.loads(result_preview)["messages"]
@@ -70,6 +77,7 @@ class ChatService:
         self.failed = False
         self.skills = None
         self.work = WorkService(self)
+        self.journal = chat_journal.ChatJournal(self)
 
     async def conversation(self, conn, principal: Principal, conversation_id: UUID | str) -> sqlite3.Row:
         await self.owner(conn, principal)
@@ -131,7 +139,7 @@ class ChatService:
         async with self.database.transaction(write=False) as conn:
             conversation = await self.conversation(conn, principal, conversation_id)
             rows = await conn.execute_fetchall(TURN_SELECT + " WHERE t.conversation_id=? AND t.rowid<? ORDER BY t.rowid DESC LIMIT 20", (str(conversation_id), before))
-            active = await one(conn, f"SELECT turn_id FROM chat_turns WHERE conversation_id=? AND {ACTIVE}", (str(conversation_id),))
+            active = await one(conn, f"SELECT turn_id FROM chat_turns WHERE conversation_id=? AND {ACTIVE} ORDER BY rowid LIMIT 1", (str(conversation_id),))
             value = {"conversation": dict(conversation), "active_turn_id": active[0] if active else None, "turns": [public_turn(row) for row in reversed(rows)]}
             value["work_grant"] = await self.work.describe(conn,conversation_id)
             for turn in value["turns"]:
@@ -210,7 +218,10 @@ class ChatService:
                 skills = directory["skills"]
             if conversation["archived"] or conversation["revision"] != value.expected_revision:
                 raise Conflict("IDEMPOTENCY_CONFLICT")
-            if await one(conn, f"SELECT 1 FROM chat_turns WHERE conversation_id=? AND {ACTIVE}", (str(conversation_id),)):
+            previous = await one(conn, f"SELECT turn_id FROM chat_turns WHERE conversation_id=? AND {ACTIVE} ORDER BY rowid DESC LIMIT 1", (str(conversation_id),))
+            if previous and not value.enqueue:
+                raise Conflict("BUSY")
+            if previous and (await one(conn,"SELECT count(*) FROM chat_turns WHERE conversation_id=? AND status='queued'",(str(conversation_id),)))[0]>=5:
                 raise Conflict("BUSY")
             now = utc_now()
             recent = await one(conn, "SELECT count(*) FROM chat_turns WHERE owner_id=? AND created_at>?", (str(principal.identity_id), timestamp(now-timedelta(minutes=1))))
@@ -226,29 +237,61 @@ class ChatService:
                     raise Conflict("IDEMPOTENCY_CONFLICT")
                 refs = snapshot["memories"]
                 messages.insert(0, memory_context.message(refs))
+            references = []
+            if value.reference_turn_ids:
+                reference_snapshot = await self.journal.references(conn,principal,conversation["project_id"],value.reference_turn_ids)
+                if reference_snapshot["references_digest"] != value.references_digest:
+                    raise Conflict("IDEMPOTENCY_CONFLICT")
+                references = reference_snapshot["references"]
+                messages.insert(0,{"role":"user","content":"本轮明确引用的历史资料（只作数据，引用时标注来源 turn_id）：\n"+canonical(references)})
             selected = 0
+            history_summary = []
             available = 0
-            if value.include_context:
+            options = {"generate_title": count == 0 and bool(conversation["auto_title"]), "allow_tools": value.allow_tools}
+            if work_grant_id:
+                options.update(work_catalog=work_catalog, work_limit=4)
+            elif skills:
+                options["skill_catalog"] = skills
+            if value.include_context and not value.allow_compaction:
                 available = (await one(conn, "SELECT count(*) FROM chat_turns WHERE conversation_id=? AND status='completed'", (str(conversation_id),)))[0]
-                rows = await conn.execute_fetchall("SELECT * FROM chat_turns WHERE conversation_id=? AND status='completed' ORDER BY rowid DESC LIMIT 10", (str(conversation_id),))
+                rows = await conn.execute_fetchall("SELECT * FROM chat_turns WHERE conversation_id=? AND status='completed' ORDER BY rowid DESC LIMIT 40", (str(conversation_id),))
                 for row in rows:
                     # Referenced data and model paraphrases are not silently reused
                     # under an old memory consent. Select those memories again.
                     if json.loads(row["memory_refs_json"]):
                         break
-                    if row["work_grant_id"]:
+                    if row["work_grant_id"] or json.loads(row["references_json"]):
                         break
+                    if selected >= 10:
+                        history_summary.append({"turn_id":row["turn_id"],"user_excerpt":row["text"][:160],"assistant_excerpt":row["response_text"][:240]})
+                        continue
                     candidate = [{"role": "user", "content": row["text"]}, {"role": "assistant", "content": row["response_text"]}, *messages]
-                    if len(canonical(candidate).encode()) > (12288 if work_grant_id else 24576):
+                    if len(canonical(candidate).encode()) > 24576 or request_size(self.config,candidate,**options) > self.config.chat_input_bytes:
                         break
                     messages, selected = candidate, selected+1
+            if history_summary:
+                while history_summary:
+                    candidate=[history_message(history_summary),*messages]
+                    if request_size(self.config,candidate,**options)<=self.config.chat_input_bytes:
+                        messages=candidate
+                        break
+                    history_summary.pop()
+            context_sources = []
+            if value.include_context and value.allow_compaction:
+                older, context_sources, records = await chat_compaction.history(conn, conversation_id)
+                context_sources.extend([[] for _ in messages])
+                messages = [*older, *messages]
+                selected = available = len(records)
+            if not value.allow_compaction and not pressure(self.config,messages,**options)["fits"]:
+                raise AccessDenied("MODEL_INPUT_LIMIT")
             context = canonical(messages)
             turn_id = str(uuid4())
             await conn.execute("INSERT INTO chat_turns(turn_id,conversation_id,owner_id,request_id,request_json,text,context_json,context_digest,context_count,context_truncated,status,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?,'queued',?,?)", (
                 turn_id, str(conversation_id), str(principal.identity_id), str(value.request_id), encoded, value.text, context,
                 hashlib.sha256(context.encode()).hexdigest(), selected, int(available > selected), timestamp(now), timestamp(now+timedelta(minutes=5))))
             await conn.execute("UPDATE chat_turns SET skill_catalog_json=? WHERE turn_id=?", (canonical(skills), turn_id))
-            await conn.execute("UPDATE chat_turns SET memory_refs_json=? WHERE turn_id=?", (canonical(refs), turn_id))
+            await conn.execute("UPDATE chat_turns SET memory_refs_json=?,queue_after_turn_id=?,history_summary_json=?,references_json=? WHERE turn_id=?", (canonical(refs),previous[0] if previous else None,canonical(history_summary),canonical(references),turn_id))
+            await conn.execute("UPDATE chat_turns SET context_sources_json=? WHERE turn_id=?", (canonical(context_sources),turn_id))
             if work_grant_id:
                 await conn.execute("UPDATE chat_turns SET work_grant_id=?,work_catalog_json=? WHERE turn_id=?",(work_grant_id,canonical(work_catalog),turn_id))
             await conn.execute("UPDATE conversations SET revision=revision+1,title=? WHERE conversation_id=?", (" ".join(value.text.split())[:40] if count == 0 and conversation["auto_title"] else conversation["title"], str(conversation_id)))
@@ -370,6 +413,8 @@ class ChatService:
                 row = await one(conn, "SELECT * FROM chat_turns WHERE turn_id=? AND owner_id=?", (str(turn_id), str(principal.identity_id)))
                 if row is None:
                     raise LookupError("turn not found")
+                await conn.execute("INSERT INTO chat_controls(control_id,turn_id,request_id,request_json,kind,created_at) SELECT ?,?,?,?,'stop',? WHERE NOT EXISTS(SELECT 1 FROM chat_controls WHERE turn_id=? AND kind='stop')",(str(uuid4()),str(turn_id),str(uuid4()),"{}",timestamp(utc_now()),str(turn_id)))
+                await conn.execute("UPDATE chat_turns SET recovery_required=0 WHERE turn_id=?",(str(turn_id),))
                 if row["work_grant_id"] and (row["work_status"] or row["status"] in {"queued","generating"}):
                     await self.work.abort(conn,str(turn_id),"WORK_USER_STOPPED",utc_now())
                 if row["status"] in {"queued", "generating"}:
@@ -386,18 +431,46 @@ class ChatService:
 
     async def recover(self) -> None:
         async with self.database.transaction() as conn:
-            await conn.execute("UPDATE conversations SET revision=revision+1 WHERE conversation_id IN (SELECT conversation_id FROM chat_turns WHERE status IN ('generating','stopping'))")
-            await conn.execute("UPDATE model_calls SET cost_status='unknown',outcome='unknown',finished_at=? WHERE (chat_turn_id IS NOT NULL OR work_root_turn_id IS NOT NULL) AND outcome='started'", (timestamp(utc_now()),))
+            now=utc_now()
+            await conn.execute("UPDATE chat_exchanges SET outcome='interrupted',finished_at=? WHERE outcome='started'",(timestamp(now),))
+            await conn.execute("UPDATE model_calls SET cost_status='unknown',outcome='unknown',finished_at=? WHERE (chat_turn_id IS NOT NULL OR work_root_turn_id IS NOT NULL OR call_id IN (SELECT call_id FROM chat_compactions)) AND outcome='started'",(timestamp(now),))
+            await conn.execute("UPDATE chat_compactions SET outcome='interrupted',finished_at=? WHERE outcome='started'",(timestamp(now),))
+            # A completed auxiliary call must not silently wake another paid
+            # stage after a restart. Its checkpoint remains reusable.
+            await conn.execute("UPDATE conversations SET revision=revision+1 WHERE conversation_id IN (SELECT conversation_id FROM chat_turns WHERE status='queued' AND EXISTS(SELECT 1 FROM chat_compactions p WHERE p.turn_id=chat_turns.turn_id))")
+            await conn.execute("UPDATE chat_turns SET recovery_required=1,revision=revision+1 WHERE status='queued' AND work_grant_id IS NOT NULL AND EXISTS(SELECT 1 FROM chat_compactions p WHERE p.turn_id=chat_turns.turn_id)")
+            await conn.execute("UPDATE chat_turns SET status='interrupted',error_code='CONTEXT_RESTART_REQUIRES_NEW_REQUEST',revision=revision+1 WHERE status='queued' AND work_grant_id IS NULL AND EXISTS(SELECT 1 FROM chat_compactions p WHERE p.turn_id=chat_turns.turn_id)")
+            await conn.execute("UPDATE conversations SET revision=revision+1 WHERE conversation_id IN (SELECT conversation_id FROM chat_turns WHERE status IN ('generating','stopping') OR (work_status!='' OR status='queued' AND work_grant_id IS NOT NULL AND work_round>0) AND recovery_required=0 AND status NOT IN ('stopped','stopping','interrupted','failed'))")
+            interrupted=await conn.execute_fetchall("SELECT turn_id FROM chat_turns WHERE status IN ('generating','stopping')")
+            for row in interrupted:
+                work=await one(conn,"SELECT work_grant_id FROM chat_turns WHERE turn_id=?",(row[0],))
+                if work[0]:
+                    await self.work.abort(conn,row[0],"MODEL_OUTCOME_UNKNOWN",now)
             await conn.execute("UPDATE chat_turns SET status=CASE WHEN status='stopping' THEN 'stopped' ELSE 'interrupted' END,revision=revision+1,error_code='MODEL_OUTCOME_UNKNOWN' WHERE status IN ('generating','stopping')")
-            rows=await conn.execute_fetchall("SELECT turn_id FROM chat_turns WHERE work_status!=''")
-            for row in rows:
-                await self.work.abort(conn,row[0],"CORE_RESTARTED",utc_now())
+            await conn.execute("UPDATE chat_turns SET recovery_required=1,revision=revision+1 WHERE (work_status!='' OR status='queued' AND work_grant_id IS NOT NULL AND work_round>0) AND recovery_required=0 AND status NOT IN ('stopped','stopping','interrupted','failed')")
 
     async def delta(self, turn_id: str, text: str) -> None:
         async with self.database.transaction() as conn:
             cursor = await conn.execute("UPDATE chat_turns SET response_text=?,revision=revision+1 WHERE turn_id=? AND status='generating'", (text, turn_id))
             if cursor.rowcount != 1:
                 raise asyncio.CancelledError()
+
+    @staticmethod
+    def model_options(row, work_limit):
+        row = dict(row)
+        request = json.loads(row["request_json"])
+        summary = row["phase"] == "summary"
+        options = {"generate_title": not summary and bool(row.get("generate_title",False)),
+                   "allow_tools": not summary and request.get("allow_tools",False)}
+        if not summary and request.get("allow_skills"):
+            options["skill_catalog"] = json.loads(row["skill_catalog_json"])
+        if summary:
+            options["final_result"] = True
+        if row["work_grant_id"]:
+            allow_tools = row["work_round"] < 4 and work_limit > 0
+            options = {"generate_title": row["work_round"] == 0 and bool(row.get("generate_title",False)),
+                       "allow_tools": allow_tools, "work_catalog": json.loads(row["work_catalog_json"]) if allow_tools else [], "work_limit": work_limit}
+        return options
 
     async def claim(self):
         if self.failed or self.harness.failed:
@@ -414,15 +487,23 @@ class ChatService:
                     return None
                 if await one(conn, "SELECT 1 FROM model_calls WHERE outcome='started' LIMIT 1"):
                     return None
-                row = await one(conn, "SELECT t.*,(c.auto_title=1 AND NOT EXISTS(SELECT 1 FROM chat_turns older WHERE older.conversation_id=t.conversation_id AND older.rowid<t.rowid)) AS generate_title FROM chat_turns t JOIN conversations c USING(conversation_id) WHERE t.status='queued' ORDER BY t.rowid LIMIT 1")
+                row = await one(conn, chat_journal.QUEUE_SQL)
                 if row is None:
                     return None
                 summary = row["phase"] == "summary"
                 reservation = self.config.task_cost_microunits
-                messages = json.loads(row["context_json"])
+                row = dict(row)
+                messages = json.loads(row["context_surface_json"] or row["context_json"])
                 error = None
                 try:
                     await memory_context.validate_turn(conn, row)
+                    refs=json.loads(row["references_json"])
+                    if refs:
+                        conversation=await one(conn,"SELECT project_id FROM conversations WHERE conversation_id=?",(row["conversation_id"],))
+                        identity=await one(conn,"SELECT token_hash FROM identities WHERE identity_id=?",(row["owner_id"],))
+                        current=await self.journal.references(conn,Principal(UUID(row["owner_id"]),"owner",identity[0]),conversation[0],[item["turn_id"] for item in refs])
+                        if current["references"] != refs:
+                            raise AccessDenied("MEMORY_UNAVAILABLE")
                     if row["work_grant_id"]:
                         reservation,messages = await self.work.model_start(conn,row,now)
                 except AccessDenied as exc:
@@ -443,6 +524,37 @@ class ChatService:
                         error = exc.code if isinstance(exc, AccessDenied) else "IDEMPOTENCY_CONFLICT" if isinstance(exc, Conflict) else "RESULT_UNAVAILABLE"
                     if (await one(conn, "SELECT archived FROM conversations WHERE conversation_id=?", (row["conversation_id"],)))[0]:
                         error = "APPROVAL_EXPIRED"
+                work_limit=4-(await one(conn,"SELECT count(*) FROM chat_work_steps WHERE turn_id=?",(row["turn_id"],)))[0] if row["work_grant_id"] else 0
+                options = self.model_options(row,work_limit)
+                pending_corrections=await chat_journal.corrections(conn,row["turn_id"])
+                plan = None
+                compact_noop = False
+                try:
+                    request = json.loads(row["request_json"])
+                    if request.get("allow_compaction"):
+                        projected = prune_tools(messages) if pressure(self.config,messages,**options)["pressured"] else messages
+                        if projected != messages:
+                            messages = projected
+                            await conn.execute("UPDATE chat_turns SET context_surface_json=?,context_truncated=1 WHERE turn_id=?",(canonical(messages),row["turn_id"]))
+                            row["context_surface_json"] = canonical(messages)
+                        plan = await chat_compaction.prepare(conn,self.config,row,messages,options)
+                        calls = await chat_compaction.root_calls(conn,row["turn_id"])
+                        reservation = chat_compaction.remaining(self.config,calls)
+                    if plan:
+                        # Freeze the replay surface before starting the auxiliary call.
+                        await conn.execute("UPDATE chat_turns SET context_surface_json=? WHERE turn_id=?",(canonical(messages),row["turn_id"]))
+                        row["_compaction"] = True
+                        messages,options = plan["messages"],plan["options"]
+                    elif request.get("compact_only"):
+                        compact_noop = True
+                except AccessDenied as exc:
+                    error = error or exc.code
+                if not plan:
+                    messages=[*messages,*pending_corrections]
+                if not pressure(self.config,messages,**options)["fits"]:
+                    error = "MODEL_INPUT_LIMIT"
+                if not await chat_journal.capacity(conn):
+                    error = "BUSY"
                 owner = await one(conn, "SELECT 1 FROM identities WHERE identity_id=? AND role='owner' AND revoked_at IS NULL", (row["owner_id"],))
                 error = error or ("AUTH_REQUIRED" if not owner else "MODEL_DISABLED" if not self.config.chat_enabled or self.provider is None else await budget_error(conn, self.config, now, reservation=reservation))
                 if not summary and row["expires_at"] <= timestamp(now):
@@ -453,16 +565,27 @@ class ChatService:
                     await conn.execute("UPDATE chat_turns SET status=?,error_code=?,revision=revision+1 WHERE turn_id=?", ("expired" if error == "DEADLINE_EXCEEDED" else "failed", error, row["turn_id"]))
                     await conn.execute("UPDATE conversations SET revision=revision+1 WHERE conversation_id=?", (row["conversation_id"],))
                     return None
+                if compact_noop:
+                    await conn.execute("UPDATE chat_turns SET status='completed',response_text='没有可安全压缩的较早历史；原始记录保留。',revision=revision+1 WHERE turn_id=?",(row["turn_id"],))
+                    await conn.execute("UPDATE conversations SET revision=revision+1 WHERE conversation_id=?",(row["conversation_id"],))
+                    return None
                 call_id = str(uuid4())
                 await conn.execute("INSERT INTO model_calls(call_id,provider,model,cost_status,created_at,owner_id,reserved_microunits,pricing_json,outcome,chat_turn_id,chat_stage,task_id) VALUES(?,'deepseek',?,'reserved',?,?,?,?, 'started',?,?,?)", (
                     call_id, MODEL, timestamp(now), row["owner_id"], reservation,
-                    canonical({"input": self.config.input_price, "output": self.config.output_price, "currency": "USD", "valid_until": self.config.price_valid_until.isoformat()}), None if row["work_grant_id"] else row["turn_id"], int(summary), row["task_id"]))
-                if row["work_grant_id"]:
+                    canonical({"input": self.config.input_price, "output": self.config.output_price, "currency": "USD", "valid_until": self.config.price_valid_until.isoformat()}), None if row["work_grant_id"] or plan else row["turn_id"], int(summary), row["task_id"]))
+                if row["work_grant_id"] and not plan:
                     await conn.execute("UPDATE model_calls SET work_root_turn_id=?,work_round=? WHERE call_id=?",(row["turn_id"],row["work_round"],call_id))
                 await conn.execute("UPDATE chat_turns SET status='generating',revision=revision+1 WHERE turn_id=?", (row["turn_id"],))
                 if row["skill_run_id"]:
                     await conn.execute("UPDATE model_calls SET skill_run_id=? WHERE call_id=?", (row["skill_run_id"], call_id))
-                work_limit=4-(await one(conn,"SELECT count(*) FROM chat_work_steps WHERE turn_id=?",(row["turn_id"],)))[0] if row["work_grant_id"] else 0
+                if plan:
+                    await chat_compaction.begin(conn,row,call_id,plan,now)
+                    from nexus.core.models.chat import request_body
+                    await chat_journal.begin_payload(conn,row["turn_id"],call_id,request_body(self.config,messages,**options).decode(),now)
+                else:
+                    await chat_journal.begin(conn,self.config,row,call_id,messages,options,now)
+                if row["work_grant_id"] and not plan:
+                    await conn.execute("UPDATE chat_turns SET work_messages_json=? WHERE turn_id=?",(canonical(messages),row["turn_id"]))
                 await audit(conn, row["owner_id"], None, "model.reserved", now)
             # HTTP starts only after the transaction committed, ordered with controls.
             accumulated, last_flush = "", 0.0
@@ -474,18 +597,12 @@ class ChatService:
                     raise ProviderFailure("MODEL_RESPONSE_LIMIT")
                 clock = asyncio.get_running_loop().time()
                 if clock-last_flush >= .1:
-                    await self.delta(row["turn_id"], accumulated)
+                    if not plan:
+                        await self.delta(row["turn_id"], accumulated)
+                    async with self.database.transaction() as conn:
+                        await conn.execute("UPDATE chat_exchanges SET partial_text=? WHERE call_id=? AND outcome='started'",(accumulated,call_id))
                     last_flush = clock
 
-            request=json.loads(row["request_json"])
-            options = {"generate_title": not summary and bool(row["generate_title"]), "allow_tools": not summary and request.get("allow_tools",False)}
-            if not summary and request.get("allow_skills"):
-                options["skill_catalog"] = json.loads(row["skill_catalog_json"])
-            if summary:
-                options["final_result"] = True
-            if row["work_grant_id"]:
-                allow_work_tools=row["work_round"] < 4 and work_limit>0
-                options = {"generate_title":row["work_round"] == 0 and bool(row["generate_title"]),"allow_tools":allow_work_tools,"work_catalog":json.loads(row["work_catalog_json"]) if allow_work_tools else [],"work_limit":work_limit}
             task = asyncio.create_task(self.provider.invoke(messages, receive, **options))
             self.active = row["turn_id"], task
             return row, call_id, task, lambda: accumulated
@@ -564,12 +681,19 @@ class ChatService:
                 status, error = "stopped", None
             elif interrupted:
                 status, error = "interrupted", "MODEL_OUTCOME_UNKNOWN"
+            if isinstance(row,dict) and row.get("_compaction"):
+                await conn.execute("UPDATE model_calls SET cost_microunits=?,cost_status=?,input_tokens=?,output_tokens=?,finished_at=?,outcome=?,model=? WHERE call_id=? AND outcome='started'",(
+                    cost,"calculated" if cost is not None else "unknown",input_tokens,output_tokens,timestamp(now),"completed" if cost is not None else "unknown",reported_model[:200],call_id))
+                await chat_compaction.finish(conn,row,call_id,reply,status,now)
+                await chat_journal.finish(conn,call_id,reply,partial,status,now)
+                return
             proposal=None
             plan=None
             if status=="completed" and reply is not None and reply.proposal is not None:
                 try:
                     if row["work_grant_id"]:
-                        await self.work.proposed(conn,row,reply,now)
+                        fresh=await one(conn,"SELECT * FROM chat_turns WHERE turn_id=?",(row["turn_id"],))
+                        await self.work.proposed(conn,fresh,reply,now)
                     else:
                         proposal=CHAT_PROPOSAL.validate_json(canonical(reply.proposal)).model_dump(mode="json")
                     if not row["work_grant_id"] and (row["phase"] == "summary" or not json.loads(row["request_json"]).get("allow_tools")):
@@ -587,7 +711,13 @@ class ChatService:
                 except (ValidationError,AccessDenied,ValueError,TypeError,KeyError):
                     proposal=None
                     status,error="failed","POLICY_DENIED"
-            if row["work_grant_id"] and status not in {"completed"}:
+            if row["work_grant_id"] and status=="completed" and reply and reply.proposal is None and await chat_journal.corrections(conn,row["turn_id"]):
+                fresh=await one(conn,"SELECT work_messages_json,context_json FROM chat_turns WHERE turn_id=?",(row["turn_id"],))
+                messages=json.loads(fresh[0] or fresh[1])
+                messages.append({"role":"assistant","content":reply.content})
+                await conn.execute("UPDATE chat_turns SET work_round=work_round+1,work_messages_json=? WHERE turn_id=?",(canonical(messages),row["turn_id"]))
+                status="queued"
+            if row["work_grant_id"] and status not in {"completed","queued"}:
                 await self.work.abort(conn,row["turn_id"],error or "WORK_STOPPED",now)
             await conn.execute("UPDATE model_calls SET cost_microunits=?,cost_status=?,input_tokens=?,output_tokens=?,finished_at=?,outcome=?,model=? WHERE call_id=? AND outcome='started'", (
                 cost, "calculated" if cost is not None else "unknown", input_tokens, output_tokens,
@@ -607,6 +737,7 @@ class ChatService:
                         await conn.execute("UPDATE chat_turns SET proposal_json=?,proposal_digest=?,proposal_policy_version=?,action_status='proposed',native_tool_call_json=? WHERE turn_id=?",(canonical(proposal),digest,version,canonical(reply.native_tool_call) if reply.native_tool_call else None,row["turn_id"]))
                         if plan is not None:
                             await conn.execute("UPDATE chat_turns SET skill_plan_json=? WHERE turn_id=?", (canonical(plan), row["turn_id"]))
+            await chat_journal.finish(conn,call_id,reply,partial,status,now)
             await audit(conn, row["owner_id"], None, "model.settled" if cost is not None else "model.unknown", now)
 
     async def process_one(self) -> bool:

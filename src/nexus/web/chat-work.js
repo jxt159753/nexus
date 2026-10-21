@@ -2,7 +2,7 @@
 const chatWorkState={grant:null,catalog:null,permission:null,retry:null,nodes:new Map(),defaultNode:null,webEnabled:false};
 function chatWorkspaceReady() {
   const node=chatWorkState.nodes.get($("chat-node").value);
-  return !!node && (chatWorkState.webEnabled || node.roots.includes("workspace") && ["filesystem.read@1","filesystem.search@1","filesystem.write@1"].some(tool=>node.tools.includes(tool)));
+  return !!node && (chatWorkState.webEnabled || node.roots.includes("workspace") && ["filesystem.read@1","filesystem.search@1","filesystem.write@1","filesystem.read_lines@1","filesystem.glob@1","filesystem.grep@1","filesystem.edit@1"].some(tool=>node.tools.includes(tool)));
 }
 function chatWorkReset() {
   chatWorkState.grant=null; chatWorkState.catalog=null; chatWorkState.permission=null; chatWorkState.retry=null;
@@ -33,14 +33,16 @@ async function chatWorkSubmission() {
 function chatWorkCards(turn) {
   const box=el("section",undefined,"chat-action");
   box.append(el("h3","本轮工作记录"));
-  const labels={get_node_status:"查询节点状态",get_system_info:"读取系统信息",list_directory:"列出工作区",read_file:"读取文件",find_files:"查找文件",write_file:"写入文件",run_command:"执行固定命令",run_skill:"运行 Skill",run_tool:"运行 Tool",web_search:"搜索网页",web_fetch:"抓取网页"};
+  const labels={observe_target:"观察已配置网页或应用",interact_target:"操作已配置网页或应用",read:"按行读取文件",glob:"匹配文件路径",grep:"搜索文件内容",edit:"精确修改文件",get_node_status:"查询节点状态",get_system_info:"读取系统信息",list_directory:"列出工作区",read_file:"读取文件",find_files:"查找文件",write_file:"写入文件",run_command:"执行固定命令",inspect_capability:"查看能力详情",run_skill:"运行 Skill",run_tool:"运行 Tool",web_search:"搜索网页",web_fetch:"抓取网页"};
   const statuses={pending:"准备执行",waiting:"等待执行结果",permission:"需要你的确认",succeeded:"已完成",failed:"未完成",stopped:"工作已停止，实际执行状态见任务记录"};
   for (const step of turn.work_steps || []) {
     const card=el("section",undefined,"chat-result-preview");
     card.append(el("strong",`${step.step_index}. ${labels[step.proposal.intent] || step.proposal.intent} · ${statuses[step.status]}`));
     const args=step.proposal.arguments,data=step.result?.data,preview=step.result?.preview;
+    if (args.target_id) card.append(el("p",`目标：${args.target_id}${args.action_id ? " · 动作："+args.action_id : ""}`));
+    if (data?.observation) card.append(el("pre",data.observation.state_json),el("p","证据是所配置目标的观察或动作返回，实际业务结果需核对观察内容。","hint"));
     if (args.path) card.append(el("p",`workspace/${args.path}`));
-    if (args.pattern) card.append(el("p",`文件名：${args.pattern}`));
+    if (args.pattern) card.append(el("p",`搜索条件：${args.pattern}`));
     if (args.command_id) card.append(el("p",`固定命令：${args.command_id}`));
     if (args.query) card.append(el("p",`搜索：${args.query}`));
     if (preview) {
@@ -56,6 +58,8 @@ function chatWorkCards(turn) {
       if (data.truncated) card.append(el("p","网页内容已截断。","hint"));
     }
     else if (data && step.proposal.intent==="get_node_status") card.append(el("p",`${data.online ? "在线" : "离线"} · ${data.busy==null ? "忙闲未知" : data.busy ? "忙碌" : "空闲"}${data.heartbeat_age_seconds==null ? "" : ` · ${data.heartbeat_age_seconds} 秒前收到心跳`} · 观测于 ${new Date(data.observed_at).toLocaleTimeString()}`));
+    else if (data?.lines) card.append(el("pre",data.lines.map(line=>`${line.number}: ${line.text}${line.truncated ? " […本行截断]" : ""}`).join("\n")),el("p",data.next_offset ? `下一页从第 ${data.next_offset} 行开始。` : "已到文件末尾。","hint"));
+    else if (data?.matches) card.append(el("pre",data.matches.map(line=>`${line.path}:${line.number}: ${line.text}`).join("\n")),el("p",data.truncated ? "搜索有省略，详见执行记录。" : "搜索已完成。","hint"));
     else if (data && "text" in data) card.append(el("pre",data.text),el("p",data.truncated ? "读取结果已截断。" : "已读取文件。","hint"));
     else if (data && "stdout" in data) card.append(el("pre",data.stdout || data.stderr || "命令没有文本输出。"),el("p",`退出码：${data.exit_code}`,"hint"));
     else if (data && step.proposal.intent!=="write_file") card.append(el("pre",JSON.stringify(data,null,2)));

@@ -16,6 +16,7 @@ class TrustedNode(StrictContract):
     roots: frozenset[Literal["workspace"]] = frozenset()
     resource_version: StrictInt = Field(default=1, ge=1)
     command_digests: dict[CommandId, CommandDigest] = Field(default_factory=dict, max_length=16)
+    interaction_digests: dict[CommandId, CommandDigest] = Field(default_factory=dict, max_length=16)
 
 
 class SandboxNodePolicy(StrictContract):

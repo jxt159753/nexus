@@ -16,13 +16,13 @@ process.stdin.on("end",async()=>{
     await page.locator('[data-tab="chat"]').click(); await page.locator("#chat-project").selectOption({label:"M6 演示"}); await page.locator("#chat-new").click();
     await page.waitForFunction(()=>!document.querySelector("#chat-send").disabled);
     await page.locator("#chat-tools").uncheck(); await page.locator("#chat-text").fill("讨论小游戏项目"); await page.locator("#chat-send").click();
-    await page.waitForFunction(()=>document.querySelectorAll(".chat-turn").length===1 && !document.querySelector("#chat-send").disabled);
+    await page.waitForFunction(()=>document.querySelectorAll(".chat-turn").length===1 && !chatState.active && !document.querySelector("#chat-send").disabled);
     await page.getByRole("button",{name:"从本条输入明确保存记忆"}).click();
     await page.locator("#chat-memory-content").fill("使用 Godot，先做桌面版"); await page.locator("#chat-memory-until").fill("2026-10-24T18:00"); await page.locator("#chat-memory-save-consent").check(); await page.locator("#chat-memory-save").click();
     await page.locator(".memory-pick").waitFor(); await page.locator(".memory-pick").check(); await page.locator("#chat-memory-preview").click();
     await page.locator("#chat-memory-outbound").waitFor({state:"visible"}); assert.ok((await page.locator("#chat-memory-outbound").innerText()).includes("使用 Godot"));
     await page.locator("#chat-memory-consent").check(); await page.locator("#chat-text").fill("参考本轮选定的项目背景"); await page.locator("#chat-send").click();
-    await page.waitForFunction(()=>document.querySelectorAll(".chat-turn").length===2 && !document.querySelector("#chat-send").disabled);
+    await page.waitForFunction(()=>document.querySelectorAll(".chat-turn").length===2 && !chatState.active && !document.querySelector("#chat-send").disabled);
     await page.getByText("本轮引用的记忆与来源",{exact:true}).click();
     assert.ok(await page.getByText("使用 Godot，先做桌面版",{exact:false}).count());
     assert.equal(await page.locator("#chat-memory-consent").isChecked(),false);

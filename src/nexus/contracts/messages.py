@@ -17,7 +17,8 @@ from nexus.contracts.base import (
 )
 from nexus.contracts.errors import ErrorPayload
 from nexus.contracts.basic import ToolName, CommandId
-from nexus.contracts.tools import FileReadCall, FileSearchCall, FilePreviewCall, FileWriteCall, CommandRunCall, FileReadResult, FileSearchResult, FilePreviewResult, FileWriteResult, CommandRunResult
+from nexus.contracts.interaction import InteractionResult
+from nexus.contracts.tools import ObserveCall, InteractCall, FileLinesCall, FileLinesResult, FileGlobCall, FileGlobResult, FileGrepCall, FileGrepResult, FileEditPreviewCall, FileEditPreviewResult, FileEditCall, FileEditResult, FileReadCall, FileSearchCall, FilePreviewCall, FileWriteCall, CommandRunCall, FileReadResult, FileSearchResult, FilePreviewResult, FileWriteResult, CommandRunResult
 from nexus.contracts.task import ExecutionOutcome, TaskStatus
 from nexus.contracts.tools import (
     ListDirectoryCall,
@@ -101,7 +102,8 @@ class ToolCapability(StrictContract):
 class NodeHello(StrictContract):
     node_id: UUID
     node_version: StrictStr = Field(min_length=1, max_length=50)
-    tools: list[ToolCapability] = Field(max_length=7)
+    tools: list[ToolCapability] = Field(max_length=14)
+    interaction_digests: dict[CommandId, CommandDigest] = Field(default_factory=dict, max_length=16)
     command_digests: dict[CommandId, CommandDigest] = Field(default_factory=dict, max_length=16)
     roots: list[Literal["workspace"]] = Field(max_length=1)
     boot_id: UUID
@@ -184,8 +186,36 @@ class CommandRunExecute(CommandExecuteBase, CommandRunCall):
     pass
 
 
+class FileLinesExecute(CommandExecuteBase, FileLinesCall):
+    pass
+
+
+class FileGlobExecute(CommandExecuteBase, FileGlobCall):
+    pass
+
+
+class FileGrepExecute(CommandExecuteBase, FileGrepCall):
+    pass
+
+
+class FileEditPreviewExecute(CommandExecuteBase, FileEditPreviewCall):
+    pass
+
+
+class FileEditExecute(CommandExecuteBase, FileEditCall):
+    pass
+
+
+class ObserveExecute(CommandExecuteBase, ObserveCall):
+    pass
+
+
+class InteractExecute(CommandExecuteBase, InteractCall):
+    pass
+
+
 CommandExecute = Annotated[
-    SystemInfoExecute | ListDirectoryExecute | FileReadExecute | FileSearchExecute | FilePreviewExecute | FileWriteExecute | CommandRunExecute, Field(discriminator="tool")
+    SystemInfoExecute | ListDirectoryExecute | FileReadExecute | FileSearchExecute | FilePreviewExecute | FileWriteExecute | CommandRunExecute | FileLinesExecute | FileGlobExecute | FileGrepExecute | FileEditPreviewExecute | FileEditExecute | ObserveExecute | InteractExecute, Field(discriminator="tool")
 ]
 
 
@@ -255,8 +285,43 @@ class CommandRunCommandResult(CommandResultBase):
     result: CommandRunResult | None = None
 
 
+class FileLinesCommandResult(CommandResultBase):
+    tool: Literal["filesystem.read_lines"]
+    result: FileLinesResult | None = None
+
+
+class FileGlobCommandResult(CommandResultBase):
+    tool: Literal["filesystem.glob"]
+    result: FileGlobResult | None = None
+
+
+class FileGrepCommandResult(CommandResultBase):
+    tool: Literal["filesystem.grep"]
+    result: FileGrepResult | None = None
+
+
+class FileEditPreviewCommandResult(CommandResultBase):
+    tool: Literal["filesystem.edit_preview"]
+    result: FileEditPreviewResult | None = None
+
+
+class FileEditCommandResult(CommandResultBase):
+    tool: Literal["filesystem.edit"]
+    result: FileEditResult | None = None
+
+
+class ObserveCommandResult(CommandResultBase):
+    tool: Literal["interaction.observe"]
+    result: InteractionResult | None = None
+
+
+class InteractCommandResult(CommandResultBase):
+    tool: Literal["interaction.act"]
+    result: InteractionResult | None = None
+
+
 CommandResult = Annotated[
-    SystemInfoCommandResult | ListDirectoryCommandResult | FileReadCommandResult | FileSearchCommandResult | FilePreviewCommandResult | FileWriteCommandResult | CommandRunCommandResult, Field(discriminator="tool")
+    SystemInfoCommandResult | ListDirectoryCommandResult | FileReadCommandResult | FileSearchCommandResult | FilePreviewCommandResult | FileWriteCommandResult | CommandRunCommandResult | FileLinesCommandResult | FileGlobCommandResult | FileGrepCommandResult | FileEditPreviewCommandResult | FileEditCommandResult | ObserveCommandResult | InteractCommandResult, Field(discriminator="tool")
 ]
 
 

@@ -22,7 +22,12 @@ class Stream(httpx2.AsyncByteStream):
             body={'model':'deepseek-flash','choices':[{'index':0,'delta':delta,'finish_reason':finish}]}
             if finish:body['usage']={'prompt_tokens':100,'completion_tokens':20}
             return ('data: '+json.dumps(body,ensure_ascii=False)+'\n\n').encode()
-        if value['messages'][-1]['role']=='tool':
+        if value['messages'][-1].get('content','').startswith('Compress the preceding conversation'):
+            content='\n'.join('## '+heading+'\n- preserve facts, current goals, uncertainty and original evidence' for heading in ['Goal','Decisions and Constraints','Facts and Evidence','Completed Work','Pending Work','Next Step'])
+            yield event({'content':content},'stop')
+        elif not value.get('tools'):
+            yield event({'content':'ordinary project history '+('a'*4000)},'stop')
+        elif value['messages'][-1]['role']=='tool':
             data=json.loads(value['messages'][-1]['content'])
             assert data['status']=='succeeded'
             previous=next(m for m in reversed(value['messages']) if m.get('tool_calls'))

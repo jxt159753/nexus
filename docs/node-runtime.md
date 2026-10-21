@@ -2,6 +2,8 @@
 
 本文描述 P05 的两个固定只读工具、本地策略、执行回执和受管理工具进程。P06 已组装 [Node Link](s3-link.md)，P07 已接入 [Core 持久调度与网络执行](s4-harness.md)；调用方必须先认证 Core 并检查当前会话。`grant_id` 和命令摘要不能替代授权。授权与任务进度见 [ROADMAP](ROADMAP.md)，本地技术证据见 [P05 验证记录](P05-VERIFICATION.md)，本轮回归见 [S3](S3-VERIFICATION.md)。
 
+阅读范围：下文原两工具示例保留 M1/P05 基线。后续 Windows Node 已扩展受控文件读写/查找与固定命令，见 [M6 工具说明](m6-projects-tools.md)及[聊天工作](chat-work.md)；注册表不再固定为两项，资源、回执、Job 与未知结果规则继续复用。生成 Tool 由[独立 Sandbox Node](m4-extension-protocol.md)执行，不在普通 Windows 工具进程中运行。
+
 ## 配置与固定工具
 
 `nexus.node.config.NodeConfig` 使用严格 Pydantic 模型。Python 配置示例（目录须事先存在）：
@@ -23,7 +25,7 @@ config = NodeConfig(
 
 | 项目 | 本地限制 |
 | --- | --- |
-| 工具注册表 | 不可变的 `system.info@1`、`filesystem.list@1`，均为只读、允许由 Core 安全重试 |
+| 工具注册表 | M1 两项为 `system.info@1`、`filesystem.list@1`，均只读；后续工具按严格契约登记并显式配置，写入/命令不沿用只读重试策略 |
 | 系统结果 | 仅 os_name、os_version、architecture、python_version |
 | 文件资源 | 绝对本地目录；拒绝 UNC、设备路径、网络映射盘、通配符、`..`、附加数据流及根/祖先 reparse point |
 | 目录结果 | 仅直接条目的名称和类型；不递归、不读取正文，`stat(follow_symlinks=False)`，链接/junction 标记 link |

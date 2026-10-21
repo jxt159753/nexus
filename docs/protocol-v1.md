@@ -2,6 +2,8 @@
 
 本文件记录 P02 的具体字段和解析约定。架构权威入口仍为 [ARCHITECTURE.md](ARCHITECTURE.md)，授权与任务状态见 [ROADMAP.md](ROADMAP.md)，实际验证见 [P02-VERIFICATION.md](P02-VERIFICATION.md)。这些是共享数据契约，不实现身份认证、授权、WebSocket、持久化或工具执行。
 
+阅读范围：P02 原两工具只是 v1 的初始联合类型，不是协议的永久工具数量上限。M6 已在严格 v1 契约中扩展受控文件与固定命令工具；生成 Tool 使用[独立 v2 Sandbox 协议](m4-extension-protocol.md)。下列原消息及两工具字段继续保留，新增参数/结果以对应 `contracts` 严格模型和 [M6 说明](m6-projects-tools.md)为准，Core/Node 须同步升级。
+
 ## 信封和入口
 
 所有消息包含以下字段；信封、payload 和嵌套对象都拒绝未知字段。
@@ -21,7 +23,7 @@
 
 `ProtocolError.error` 为有限 `ErrorPayload`：未知意图为 `UNSUPPORTED_TASK`，非法或不支持的协议版本为 `PROTOCOL_UNSUPPORTED`，其他 JSON/类型/参数/大小错误为 `INVALID_MESSAGE`；解析错误不可重试。公开错误不回显输入或 Pydantic 内部错误。error 信封由调用方设置消息 ID、关联 ID 和当前会话后发送，解析器本身不发送消息。
 
-所有 ID 均为 UUID；事件游标 `event_id` 为 1–19 位非负十进制字符串，不带多余前导零；revision 为非负严格整数。`command_digest` 为 64 位小写十六进制。到期与观测时间采用相同的 UTC 时间类型。MVP 现有资源契约只接受 `workspace`，它不表示该资源已获配置或授权。
+所有 ID 均为 UUID；事件游标 `event_id` 为 1–19 位非负十进制字符串，不带多余前导零；revision 为非负严格整数。`command_digest` 为 64 位小写十六进制。到期与观测时间采用相同的 UTC 时间类型。当前文件资源契约使用 `workspace`，它不表示该资源已获配置或授权。
 
 ## 消息类型
 
@@ -68,9 +70,18 @@ S7 不改变信封、工具版本、摘要或消息字段。现有 Core 入口�
 - command.result 的 outcome=succeeded 必须有匹配工具类型的 result 且没有 error；outcome=failed 必须有 error 且没有 result。不存在以 success 布尔值代替证据的入口。
 - command.status_result 的 phase 为 not_found/received/started/completed/cancelled/unknown。not_found 不带摘要或结果，其余阶段必须有摘要；只有 completed 必须携带结果。嵌套结果的 session_id、attempt_id 和摘要须与外层一致。旧回执重传时须使用当前会话，保留原 attempt 和动作身份。
 - task.updated 的状态沿用架构状态集合。succeeded 必须有 result、execution_outcome=known 和 verification=node_report_schema_checked；result 和 error 不可同时存在。这只验证数据形状，不代替 P07 对真实归属、授权及证据的检查。
-- node.hello 的 tools 最多包含两个不重复的固定工具版本，roots 最多包含 workspace；空列表不授予任何能力。node_version 最多 50 字符。
+- node.hello 的 tools 只接受当前严格 ToolName/版本集合，按 NodeHello 契约限制数量并拒绝重复，不再固定为两个；roots 最多包含 workspace。固定命令另校验同名模板摘要；空能力列表不授予权限，node_version 最多 50 字符。本地新增契约的发布状态另见路线图，不能只凭节点自报启用。
 - node.welcome 的心跳间隔为 1–10 秒、超时为 1–30 秒且大于间隔。limits 包含 max_message_bytes≤65536、max_result_bytes≤32768、execution_timeout_seconds≤10、max_concurrent_attempts=1；所有数值为正严格整数，结果字节限额必须小于消息限额。运行期收紧限额仍由 P05/P06 接入并执行。
 
 P02 只定义上述数据和无 I/O 的编解码。消息方向权限、当前认证会话、资源范围、动作摘要的计算与绑定、实际期限、状态转移、重试、持久化和工具验证分别由后续任务落实；模型解析通过不代表获得执行权限或任务已经成功。
 
 P05 已实现 Node 本地执行，并在 `nexus.contracts.commands` 定义共享摘要：命令排除 session_id / command_digest，加入可信 node_id，按键排序后以紧凑 UTF-8 JSON 取 SHA-256；覆盖动作、task/attempt、grant 和期限。会话变化允许重传，动作/期限变化不得复用 attempt。P06 接入认证 Link，P07 接入权威派发与验证，P08 接入 [恢复与控制](s5-recovery.md)。消息名称和摘要算法不变，S5 增加上文停止证据字段。
+
+
+## M6 追加：分页、精确编辑及配置界面目标
+
+本地新增 `filesystem.read_lines/glob/grep/edit_preview/edit@1` 及 `interaction.observe/act@1`；完整契约在 `nexus.contracts.basic/tools/interaction`。读行返回 offset、编号行、total_lines、next_offset 和完整文件摘要；glob/grep 返回路径、行号和扫描/省略范围；edit 强制读取摘要、成功预览关联及结果内容摘要，不把差异文本当授权。
+
+`node.hello` 新增可选 `interaction_digests`（默认空，最多 16），与固定命令摘要分别检查；工具列表当前最多 14，继续拒绝重复与未知工具。Core 登记值、Node 广告、持久身份授权、具体任务和 Node 配置必须共同允许。interaction 操作绑定 target/action、template_digest、观察摘要及可选有界值，不接收代码、选择器或进程路径。
+
+`InteractionResult` 返回固定目标观察及其摘要；act 还需匹配 action_id、previous_state_sha256，verification 为 configured_target_observed/configured_action_returned。外层仍为 node_report_schema_checked，不宣称业务完成或独立观察。edit/act/write/command 无新 attempt 自动重试，原结果确认与恢复协议不变。同步升级按 Core 在先、Node 在后；旧 Node 不提供新工具，严格旧 Core 不接受新增握手字段。使用与授权说明见 [新工具说明](dsh-tools-usage.md)。

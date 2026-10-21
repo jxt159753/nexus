@@ -323,6 +323,7 @@ class SkillService:
             step = await one(conn, "SELECT * FROM skill_run_steps WHERE run_id=? AND step_index=?", (run_id, run["current_step"]))
             steps = await conn.execute_fetchall("SELECT * FROM skill_run_steps WHERE run_id=? ORDER BY step_index", (run_id,))
             paused = bool((await one(conn, "SELECT paused FROM system_state WHERE singleton=1"))[0])
+            recovery_hold = await one(conn,"SELECT 1 FROM chat_work_steps s JOIN chat_turns t USING(turn_id) WHERE s.skill_run_id=? AND t.recovery_required=1",(run_id,))
         now = utc_now()
         if run["expires_at"] <= timestamp(now):
             if step is not None and step["task_id"]:
@@ -356,6 +357,8 @@ class SkillService:
                     return
             await self._finish(run_id, "cancelled")
             return
+        if recovery_hold:
+            return  # Harness may reconcile existing attempts; no new Skill step yet.
         if step is None:
             results = {item["step_id"]: json.loads(item["result_json"]) for item in steps if item["result_json"]}
             release = json.loads(version["release_json"])

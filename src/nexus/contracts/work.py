@@ -5,8 +5,9 @@ from uuid import UUID
 
 from pydantic import Field, StrictBool, StrictInt, StrictStr, TypeAdapter, model_validator
 
+from nexus.contracts.interaction import WorkObserveArguments, WorkInteractArguments
 from nexus.contracts.base import StrictContract
-from nexus.contracts.basic import FileReadArguments, FileSearchArguments, FilePreviewArguments, CommandId
+from nexus.contracts.basic import FileLinesArguments, FileGlobArguments, FileGrepArguments, FileEditPreviewArguments, FileReadArguments, FileSearchArguments, FilePreviewArguments, CommandId
 from nexus.contracts.chat import SkillArguments, SkillProposal
 from nexus.contracts.language import SystemProposal, DirectoryProposal
 from nexus.contracts.web import WebSearchArguments, WebFetchArguments
@@ -69,6 +70,15 @@ class ToolProposal(StrictContract):
     arguments: SkillArguments
 
 
+class CapabilityArguments(StrictContract):
+    version_id: UUID
+
+
+class CapabilityProposal(StrictContract):
+    intent: Literal["inspect_capability"]
+    arguments: CapabilityArguments
+
+
 class WebSearchProposal(StrictContract):
     intent: Literal["web_search"]
     arguments: WebSearchArguments
@@ -79,4 +89,34 @@ class WebFetchProposal(StrictContract):
     arguments: WebFetchArguments
 
 
-WORK_PROPOSAL = TypeAdapter(Annotated[SystemProposal | DirectoryProposal | ReadProposal | SearchProposal | WriteProposal | CommandProposal | StatusProposal | SkillProposal | ToolProposal | WebSearchProposal | WebFetchProposal, Field(discriminator="intent")])
+class LinesProposal(StrictContract):
+    intent: Literal["read"]
+    arguments: FileLinesArguments
+
+
+class GlobProposal(StrictContract):
+    intent: Literal["glob"]
+    arguments: FileGlobArguments
+
+
+class GrepProposal(StrictContract):
+    intent: Literal["grep"]
+    arguments: FileGrepArguments
+
+
+class EditProposal(StrictContract):
+    intent: Literal["edit"]
+    arguments: FileEditPreviewArguments
+
+
+class ObserveProposal(StrictContract):
+    intent: Literal["observe_target"]
+    arguments: WorkObserveArguments
+
+
+class InteractProposal(StrictContract):
+    intent: Literal["interact_target"]
+    arguments: WorkInteractArguments
+
+
+WORK_PROPOSAL = TypeAdapter(Annotated[SystemProposal | DirectoryProposal | ReadProposal | SearchProposal | WriteProposal | CommandProposal | StatusProposal | SkillProposal | ToolProposal | CapabilityProposal | WebSearchProposal | WebFetchProposal | LinesProposal | GlobProposal | GrepProposal | EditProposal | ObserveProposal | InteractProposal, Field(discriminator="intent")])

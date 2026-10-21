@@ -1,4 +1,3 @@
-
 [build-system]
 requires = ["setuptools>=75,<81"]
 build-backend = "setuptools.build_meta"
@@ -29,7 +28,7 @@ include = ["nexus*"]
 
 [tool.setuptools.package-data]
 "nexus.core.storage" = ["migrations/*.sql"]
-"nexus.node" = ["migrations/*.sql"]
+"nexus.node" = ["migrations/*.sql", "tools/*.ps1"]
 "nexus.web" = ["*.html", "*.css", "*.js"]
 
 [tool.pytest.ini_options]
