@@ -60,6 +60,7 @@ class NodeClient:
             message = parse_message(await ws.recv())
         if message.type != "node.welcome":
             raise ProtocolError(ErrorCode.FORBIDDEN, "Core welcome required")
+        self.runtime.use_core_clock(message.sent_at)
         welcome = message.payload
         self.state = LinkState("online", welcome.session_id, self.state.reconnect_count)
         rate = MessageRate()

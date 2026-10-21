@@ -72,6 +72,7 @@ Core、Node、Tool、Skill 等词的解释见 [架构文档的名词说明](ARCH
 | M6 的 DSH 工具与会话机制 | [追加验证、固定包与限制](DSH-TOOLS-VERIFICATION.md) |
 | M6 的 DSH 参考优化 | [本地验证、源码基线与限制](DSH-REFERENCE-VERIFICATION.md) |
 | M6 跨轮代码与保存衔接 | [DSH 对照、回归与未验证项](CHAT-CONTINUITY-VERIFICATION.md) |
+| M6 回执与执行队列恢复 | [时钟、停止证据与实际上线验证](RECOVERY-EVIDENCE-VERIFICATION.md) |
 | 历次交付、上线、批准与中间失败 | [2026 年 10 月历史记录](history/2026-10-delivery.md)，固定历史快照，不更新进度 |
 
 ## 设计决定与旧工作单

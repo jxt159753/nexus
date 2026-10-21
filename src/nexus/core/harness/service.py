@@ -107,6 +107,8 @@ class Harness:
                 ack = ResultAck(session_id=connection.session_id, attempt_id=result.attempt_id, status=status)
             elif message.type == "command.status_result":
                 followup = await self.executions.status(connection.principal, message.payload)
+                if followup == "already_settled":
+                    ack = ResultAck(session_id=connection.session_id, attempt_id=message.payload.attempt_id, status="already_settled")
             elif message.type == "command.cancelled":
                 await self.executions.cancelled(connection.principal, message.payload.attempt_id)
             # Transport errors alone never prove an execution stopped.

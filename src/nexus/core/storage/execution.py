@@ -114,7 +114,14 @@ class ExecutionRepository:
                 return "already_settled" if task.status in TERMINAL or row["phase"] == "completed" else "stored"
             now = utc_now()
             if not (task.created_at - timedelta(seconds=5) <= result.observed_at <= min(now, command.expires_at) + timedelta(seconds=5)):
-                raise invalid()
+                if row["phase"] == "completed":
+                    return "already_settled"
+                # An authenticated, identity-bound completion proves the worker
+                # ended even when device clock skew invalidates its output time.
+                # Reject the business result without permanently holding the slot.
+                await audit(conn, str(node.identity_id), str(task.task_id), "attempt.result_time_rejected", now)
+                await self._ended(conn, task, row, now, outcome="unknown", retry=False)
+                return "already_settled"
             task = await expire_task(conn, task, now)
             if task.status in TERMINAL or task.current_attempt_id != result.attempt_id or row["phase"] == "completed":
                 await conn.execute("UPDATE task_attempts SET result_json=?, phase='completed', execution_stopped=1 WHERE attempt_id=?", (result.model_dump_json(), str(result.attempt_id)))
@@ -210,16 +217,16 @@ class ExecutionRepository:
             if status.phase != "not_found" and status.command_digest != row["command_digest"]:
                 raise invalid()
             if row["phase"] in {"completed", "verifying"}:
-                return "none"
+                return "already_settled" if row["phase"] == "completed" and (status.phase == "cancelled" or status.phase == "unknown" and status.execution_stopped) else "none"
             now = utc_now()
             task = await expire_task(conn, task, now)
             if status.phase == "cancelled":
                 await self._ended(conn, task, row, now, outcome="known", retry=not task.cancel_requested)
-                return "none"
+                return "already_settled"
             if status.phase == "unknown":
                 if status.execution_stopped:
                     await self._ended(conn, task, row, now, outcome="unknown", retry=True)
-                    return "none"
+                    return "already_settled"
                 await conn.execute("UPDATE task_attempts SET phase='unknown' WHERE attempt_id=?", (str(status.attempt_id),))
             if task.status in TERMINAL or task.cancel_requested or row["stop_reason"]:
                 return "none"  # Periodic stop requests avoid a status/cancel feedback loop.

@@ -189,9 +189,9 @@ class ReceiptStore:
         if type(limit) is not int or not 1 <= limit <= 100:
             raise ValueError("page size must be 1..100")
         with self.transaction() as conn:
-            return [self._receipt(r) for r in conn.execute("SELECT * FROM execution_receipts WHERE phase='completed' AND acknowledged=0 AND attempt_id>? ORDER BY attempt_id LIMIT ?", (after, limit))]
+            return [self._receipt(r) for r in conn.execute("SELECT * FROM execution_receipts WHERE (phase='completed' OR phase='cancelled' OR (phase='unknown' AND execution_stopped=1)) AND acknowledged=0 AND attempt_id>? ORDER BY attempt_id LIMIT ?", (after, limit))]
 
     def acknowledge(self, attempt_id: UUID) -> None:
         with self.transaction() as conn:
-            if conn.execute("UPDATE execution_receipts SET acknowledged=1 WHERE attempt_id=? AND phase='completed'", (str(attempt_id),)).rowcount != 1:
-                raise ValueError("no completed receipt to acknowledge")
+            if conn.execute("UPDATE execution_receipts SET acknowledged=1 WHERE attempt_id=? AND (phase='completed' OR phase='cancelled' OR (phase='unknown' AND execution_stopped=1))", (str(attempt_id),)).rowcount != 1:
+                raise ValueError("no settled receipt to acknowledge")
