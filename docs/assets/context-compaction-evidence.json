@@ -43,7 +43,57 @@
     "seconds": 53.93
   },
   "real_provider_calls": 0,
-  "production_deployed": false,
+  "production_deployed": true,
   "app_frontend_changes_excluded": true,
-  "windows_node_updated": false
+  "windows_node_updated": false,
+  "github_commit": "d64fc5f97211895ddbd5f0bb01def00a6012b9ee",
+  "deployment": {
+    "release": "/opt/nexus/releases/context-20261021",
+    "wheel_sha256": "5f6393a98352df0ea4311dbc636cab9e8e3a4a566b77ebbadefd8bdc2732a84f",
+    "backup": "/var/backups/nexus/before-context-20261021T062544Z",
+    "backup_sha256": "1cb14411f8f1859799507940b731be5c70625fc451212497d81d4f34a09ca765",
+    "schema": 20,
+    "before_counts": {
+      "tasks": 42,
+      "conversations": 18,
+      "chat_turns": 31,
+      "model_calls": 45,
+      "identities": 3,
+      "grants": 14,
+      "skill_runs": 0
+    },
+    "all_old_rows_preserved": true,
+    "configuration_unchanged": true,
+    "model_secret_unchanged": true,
+    "paused": true,
+    "service": "active",
+    "before_pid": 3945627,
+    "pid": 2389788,
+    "deployed": true,
+    "observed_at": "2026-10-21T06:25:45.297934+00:00"
+  },
+  "final_service": {
+    "schema": 20,
+    "single_core": true,
+    "service": "active",
+    "paused": false,
+    "integrity": "ok"
+  },
+  "api_verification": {
+    "tasks": 42,
+    "conversations": 18,
+    "turns": 31,
+    "ledger_unchanged": true,
+    "node_scopes_unchanged": true,
+    "online_nodes": 0,
+    "online_sandbox_nodes": 0,
+    "node_availability_not_decreased": true,
+    "catalogs": [],
+    "fixed_static_asset": true,
+    "tls_verified": true,
+    "web_enabled": true
+  },
+  "pause_restored": true,
+  "preexisting_terminal_unknown_tasks_preserved": 1,
+  "preexisting_unknown_cost_calls_preserved": 2
 }
