@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "installer_sha256": "54aff24ef76fa4459ea1307f34bc6be47280af6eb86a554aaca0a1a3cc993c2d",
+  "core_version": "local P56 backend + 022 migration",
+  "browser": "Edg/155.0.4283.62",
+  "upload_over_2mib": true,
+  "ui_has_no_fake_progress": true,
+  "bridge_download_sha256": true,
+  "ui_download_sha256": true,
+  "sent_with_consent": true,
+  "cancel_observed": true,
+  "cancel_no_orphan": true,
+  "disconnect_failure_shown": true,
+  "retry_once": true,
+  "restart_keeps_history": true,
+  "expired_login_returns_to_login": true,
+  "credentials_cleared": true
+}

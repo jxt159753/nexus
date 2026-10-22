@@ -66,7 +66,8 @@ class NodeLink:
         trusted = NodeScope(principal.identity_id, advertised, frozenset(hello.roots),
                             policy.tools, policy.roots, policy.resource_version,
                             {key: value for key, value in hello.command_digests.items() if policy.command_digests.get(key) == value},
-                            {key: value for key, value in hello.interaction_digests.items() if policy.interaction_digests.get(key) == value})
+                            {key: value for key, value in hello.interaction_digests.items() if policy.interaction_digests.get(key) == value},
+                            hello.plugin_digest if hello.plugin_digest==policy.plugin_digest else None)
         connection = NodeConnection(ws, principal, hello, trusted)
         await self._scope(connection)
         # Never make the connection visible if its durable audit cannot commit.

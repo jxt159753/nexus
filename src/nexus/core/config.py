@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import Field, StrictBool, StrictInt, model_validator
 from nexus.contracts.base import MAX_MESSAGE_BYTES, MAX_RESULT_BYTES, StrictContract
 from nexus.core.models.config import ModelConfig
+from nexus.plugins.config import PluginConfig
 from nexus.contracts.basic import ToolKey, CommandId
 from nexus.contracts.base import CommandDigest
 
@@ -17,6 +18,7 @@ class TrustedNode(StrictContract):
     resource_version: StrictInt = Field(default=1, ge=1)
     command_digests: dict[CommandId, CommandDigest] = Field(default_factory=dict, max_length=16)
     interaction_digests: dict[CommandId, CommandDigest] = Field(default_factory=dict, max_length=16)
+    plugin_digest: CommandDigest | None=None
 
 
 class SandboxNodePolicy(StrictContract):
@@ -62,6 +64,7 @@ class CoreConfig(StrictContract):
     execution_timeout_seconds: StrictInt = Field(default=10, ge=1, le=10)
     models: ModelConfig = Field(default_factory=ModelConfig)
     extensions: ExtensionConfig = Field(default_factory=ExtensionConfig)
+    plugins: PluginConfig = Field(default_factory=PluginConfig)
 
     @model_validator(mode="after")
     def check_service(self) -> Self:

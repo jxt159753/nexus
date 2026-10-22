@@ -1,0 +1,11 @@
+# Merge these entries into an existing Core configuration; do not replace it.
+[plugins]
+enabled = false
+max_versions = 256
+max_total_bytes = 8388608
+
+# Add plugin.call@1 to the existing selected Node's tools and retain its roots.
+# Add the exact plugin_digest printed by the corresponding Node:
+# python -m nexus.node --config <node.toml> --print-policy-digests
+# Enroll owner AND Node grants for plugin.call@1/workspace explicitly.
+# Global and per-conversation normal/full settings live in Core's database.

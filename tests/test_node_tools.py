@@ -19,9 +19,9 @@ def test_fixed_registry_and_field_whitelist(tmp_path, monkeypatch):
         pytest.fail("local tools must not call a model or network")
     monkeypatch.setattr("socket.socket", no_network)
     monkeypatch.setattr("socket.create_connection", no_network)
-    assert set(REGISTRY) == {"system.info@1", "filesystem.list@1", "filesystem.read@1", "filesystem.search@1", "filesystem.write_preview@1", "filesystem.write@1", "command.run@1", "filesystem.read_lines@1", "filesystem.glob@1", "filesystem.grep@1", "filesystem.edit_preview@1", "filesystem.edit@1", "interaction.observe@1", "interaction.act@1"}
-    assert all(t.read_only and t.retry_safe for key,t in REGISTRY.items() if key not in {"filesystem.write@1","filesystem.edit@1","command.run@1","interaction.act@1"})
-    assert all(not REGISTRY[key].retry_safe for key in {"filesystem.write@1","filesystem.edit@1","command.run@1","interaction.act@1"})
+    assert set(REGISTRY) == {"system.info@1", "filesystem.list@1", "filesystem.read@1", "filesystem.search@1", "filesystem.write_preview@1", "filesystem.write@1", "command.run@1", "filesystem.read_lines@1", "filesystem.glob@1", "filesystem.grep@1", "filesystem.edit_preview@1", "filesystem.edit@1", "interaction.observe@1", "interaction.act@1", "filesystem.read_image@1",'plugin.call@1'}
+    assert all(t.read_only and t.retry_safe for key,t in REGISTRY.items() if key not in {"filesystem.write@1","filesystem.edit@1","command.run@1","interaction.act@1",'plugin.call@1'})
+    assert all(not REGISTRY[key].retry_safe for key in {"filesystem.write@1","filesystem.edit@1","command.run@1","interaction.act@1",'plugin.call@1'})
     with pytest.raises(TypeError):
         REGISTRY["shell@1"] = None
     assert set(system_info().model_dump()) == {"os_name", "os_version", "architecture", "python_version"}

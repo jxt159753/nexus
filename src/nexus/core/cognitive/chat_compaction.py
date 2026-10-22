@@ -40,16 +40,18 @@ def source_records(rows):
 
 
 async def reusable_turn(conn: aiosqlite.Connection, row: sqlite3.Row) -> bool:
-    """A tool scope alone is not private data; actual work results still are."""
-    if json.loads(row["memory_refs_json"]) or json.loads(row["references_json"]):
+    """User-approved 2026-10-21: completed tool turns participate in ordinary context.
+
+    Explicit memory/reference/attachment consent remains a hard boundary; this function only
+    decides whether an ordinary completed turn can be replayed automatically.
+    """
+    if json.loads(row["memory_refs_json"]) or json.loads(row["references_json"]) or json.loads(row["attachments_json"]):
         return False
-    return not row["work_grant_id"] or await one(
-        conn, "SELECT 1 FROM chat_work_steps WHERE turn_id=? LIMIT 1", (row["turn_id"],)
-    ) is None
+    return True
 
 
 async def history(conn, conversation_id):
-    """Only previously consented ordinary history, stopping at private boundaries."""
+    """Replay ordinary history up to the most recent explicit private-data boundary."""
     rows = await conn.execute_fetchall("SELECT * FROM chat_turns WHERE conversation_id=? AND status='completed' ORDER BY rowid DESC LIMIT 200", (str(conversation_id),))
     eligible = []
     for row in rows:

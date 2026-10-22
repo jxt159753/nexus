@@ -26,10 +26,11 @@ class TransportPolicy:
             parsed = urlsplit(origin)
             if parsed.netloc == "" or parsed.path or parsed.query or parsed.fragment or parsed.username or parsed.password:
                 raise ValueError("invalid origin")
-            if parsed.scheme == "https" and not self.local_http:
+            if parsed.scheme == "https":
                 continue
-            if not (self.local_http and parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost", "::1"}):
-                raise ValueError("HTTPS required except explicit loopback development")
+            if self.local_http and parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost", "::1"}:
+                continue
+            raise ValueError("HTTPS required except explicit loopback development")
 
 
 class LoginBody(StrictContract):

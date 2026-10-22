@@ -39,6 +39,7 @@ def scope_digest(scope: NodeScope) -> str:
         "local_tools": sorted(scope.local_tools), "local_roots": sorted(scope.local_roots),
         **({"command_digests": scope.command_digests} if scope.command_digests else {}),
         **({"interaction_digests": scope.interaction_digests} if scope.interaction_digests else {}),
+        **({'plugin_digest':scope.plugin_digest} if scope.plugin_digest else {}),
     }))
 
 
@@ -131,7 +132,7 @@ class SecurityService:
                 and "workspace" in scope.roots & scope.local_roots
             ))
             roots = frozenset({"workspace"}) if tools-{"system.info@1"} else frozenset()
-            return NodeScope(scope.node_id, tools, roots, scope.local_tools, scope.local_roots, scope.resource_version, scope.command_digests, scope.interaction_digests)
+            return NodeScope(scope.node_id, tools, roots, scope.local_tools, scope.local_roots, scope.resource_version, scope.command_digests, scope.interaction_digests,scope.plugin_digest)
 
     async def login(self, token: SecretStr, *, now: datetime | None = None) -> BrowserSession:
         now = now or utc_now()
@@ -219,6 +220,10 @@ class SecurityService:
         key = f"{task.action.tool}@{task.action.tool_version}"
         if key not in TOOL_ARGUMENT_MODELS or key not in scope.tools or key not in scope.local_tools:
             raise AccessDenied("POLICY_DENIED")
+        if task.action.tool == 'plugin.call':
+            if not scope.plugin_digest: raise AccessDenied('PLUGIN_NODE_POLICY_CHANGED')
+            from nexus.core.plugins.service import authorize_task
+            await authorize_task(conn, task)
         if task.action.tool == "command.run" and scope.command_digests.get(task.action.arguments.command_id) != task.action.arguments.template_digest:
             raise AccessDenied("POLICY_DENIED")
         if task.action.tool.startswith("interaction.") and scope.interaction_digests.get(task.action.arguments.target_id)!=task.action.arguments.template_digest:
@@ -263,7 +268,7 @@ class SecurityService:
     async def _prepare(self, conn: aiosqlite.Connection, task: TaskRecord, scope: NodeScope, version: int, now: datetime) -> Authorization:
         from nexus.core.security.work import check_task
         work_allowed = await check_task(conn, task, scope, now)
-        automatic_file = task.action.tool in {"filesystem.read","filesystem.search","filesystem.write_preview","filesystem.write","filesystem.read_lines","filesystem.glob","filesystem.grep","filesystem.edit_preview","filesystem.edit"}
+        automatic_file = task.action.tool in {"filesystem.read","filesystem.search","filesystem.write_preview","filesystem.write","filesystem.read_lines","filesystem.glob","filesystem.grep","filesystem.edit_preview","filesystem.edit","filesystem.read_image"}
         if task.status == "recovering" and not task.cancel_requested:
             old = await one(conn, "SELECT execution_stopped,phase FROM task_attempts WHERE attempt_id=?", (str(task.current_attempt_id),))
             if old is not None and old["execution_stopped"] and old["phase"] == "completed":

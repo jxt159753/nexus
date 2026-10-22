@@ -15,6 +15,7 @@ class ModelConfig(StrictContract):
     max_output_tokens: StrictInt = Field(default=512, ge=32, le=512)
     chat_enabled: StrictBool = False
     web_enabled: StrictBool = False
+    chat_images_enabled: StrictBool = False
     web_request_cost_microunits: StrictInt = Field(default=750, ge=750, le=50_000)
     chat_max_output_tokens: StrictInt = Field(default=2048, ge=32, le=2048)
     chat_input_bytes: StrictInt = Field(default=32768, ge=8192, le=32768)

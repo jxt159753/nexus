@@ -1,0 +1,28 @@
+{
+  "passed": true,
+  "browser": "msedge/155.0.4283.62",
+  "progress_observed": true,
+  "text_truncation": true,
+  "metadata_only": true,
+  "image_snapshot": true,
+  "image_source_limit": true,
+  "corrupt_image_kept": true,
+  "refresh_no_reupload": true,
+  "no_consent_no_send": true,
+  "attachment_only_message": true,
+  "drag_and_drop": true,
+  "paste_image": true,
+  "cross_conversation_404": true,
+  "attachment_in_use_403": true,
+  "duplicate_key_409": true,
+  "oversized_413": true,
+  "unauthorized_401": true,
+  "cancel_upload": true,
+  "legacy_console": true,
+  "real_model_calls": 3,
+  "screenshots": [
+    "desktop",
+    "mobile"
+  ],
+  "home_390": true
+}

@@ -37,6 +37,7 @@ class SandboxConnection:
     session_id: UUID = field(default_factory=uuid4)
     last_heartbeat: float = field(default_factory=time.monotonic)
     pending: dict[UUID, asyncio.Future] = field(default_factory=dict)
+    pending_artifacts: dict[UUID,str] = field(default_factory=dict)
     send_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     blocked: bool = False
     queries: dict[UUID, asyncio.Future] = field(default_factory=dict)
@@ -91,6 +92,7 @@ class SandboxLink:
             return {"outcome": "failed", "error_code": "SANDBOX_BUSY", "stopped": True}
         future = asyncio.get_running_loop().create_future()
         connection.pending[execution_id] = future
+        connection.pending_artifacts[execution_id] = version['artifact_digest']
         payload = SandboxExecute(
             session_id=connection.session_id, execution_id=execution_id,
             version_id=UUID(version["version_id"]), artifact_digest=version["artifact_digest"],
@@ -127,6 +129,7 @@ class SandboxLink:
             return {"outcome": "unknown", "error_code": "SANDBOX_EVIDENCE_UNKNOWN"}
         finally:
             connection.pending.pop(execution_id, None)
+            connection.pending_artifacts.pop(execution_id,None)
             if cancellation is not None:
                 cancellation.cancel()
                 await asyncio.gather(cancellation, return_exceptions=True)
@@ -208,7 +211,7 @@ class SandboxLink:
                 if future is not None and not future.done() and message.payload.stopped:
                     future.set_result(SandboxResult(
                         session_id=connection.session_id, execution_id=message.payload.execution_id,
-                        artifact_digest=connection.hello.image_digest, outcome="failed",
+                        artifact_digest=connection.pending_artifacts[message.payload.execution_id], outcome="failed",
                         error_code="SANDBOX_CANCELLED", stopped=message.payload.stopped))
             else:
                 raise ProtocolError(ErrorCode.FORBIDDEN, "v2 message is not valid in this direction")

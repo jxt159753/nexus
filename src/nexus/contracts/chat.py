@@ -81,7 +81,7 @@ class ConversationUpdate(StrictContract):
 class ChatSubmission(StrictContract):
     request_id: UUID
     expected_revision: StrictInt = Field(ge=1)
-    text: StrictStr = Field(min_length=1, max_length=2000)
+    text: StrictStr = Field(min_length=0, max_length=2000)
     memory_ids: list[UUID] = Field(default_factory=list, max_length=8)
     memory_digest: StrictStr | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     allow_memory_model: StrictBool = False
@@ -101,14 +101,21 @@ class ChatSubmission(StrictContract):
     reference_turn_ids: list[UUID] = Field(default_factory=list, max_length=3)
     references_digest: StrictStr | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     allow_reference_model: StrictBool = False
+    attachment_ids: list[UUID] = Field(default_factory=list, max_length=4)
+    attachments_digest: StrictStr | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    allow_attachment_model: StrictBool = False
 
     @model_validator(mode="after")
     def bounded(self):
         if self.compact_only and (not self.allow_compaction or not self.include_context or self.text.strip() != "/compact"
-                                 or self.allow_tools or self.memory_ids or self.reference_turn_ids):
+                                 or self.allow_tools or self.memory_ids or self.reference_turn_ids or self.attachment_ids):
             raise ValueError("/compact requires context and compaction consent without tools or selected private references")
         if len(set(self.reference_turn_ids)) != len(self.reference_turn_ids):
             raise ValueError("duplicate references")
+        if len(set(self.attachment_ids)) != len(self.attachment_ids):
+            raise ValueError("duplicate attachments")
+        if bool(self.attachment_ids) != bool(self.attachments_digest) or bool(self.attachment_ids) != self.allow_attachment_model:
+            raise ValueError("attachments require preview and separate outbound consent")
         if bool(self.reference_turn_ids) != bool(self.references_digest) or bool(self.reference_turn_ids) != self.allow_reference_model:
             raise ValueError("references require preview and separate outbound consent")
         if self.work_grant_id and self.workspace_work:
@@ -123,7 +130,7 @@ class ChatSubmission(StrictContract):
             raise ValueError("memory requires preview and separate outbound consent")
         if not self.memory_ids and (self.memory_digest is not None or self.allow_memory_model):
             raise ValueError("memory consent must select records")
-        if not self.text.strip() or len(self.text.encode("utf-8")) > 6000:
+        if (not self.text.strip() and not self.attachment_ids) or len(self.text.encode("utf-8")) > 6000:
             raise ValueError("bounded nonempty text required")
         if self.allow_tools and self.node_id is None:
             raise ValueError("tool suggestions require an explicit node")
@@ -157,3 +164,24 @@ class ChatResume(StrictContract):
 
 class ChatReferences(StrictContract):
     turn_ids: list[UUID] = Field(min_length=1, max_length=3)
+
+
+class ChatProgressText(StrictContract):
+    id: StrictStr
+    text: StrictStr = Field(max_length=1200)
+    truncated: StrictBool = False
+
+
+class ChatPresentation(StrictContract):
+    """Read-only display projection; completion describes the reply, not tool success."""
+
+    version: Literal[1] = 1
+    phase: Literal["queued", "responding", "working", "awaiting_input", "recovering",
+                   "stopping", "completed", "stopped", "incomplete", "interrupted",
+                   "failed", "expired", "unknown"]
+    label: StrictStr
+    process: list[ChatProgressText] = Field(default_factory=list, max_length=8)
+    process_truncated: StrictBool = False
+    live_text: StrictStr = ""
+    final_text: StrictStr | None = None
+    collapse_process: StrictBool = False

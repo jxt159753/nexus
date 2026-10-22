@@ -12,6 +12,9 @@
 | [聊天中的多步流程](m5-chat-skills.md) | 可用流程目录、参数与计划确认、步骤审批/取消及结果解读 |
 | [项目、可控记忆与基础工具](m6-projects-tools.md) | 项目会话与待办、记忆保存/逐轮外发、受限文件读写/查找和固定命令 |
 | [新文件工具、会话交互与配置目标](dsh-tools-usage.md) | 分页/内容搜索/精确修改、纠正/排队/日志/历史引用、Edge/Chrome 与明确配置程序 |
+| [DSH 图片与查询工具](dsh-builtin-tools.md) | 图片读取配置、时间和任务查询、Skill 说明及有界结果 |
+| [聊天附件](chat-attachments.md) | 任意文件上传、图片/文本预览、原件下载和逐轮外发同意 |
+| [原生插件与权限](plugins.md) | 普通/完全模式、会话覆盖、宿主终端、自写插件测试/启用与接口 |
 | [聊天工作与网页工具](chat-work.md) | 工作区默认读写、有限工具循环、DeepSeek 搜索/抓取、来源及费用 |
 | [任务、记忆与项目页面](s6-browser-records.md) | 提交只读任务、审批、暂停、保存或撤销记忆、关联项目 |
 | [单条自然语言任务](m2-language.md) | 把一句操作请求解释为已有工具，确认后执行 |
@@ -41,6 +44,10 @@
 | [架构设计](ARCHITECTURE.md) | 中心服务与设备的分工、任务状态、权限、恢复、模型与扩展设计 |
 | [Web 与 App 设计边界](ARCHITECTURE.md#17-web-前端与-app-设计边界) | 页面职责、共享数据、App 接入、离线行为和客户端权限 |
 | [Windows / Android 前端 DSH 工作说明](FRONTEND-DSH-WORKORDER.md) | 用户直接指挥 DSH 的首轮提示、方案决策、开发边界与交付验收方式 |
+| [聊天过程展示与最终总结](CHAT-PROGRESS-FRONTEND.md) | 公开摘要、真实工具进度、最终回答与前端折叠契约，及 DSH 适配说明 |
+| [DSH 图片工具前端接入要求](DSH-BUILTIN-TOOLS-FRONTEND.md) | 交给 DSH 的图片展示、外发提示、查询结果及验收要求 |
+| [图片与文件上传前端要求](CHAT-ATTACHMENTS-FRONTEND.md) | 交给 DSH 的附件选择/拖放/粘贴、Windows 大文件传输、预览和验收要求 |
+| [原生插件与权限前端要求](PLUGINS-FRONTEND.md) | 权限继承、插件生命周期、终端、交付物及 Windows Node 配置桥 |
 | [存储与权限](storage-security.md) | 数据保存、身份、会话、审批及相关接口 |
 | [Windows 执行端](node-runtime.md) | 目录范围、本地工具、执行记录和进程管理 |
 | [设备连接](s3-link.md) | Core/Node 配置、身份认证、连接与重连 |
@@ -70,6 +77,10 @@ Core、Node、Tool、Skill 等词的解释见 [架构文档的名词说明](ARCH
 | M6 会话工作与上线 | [验证与限制](M6-WORK-VERIFICATION.md)、[脱敏摘要](assets/m6-work-evidence.json) |
 | M6 文件默认权限与网页工具 | [追加验证与限制](M6-WORK-FIX-VERIFICATION.md)、[脱敏摘要](assets/m6-work-fix-evidence.json) |
 | M6 的 DSH 工具与会话机制 | [追加验证、固定包与限制](DSH-TOOLS-VERIFICATION.md) |
+| M6 的 DSH 图片与查询工具 | [真实解码、权限、协议、前端接入及本地验证](DSH-BUILTIN-TOOLS-VERIFICATION.md) |
+| M6 的会话附件 | [任意文件、外发同意、迁移和独立 Core 重启验证](CHAT-ATTACHMENTS-VERIFICATION.md) |
+| 原生插件 P57–P61 | [固定包、真实宿主与 runsc、生产部署及费用证据](PLUGINS-VERIFICATION.md) |
+| M6 的会话附件前端与 Windows 桥 | [界面、旧控制台、Base64 传输、安装版大文件与恢复验证](CHAT-ATTACHMENTS-FRONTEND-VERIFICATION.md) |
 | M6 的 DSH 参考优化 | [本地验证、源码基线与限制](DSH-REFERENCE-VERIFICATION.md) |
 | M6 跨轮代码与保存衔接 | [DSH 对照、回归与未验证项](CHAT-CONTINUITY-VERIFICATION.md) |
 | M6 回执与执行队列恢复 | [时钟、停止证据与实际上线验证](RECOVERY-EVIDENCE-VERIFICATION.md) |
@@ -99,5 +110,8 @@ DSH GitHub 架构/Harness 对照、上下文投影、工具清单与按需能力
 
 - [上下文与压缩](context-compaction.md)：自动压缩、`/compact`、原始记录与费用边界。
 - [DSH 压缩设计](decisions/0022-dsh-context-compaction.md)：参考来源、容量、记录与恢复。
+- [Windows App 与随包 Node](decisions/0023-windows-app-bundled-node.md)：Tauri 2、Core 原生桥、Node 进程与安装包边界。
+- [Three.js 三维过程视图](decisions/0024-threejs-3d-visualization.md)：Core/Node/任务场景、输入桥与 WebGL 回退。
+- [工具轮次上下文复用](decisions/0025-tool-turn-context-reuse.md)：已完成工具轮次进入后续上下文，记忆/引用边界保留。
 
 - [DSH 上下文压缩验证](CONTEXT-COMPACTION-VERIFICATION.md)：固定版本、测试、上线与限制。

@@ -1,9 +1,11 @@
+from nexus.plugins.contracts import PluginNodeArguments, PluginNodeResult, PluginNodeCall
 
 from typing import Annotated, Literal, Self
 
 from pydantic import Field, StrictBool, StrictInt, StrictStr, model_validator
 from nexus.contracts.basic import FileReadArguments, FileSearchArguments, FilePreviewArguments, FileWriteArguments, CommandRunArguments, FileLinesArguments, FileGlobArguments, FileGrepArguments, FileEditPreviewArguments, FileEditArguments, glob_matches, relative_path, text_digest, write_digest
 from nexus.contracts.interaction import ObserveArguments, InteractArguments, InteractionResult
+from nexus.contracts.images import ImageReadArguments, ImageReadResult
 from nexus.contracts.base import CommandDigest
 
 from nexus.contracts.base import MAX_RESULT_BYTES, StrictContract, Version1
@@ -145,6 +147,12 @@ class FileReadCall(StrictContract):
     arguments: FileReadArguments
 
 
+class ImageReadCall(StrictContract):
+    tool: Literal["filesystem.read_image"]
+    tool_version: Version1
+    arguments: ImageReadArguments
+
+
 class FileSearchCall(StrictContract):
     tool: Literal["filesystem.search"]
     tool_version: Version1
@@ -211,11 +219,13 @@ class InteractCall(StrictContract):
     arguments: InteractArguments
 
 
-ToolCall = Annotated[SystemInfoCall | ListDirectoryCall | FileReadCall | FileSearchCall | FilePreviewCall | FileWriteCall | CommandRunCall | FileLinesCall | FileGlobCall | FileGrepCall | FileEditPreviewCall | FileEditCall | ObserveCall | InteractCall, Field(discriminator="tool")]
-ToolResult = InteractionResult | SystemInfoResult | ListDirectoryResult | FileReadResult | FileSearchResult | FilePreviewResult | FileWriteResult | CommandRunResult | FileLinesResult | FileGlobResult | FileGrepResult | FileEditPreviewResult | FileEditResult
+ToolCall = Annotated[SystemInfoCall | ListDirectoryCall | FileReadCall | FileSearchCall | FilePreviewCall | FileWriteCall | CommandRunCall | FileLinesCall | FileGlobCall | FileGrepCall | FileEditPreviewCall | FileEditCall | ObserveCall | InteractCall | ImageReadCall | PluginNodeCall, Field(discriminator="tool")]
+ToolResult = InteractionResult | SystemInfoResult | ListDirectoryResult | FileReadResult | FileSearchResult | FilePreviewResult | FileWriteResult | CommandRunResult | FileLinesResult | FileGlobResult | FileGrepResult | FileEditPreviewResult | FileEditResult | ImageReadResult | PluginNodeResult
 
 
 TOOL_ARGUMENT_MODELS = {
+    "plugin.call@1": PluginNodeArguments,
+    "filesystem.read_image@1": ImageReadArguments,
     "interaction.observe@1": ObserveArguments,
     "interaction.act@1": InteractArguments,
     "system.info@1": SystemInfoArguments,
@@ -233,6 +243,8 @@ TOOL_ARGUMENT_MODELS = {
 }
 
 TOOL_RESULT_MODELS = {
+    "plugin.call@1": PluginNodeResult,
+    "filesystem.read_image@1": ImageReadResult,
     "interaction.observe@1": InteractionResult,
     "interaction.act@1": InteractionResult,
     "system.info@1": SystemInfoResult,
@@ -255,10 +267,14 @@ def validate_result(command: ToolCall, result: ToolResult, max_bytes: int) -> To
     model = TOOL_RESULT_MODELS[f"{command.tool}@{command.tool_version}"]
     checked = model.model_validate_json(result.model_dump_json())
     args = command.arguments
+    if isinstance(checked, PluginNodeResult) and (checked.release_digest != args.release_digest or checked.tool != args.tool):
+        raise ValueError("plugin result identity mismatch")
     if hasattr(checked, "root_id") and checked.root_id != args.root_id:
         raise ValueError("resource mismatch")
     if hasattr(checked, "path") and checked.path != args.path:
         raise ValueError("path mismatch")
+    if isinstance(checked, ImageReadResult) and max(checked.image.width, checked.image.height) > args.max_dimension:
+        raise ValueError("image exceeds requested dimensions")
     if isinstance(checked, InteractionResult):
         import hashlib
         import json

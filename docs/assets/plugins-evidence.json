@@ -1,0 +1,190 @@
+{
+  "recorded_on": "2026-10-22",
+  "package": {
+    "sha256": "189e7e73a1eae84e2b9b8a65ee3ba1fe0933df9cc2719c8d0b32860c8ff5e75b",
+    "runtime_files": 212,
+    "source_matches": true
+  },
+  "node_sha256": "6fcddb72e83253aaf6668bac98db828e7001d886d57275b0d4ffa18e02b7b7bf",
+  "tests": {
+    "windows_full": {
+      "passed": 975,
+      "skipped": 2
+    },
+    "final_policy_passed": 40,
+    "fixed_package_passed": 14,
+    "linux_fixed": {
+      "passed": 252,
+      "skipped_windows": 8
+    }
+  },
+  "frozen": {
+    "shell_utf8": true,
+    "file_readback": "preview_cas_readback",
+    "programmatic_actual_output": {
+      "text": "真实冻结程序"
+    },
+    "generated_plugin": {
+      "sum": 10
+    },
+    "terminal_state": true,
+    "terminal_stopped": true
+  },
+  "runsc": {
+    "addition": {
+      "outcome": "succeeded",
+      "output": {
+        "sum": 5
+      }
+    },
+    "isolation": {
+      "outcome": "succeeded",
+      "output": {
+        "host_hidden": true,
+        "network_denied": true
+      }
+    },
+    "timeout": {
+      "outcome": "failed",
+      "error_code": "SANDBOX_TIMEOUT",
+      "stopped": true
+    },
+    "platform": "kvm",
+    "image_digest": "753aed32346183e5820e0a9a0631339d213607d22fd000ed4ec0b85681512d16",
+    "runtime_digest": "be25aff8bad3f0ad4adafa525107b22475802c1c0f5a8ae334c5320fb697a21a"
+  },
+  "self_authored": {
+    "conversation_id": "8d039740-f105-4589-be6a-9462e701a12f",
+    "turn_id": "aa94bb40-eb47-49d6-9288-0d25c6305713",
+    "generated_turn_id": "c6acc247-6e15-412a-b063-47548cac7807",
+    "plugin_version_id": "8fb8ce6a-8e75-4f1c-9db9-c4f9939e31da",
+    "plugin_digest": "32ebeff16ef17e42385ba247cbf74f3dbaaa49411ffc85ca08393fa29ec7ecf9",
+    "test_status": "passed",
+    "enabled": true,
+    "test": {
+      "business_verified": false,
+      "cases": [
+        {
+          "actual": {
+            "length": 5
+          },
+          "case": 0,
+          "matched": true
+        },
+        {
+          "actual": {
+            "length": 0
+          },
+          "case": 1,
+          "matched": true
+        }
+      ],
+      "environment": {
+        "available": true,
+        "image_digest": "753aed32346183e5820e0a9a0631339d213607d22fd000ed4ec0b85681512d16",
+        "node_id": "4f70400a-30ad-497d-a447-f13011f11248",
+        "platform": "kvm",
+        "policy": "runsc-host-limits-v2",
+        "runsc_digest": "be25aff8bad3f0ad4adafa525107b22475802c1c0f5a8ae334c5320fb697a21a",
+        "runtime": "runsc",
+        "type": "sandbox"
+      },
+      "release_digest": "32ebeff16ef17e42385ba247cbf74f3dbaaa49411ffc85ca08393fa29ec7ecf9",
+      "verification": "isolated_contract_cases"
+    },
+    "actual_result": {
+      "data": {
+        "length": 5
+      },
+      "execution_outcome": "known",
+      "status": "succeeded",
+      "verification": "node_report_schema_checked"
+    },
+    "model_calls": 3,
+    "cost_microunits": 4726,
+    "initial_unavailable_cost_microunits": 3193,
+    "global_default": {
+      "mode": "normal",
+      "revision": 1
+    },
+    "conversation_restored_to_inherit": true,
+    "verification_conversation_archived": true
+  },
+  "web": {
+    "turn_id": "90a62178-375a-4926-8fb0-e95df0d74b56",
+    "status": "completed",
+    "model_calls": 4,
+    "web_calls": 2,
+    "cost_microunits": 9072,
+    "cost_status": "calculated",
+    "conversation_restored_to_inherit": true,
+    "steps": [
+      {
+        "tool": "web_search",
+        "status": "succeeded",
+        "verification": "provider_response_checked",
+        "sources": [
+          {
+            "title": "Search & Fetch | DeepSeek API Docs - Search / Fetch API is now available, powered by our in-house search engine and supporting web search and fetch",
+            "url": "https://api-docs.deepseek.com/guides/search/#1"
+          }
+        ],
+        "url": null,
+        "content_bytes": 0,
+        "content_sha256": null,
+        "truncated": false
+      },
+      {
+        "tool": "web_fetch",
+        "status": "succeeded",
+        "verification": "provider_response_checked",
+        "sources": [],
+        "url": "https://api-docs.deepseek.com/guides/search/",
+        "content_bytes": 8192,
+        "content_sha256": "2e39e3464099e0a165a34ee1e8c052cb80dfac17057c3ded712fb8a48f2684d4",
+        "truncated": true
+      }
+    ]
+  },
+  "restart": {
+    "phase": "after-restart",
+    "counts": {
+      "tasks": 57,
+      "task_attempts": 55,
+      "conversations": 31,
+      "chat_turns": 56,
+      "model_calls": 96,
+      "plugin_test_runs": 1,
+      "plugin_sandbox_executions": 2
+    },
+    "historical_rows_preserved": {
+      "tasks": 56,
+      "task_attempts": 54,
+      "chat_turns": 53,
+      "conversations": 29,
+      "model_calls": 85,
+      "identities": 3,
+      "sandbox_executions": 3
+    },
+    "unknown_cost_calls_retained": 4,
+    "default_mode": "normal",
+    "default_revision": 1,
+    "conversation_overrides": 0,
+    "plugin_test": "passed",
+    "plugin_enabled": true,
+    "plugin_digest": "32ebeff16ef17e42385ba247cbf74f3dbaaa49411ffc85ca08393fa29ec7ecf9",
+    "new_calls": 11,
+    "new_cost_microunits": 16991,
+    "single_core": true,
+    "core_pid": 1469820,
+    "paused": true,
+    "integrity": "ok"
+  },
+  "production_resumed": true,
+  "unconfigured_production": [
+    "mcp_servers",
+    "browser_targets"
+  ],
+  "frontend_implementation": "user_controlled_DSH_pending",
+  "user_acceptance": false
+}

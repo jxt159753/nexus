@@ -1,0 +1,21 @@
+# Merge into an existing Windows Node configuration. Default stays disabled.
+# Add plugin.call@1 to allowed_tools only after the Core enrollment is ready.
+[plugins]
+enabled = false
+allow_host_python = false
+pwsh = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
+bash = 'C:\Program Files\Git\bin\bash.exe'
+git = 'C:\Program Files\Git\bin\git.exe'
+max_jobs = 8
+max_job_seconds = 600
+
+# Optional, locally pinned Pyright installed using config/plugin-runtime lock.
+# [plugins.lsp.python]
+# executable = 'C:\Program Files\nodejs\node.exe'
+# argv = ['E:\NEXUS\var\plugins-runtime\node_modules\pyright\langserver.index.js', '--stdio']
+
+# Optional administrator-configured MCP server. No invented server or shell.
+# [plugins.mcp.local.process]
+# executable = 'C:\Path\To\python.exe'
+# argv = ['-m', 'your_resource_server']
+# HTTP alternatively: [plugins.mcp.remote] url = 'https://example.org/mcp'

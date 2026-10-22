@@ -122,18 +122,28 @@ def test_work_history_keeps_private_data_boundary(world, monkeypatch, compact, b
             async with world.db.transaction() as conn:
                 await conn.execute(f"UPDATE chat_turns SET {column}='[{{}}]' WHERE turn_id=?", (first["turn_id"],))
         follow, _ = await work_input(chat, world, conv["conversation_id"], "继续", compact=compact)
-        assert follow["context_count"] == 0
-        assert (await chat.get(world.owner, follow["turn_id"]))["context_messages"] == [
-            {"role": "user", "content": "继续"}]
+        if boundary == "tool_result":
+            assert follow["context_count"] == 1
+            messages = (await chat.get(world.owner, follow["turn_id"]))["context_messages"]
+            assert messages[0] == {"role": "user", "content": "旧轮次"}
+            assert messages[-1] == {"role": "user", "content": "继续"}
+        else:
+            assert follow["context_count"] == 0
+            assert (await chat.get(world.owner, follow["turn_id"]))["context_messages"] == [
+                {"role": "user", "content": "继续"}]
         chat.provider = FakeChat(text="新的普通回答")
         await chat.process_one()
         next_turn, _ = await work_input(chat, world, conv["conversation_id"], "再继续", compact=compact)
-        assert next_turn["context_count"] == 1
-        assert (await chat.get(world.owner, next_turn["turn_id"]))["context_messages"] == [
-            {"role": "user", "content": "继续"},
-            {"role": "assistant", "content": "新的普通回答"},
-            {"role": "user", "content": "再继续"},
-        ]
+        expected = 2 if boundary == "tool_result" else 1
+        assert next_turn["context_count"] == expected
+        messages = (await chat.get(world.owner, next_turn["turn_id"]))["context_messages"]
+        assert messages[-1] == {"role": "user", "content": "再继续"}
+        if boundary != "tool_result":
+            assert messages == [
+                {"role": "user", "content": "继续"},
+                {"role": "assistant", "content": "新的普通回答"},
+                {"role": "user", "content": "再继续"},
+            ]
     asyncio.run(run())
 
 

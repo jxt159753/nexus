@@ -24,7 +24,7 @@ def main() -> None:
         })
         local = NodeConfig.model_validate_json(config.model_dump_json(include=set(NodeConfig.model_fields)))
         if args.print_policy_digests:
-            print(json.dumps({"command_digests":{key:value.digest() for key,value in local.commands.items()},"interaction_digests":{key:value.digest() for key,value in local.interaction_targets.items()}},sort_keys=True))
+            print(json.dumps({"command_digests":{key:value.digest() for key,value in local.commands.items()},"interaction_digests":{key:value.digest() for key,value in local.interaction_targets.items()},'plugin_digest':local.plugin_digest()},sort_keys=True))
             return
         token = SecretStr(os.environ.get("NEXUS_NODE_TOKEN", ""))
         with NodeRuntime(local) as runtime:

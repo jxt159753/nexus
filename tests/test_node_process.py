@@ -49,3 +49,18 @@ def test_oversize_input_rejected_before_process_creation(monkeypatch):
     monkeypatch.setattr(process_module.subprocess, "Popen", lambda *a, **k: pytest.fail("oversize input spawned worker"))
     with pytest.raises(ValueError):
         ManagedWorker().run(b"x" * (MAX_MESSAGE_BYTES + 1), "unused", 1, threading.Event())
+
+
+def test_frozen_worker_uses_entry_flag(monkeypatch):
+    captured = {}
+
+    def fake_popen(args, **kwargs):
+        captured["args"] = args
+        raise RuntimeError("stop after argument capture")
+
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", r"C:\NEXUS\nexus-node.exe")
+    monkeypatch.setattr(process_module.subprocess, "Popen", fake_popen)
+    with pytest.raises(RuntimeError):
+        ManagedWorker().run(b"gate", f"Local\\NEXUS-{uuid4().hex}", 3, threading.Event())
+    assert captured["args"] == [r"C:\NEXUS\nexus-node.exe", "--worker"]

@@ -37,6 +37,10 @@ class WebWork:
             return
         chat = self.work.chat
         proposal = json.loads(step["proposal_json"])
+        if proposal['intent']=='plugin_execute':
+            args=proposal['arguments']
+            if args['plugin_id']!='builtin.web': raise AccessDenied('WEB_DISABLED')
+            proposal={'intent':args['tool'],'arguments':args['input']}
         async with chat.database.transaction() as conn:
             now = utc_now()
             await permissions.allowed_step(conn,step["step_id"],now)
@@ -53,6 +57,10 @@ class WebWork:
             charge = chat.config.web_request_cost_microunits
             if any(call["cost_status"]!="calculated" for call in calls) or sum(call["cost_microunits"] for call in calls)+charge>chat.config.task_cost_microunits:
                 raise AccessDenied("BUDGET_EXCEEDED")
+            if chat.plugins.config.enabled:
+                from nexus.core.plugins.lifecycle import budget as plugin_budget
+                if await plugin_budget(conn,chat,step['turn_id'],chat.config.task_cost_microunits)<charge:
+                    raise AccessDenied('BUDGET_EXCEEDED')
             error = await budget_error(conn,chat.config,now,reservation=charge)
             if error:
                 raise AccessDenied(error)

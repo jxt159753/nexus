@@ -19,6 +19,8 @@ async def valid_grant(conn, grant_id, now, *, owner_id=None, node_id=None, scope
         from nexus.core.security.service import scope_digest
         if scope_digest(scope)!=grant["scope_digest"]:
             raise AccessDenied("POLICY_DENIED")
+    from nexus.core.security.modes import check_grant
+    await check_grant(conn, grant)
     return grant
 
 
@@ -55,8 +57,13 @@ async def check_task(conn, task, scope, now):
     step,grant=await allowed_step(conn,identifier,now,scope=scope)
     if grant["node_id"]!=str(task.node_id) or grant["owner_id"]!=str(task.owner_id):
         raise AccessDenied("POLICY_DENIED")
+    plan=await one(conn,'SELECT plan_mode FROM conversations WHERE conversation_id=?',(grant['conversation_id'],))
+    if plan[0] and task.action.tool in {'command.run','filesystem.write','filesystem.edit','interaction.act'}:
+        raise AccessDenied('PLAN_MODE_READ_ONLY')
     if task.current_attempt_id is None and not step["skill_run_id"] and await one(conn,"SELECT 1 FROM chat_controls WHERE turn_id=? AND kind='steer' AND applied_call_id IS NULL",(step["turn_id"],)):
         raise AccessDenied("WORK_STOPPED")
+    if grant['permission_mode'] == 'full':
+        return True
     if task.action.tool in {"filesystem.write","filesystem.edit"} and step["permission_decision"]!="approve" and not grant["auto_files"]:
         raise AccessDenied("WORK_CONFIRMATION_REQUIRED")
     if task.action.tool=="interaction.act" and step["permission_decision"]!="approve" and (grant["auto_files"] or grant["profile"]!="standard"):

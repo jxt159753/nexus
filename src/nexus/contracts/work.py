@@ -6,11 +6,13 @@ from uuid import UUID
 from pydantic import Field, StrictBool, StrictInt, StrictStr, TypeAdapter, model_validator
 
 from nexus.contracts.interaction import WorkObserveArguments, WorkInteractArguments
+from nexus.contracts.images import ImageReadArguments
 from nexus.contracts.base import StrictContract
 from nexus.contracts.basic import FileLinesArguments, FileGlobArguments, FileGrepArguments, FileEditPreviewArguments, FileReadArguments, FileSearchArguments, FilePreviewArguments, CommandId
 from nexus.contracts.chat import SkillArguments, SkillProposal
 from nexus.contracts.language import SystemProposal, DirectoryProposal
 from nexus.contracts.web import WebSearchArguments, WebFetchArguments
+from nexus.plugins.contracts import PluginInspectProposal, PluginExecuteProposal, PluginInstallProposal
 
 
 class WorkGrantCreate(StrictContract):
@@ -63,6 +65,39 @@ class CommandProposal(StrictContract):
 class StatusProposal(StrictContract):
     intent: Literal["get_node_status"]
     arguments: StrictContract
+
+
+class TimeArguments(StrictContract):
+    utc_offset_minutes: StrictInt = Field(default=0, ge=-720, le=840)
+
+
+class TimeProposal(StrictContract):
+    intent: Literal["get_current_time"]
+    arguments: TimeArguments
+
+
+class JobListArguments(StrictContract):
+    limit: StrictInt = Field(default=10, ge=1, le=20)
+
+
+class JobListProposal(StrictContract):
+    intent: Literal["job_list"]
+    arguments: JobListArguments
+
+
+class JobOutputArguments(StrictContract):
+    task_id: UUID
+    max_bytes: StrictInt = Field(default=4096, ge=512, le=8192)
+
+
+class JobOutputProposal(StrictContract):
+    intent: Literal["job_output"]
+    arguments: JobOutputArguments
+
+
+class ImageProposal(StrictContract):
+    intent: Literal["read_image"]
+    arguments: ImageReadArguments
 
 
 class ToolProposal(StrictContract):
@@ -119,4 +154,4 @@ class InteractProposal(StrictContract):
     arguments: WorkInteractArguments
 
 
-WORK_PROPOSAL = TypeAdapter(Annotated[SystemProposal | DirectoryProposal | ReadProposal | SearchProposal | WriteProposal | CommandProposal | StatusProposal | SkillProposal | ToolProposal | CapabilityProposal | WebSearchProposal | WebFetchProposal | LinesProposal | GlobProposal | GrepProposal | EditProposal | ObserveProposal | InteractProposal, Field(discriminator="intent")])
+WORK_PROPOSAL = TypeAdapter(Annotated[SystemProposal | DirectoryProposal | ReadProposal | SearchProposal | WriteProposal | CommandProposal | StatusProposal | SkillProposal | ToolProposal | CapabilityProposal | WebSearchProposal | WebFetchProposal | LinesProposal | GlobProposal | GrepProposal | EditProposal | ObserveProposal | InteractProposal | ImageProposal | TimeProposal | JobListProposal | JobOutputProposal | PluginInspectProposal | PluginExecuteProposal | PluginInstallProposal, Field(discriminator="intent")])

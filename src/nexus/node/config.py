@@ -9,6 +9,7 @@ from uuid import UUID
 from pydantic import Field, StrictInt, StrictStr, model_validator
 from nexus.contracts.basic import ToolKey, CommandId
 from nexus.contracts.base import CommandDigest, MAX_RESULT_BYTES, StrictContract
+from nexus.plugins.config import PluginNodeConfig
 
 
 class CommandTemplate(StrictContract):
@@ -57,10 +58,18 @@ class NodeConfig(StrictContract):
     allowed_tools: frozenset[ToolKey] = frozenset()
     interaction_targets: dict[CommandId, "InteractionTarget"] = Field(default_factory=dict, max_length=16)
     commands: dict[CommandId, CommandTemplate] = Field(default_factory=dict, max_length=16)
+    plugins: PluginNodeConfig = Field(default_factory=PluginNodeConfig)
     roots: dict[Literal["workspace"], Path] = Field(default_factory=dict, max_length=1)
     max_result_bytes: StrictInt = Field(default=MAX_RESULT_BYTES, ge=128, le=MAX_RESULT_BYTES)
     execution_timeout_seconds: StrictInt = Field(default=10, ge=1, le=10)
     max_receipts: StrictInt = Field(default=10000, ge=1, le=10000)
+
+    def plugin_digest(self):
+        from nexus.contracts.extensions import digest_value
+        policy=self.plugins.digest()
+        if policy is None: return None
+        return digest_value({'runtime':policy,'roots':{key:str(value) for key,value in self.roots.items()},
+            'interaction_targets':{key:value.digest() for key,value in self.interaction_targets.items()}})
 
     @model_validator(mode="after")
     def validate_paths(self) -> Self:

@@ -1,5 +1,6 @@
 "use strict";
 const chatState = {conversation:null, conversations:new Map(), turns:new Map(), previews:new Map(), actionConsents:new Set(), confirming:null, active:null, retry:null, createRequest:null, before:null, listBefore:null, latest:true, loading:false, enabled:false, epoch:0};
+const chatPresentationState = new Map();
 const chatLabels = {queued:"等待回复",generating:"正在回复",completed:"已完成",incomplete:"达到输出上限，回复未完整结束",stopping:"正在停止",stopped:"已停止",interrupted:"服务中断，未自动重发",failed:"回复失败",expired:"请求已过期"};
 function chatNodes(nodes) {
   chatWorkState.nodes=new Map(nodes.map(node=>[node.node_id,node]));
@@ -131,6 +132,32 @@ function chatResultPreview(turn, card, canContinue) {
   });
   box.append(load); if (value) box.append(send); card.append(box);
 }
+function chatPresentationPanel(turn,p) {
+  let ui=chatPresentationState.get(turn.turn_id);
+  if (!ui) {
+    ui={open:!(p.phase==="completed" && p.collapse_process && p.final_text!==null),manual:false,phase:p.phase};
+    chatPresentationState.set(turn.turn_id,ui);
+  } else if (ui.phase!==p.phase) {
+    if (p.phase==="completed" && !ui.manual) ui.open=!(p.collapse_process && p.final_text!==null);
+    ui.phase=p.phase;
+  }
+  if (p.phase==="awaiting_input") ui.open=true;
+  const details=el("details","chat-process");
+  details.open=ui.open;
+  const summary=el("summary",ui.open?"收起处理过程":"查看处理过程");
+  details.append(summary);
+  details.addEventListener("toggle",()=>{ui.open=details.open;ui.manual=true;summary.textContent=details.open?"收起处理过程":"查看处理过程";});
+  for (const item of p.process || []) {
+    const box=el("div",undefined,"chat-process-text"); box.append(chatContent(item.text || "")); details.append(box);
+    if (item.truncated) details.append(el("p","这条摘要已裁剪，完整内容保留在 Core 记录中。","hint"));
+  }
+  if (p.process_truncated) details.append(el("p","较早的公开摘要已裁剪；完整记录仍在 Core 的执行日志中。","hint"));
+  if (p.live_text) {
+    details.append(el("p","正在生成","hint"));
+    const live=el("div",undefined,"chat-process-text"); live.append(chatContent(p.live_text)); details.append(live);
+  }
+  return details;
+}
 function chatRender() {
   const log=$("chat-messages"), nearBottom=log.scrollHeight-log.scrollTop-log.clientHeight<90;
   const existing=new Map([...log.querySelectorAll("[data-turn-id]")].map(n=>[n.dataset.turnId,n]));
@@ -141,14 +168,21 @@ function chatRender() {
     if (!article) {article=el("article",undefined,"chat-turn"); article.dataset.turnId=turn.turn_id;}
     const task=turn.task_id ? state.tasks.get(turn.task_id) : null;
     const skillRevision=JSON.stringify([turn.skill_run?.revision,turn.skill_run?.steps.map(s=>[s.status,state.tasks.get(s.task_id)?.task.revision,s.tool_execution])]);
-    const revision=`${turn.revision}:${task?.task.revision ?? ""}:${chatState.conversation?.revision}:${chatState.previews.get(turn.turn_id)?.result_digest ?? ""}:${skillRevision}:${chatSkillState.busy.has(turn.turn_id)}`;
+    const revision=`${turn.revision}:${JSON.stringify(turn.presentation || null)}:${task?.task.revision ?? ""}:${chatState.conversation?.revision}:${chatState.previews.get(turn.turn_id)?.result_digest ?? ""}:${skillRevision}:${chatSkillState.busy.has(turn.turn_id)}`;
     if (article.dataset.revision!==revision) {
       article.dataset.revision=revision;
       const question=el("div",undefined,"chat-user"), answer=el("div",undefined,"chat-assistant");
+      const presentation=turn.presentation?.version===1 ? turn.presentation : null;
       question.append(el("strong","你"),el("div",turn.text,"chat-prose"));
-      answer.append(el("strong","NEXUS"),chatContent(turn.phase==="summary" ? (turn.initial_response_text || "已确认只读动作。") : turn.response_text || (turn.work_status==="waiting" ? "正在执行本轮工作，请查看下方实际进度。" : turn.work_status==="permission" ? "需要你的答复，请查看下方具体请求。" : turn.proposal ? "已提出只读动作，等待你的决定。" : turn.status==="queued" ? "等待模型…" : turn.status==="generating" ? "正在生成…" : "尚无回复内容")));
+      answer.append(el("strong","NEXUS"));
+      if (presentation) {
+        answer.append(chatPresentationPanel(turn,presentation));
+        if (presentation.final_text!==null) answer.append(el("strong","最终回答"),chatContent(presentation.final_text));
+      } else {
+        answer.append(chatContent(turn.phase==="summary" ? (turn.initial_response_text || "已确认只读动作。") : turn.response_text || (turn.work_status==="waiting" ? "正在执行本轮工作，请查看下方实际进度。" : turn.work_status==="permission" ? "需要你的答复，请查看下方具体请求。" : turn.proposal ? "已提出只读动作，等待你的决定。" : turn.status==="queued" ? "等待模型…" : turn.status==="generating" ? "正在生成…" : "尚无回复内容")));
+      }
       const cost=turn.cost_status==="unknown" ? " · 费用未知，保留预留" : turn.cost_microunits!=null ? ` · 费用上界 $${turn.cost_microunits/1000000}` : "";
-      const replyStatus=turn.work_status==="waiting" ? "工作进行中" : turn.work_status==="permission" ? "等待你的答复" : turn.skill_plan && turn.phase==="reply" ? "流程建议已生成" : chatLabels[turn.status];
+      const replyStatus=presentation ? presentation.label : (turn.work_status==="waiting" ? "工作进行中" : turn.work_status==="permission" ? "等待你的答复" : turn.skill_plan && turn.phase==="reply" ? "流程建议已生成" : chatLabels[turn.status]);
       answer.append(el("p",`${replyStatus}${turn.error_code ? " · "+turn.error_code : ""}${cost}${turn.web_call_count ? ` · 网页请求 ${turn.web_call_count} 次（计入费用）` : ""}${turn.context_truncated ? " · 部分历史或工具上下文已裁剪，完整执行结果见工作记录" : ""}`,"hint"));
       const inspect=el("button","查看本轮发送内容","quiet");
       inspect.onclick=action(async()=>{const value=await api(`/api/v1/chat/turns/${turn.turn_id}`); const details=el("pre",JSON.stringify({messages:value.turn.context_messages,skill_catalog:value.turn.skill_catalog,work_catalog:value.turn.work_catalog,work_messages:value.turn.work_messages,result_messages:value.turn.result_context_messages},null,2)); inspect.replaceWith(details);});
@@ -188,7 +222,7 @@ function chatRender() {
         if (turn.result_supported && turn.phase==="reply" && turn.status==="completed" && task?.task.status==="succeeded" && turn.auto_result_status!=="waiting" && !chatState.conversation?.archived) chatResultPreview(turn,card,!chatState.active && turn===turns.at(-1));
         answer.append(card);
       }
-      if (turn.phase==="summary") answer.append(el("strong","最终回答"),chatContent(turn.response_text || (turn.status==="queued" ? "等待模型解读结果…" : turn.status==="generating" ? "正在根据结果生成回答…" : "本次解读未完成；工具执行结果已保留。")));
+      if (!presentation && turn.phase==="summary") answer.append(el("strong","最终回答"),chatContent(turn.response_text || (turn.status==="queued" ? "等待模型解读结果…" : turn.status==="generating" ? "正在根据结果生成回答…" : "本次解读未完成；工具执行结果已保留。")));
       if (turn.memory_references?.length) {
         const refs=el("details"); refs.append(el("summary","本轮引用的记忆与来源"),el("pre",JSON.stringify(turn.memory_references,null,2))); answer.append(refs);
       }
@@ -220,7 +254,8 @@ function chatRender() {
   $("chat-tools").parentElement.lastChild.textContent=working ? "本轮使用已配置的工具与工作区" : "允许建议系统信息与目录工具（执行前需确认）";
   for (const id of ["chat-skill-load","chat-skills-catalog"]) $(id).hidden=working;
   $("chat-skills").parentElement.hidden=working;
-  $("chat-outbound-notice").textContent=working ? "发送即同意外发本轮输入、所选上下文、可用能力目录及实际工具结果；网页搜索词和公开页面网址会发送给 DeepSeek。每轮最多 4 个动作、5 次工作模型交换；勾选压缩时最多额外一次摘要调用，共用原费用上限；网页每次有结果收费 $0.00075，合计共用 $0.05 和每日 $1。" : "点击“发送给 DeepSeek”即同意外发本次输入及所选上下文和流程目录。勾选压缩时最多额外一次摘要调用，共用原费用上限。单步工具可在确认卡允许自动回传；多步流程成功后先预览结果，再同意解读。每天 $1、每轮共用 $0.05，普通聊天 1 次、含结果解读最多 2 次调用。";
+  const imageNote=working && chatWorkImageAvailable() ? " 图片工具已由服务器返回：配置工作区内的图片可能生成最多 1024px / 8 KiB 的有界快照并随本轮结果发送给 DeepSeek；可能继续缩小或使用有损 JPEG，GIF/WebP 只取首帧，透明区域显示白底。点击发送即本轮明确同意，历史选择不代替本轮同意。" : "";
+  $("chat-outbound-notice").textContent=working ? "发送即同意外发本轮输入、所选上下文、可用能力目录及实际工具结果；网页搜索词和公开页面网址会发送给 DeepSeek。每轮最多 4 个动作、5 次工作模型交换；勾选压缩时最多额外一次摘要调用，共用原费用上限；网页每次有结果收费 $0.00075，合计共用 $0.05 和每日 $1。"+imageNote : "点击“发送给 DeepSeek”即同意外发本次输入及所选上下文和流程目录。勾选压缩时最多额外一次摘要调用，共用原费用上限。单步工具可在确认卡允许自动回传；多步流程成功后先预览结果，再同意解读。每天 $1、每轮共用 $0.05，普通聊天 1 次、含结果解读最多 2 次调用。"+imageNote;
   $("chat-context-info").textContent=flowRunning ? "流程正在执行，请在上方查看步骤、审批或取消整个流程。完成后可预览结果并追问。" : waiting ? "等待工具结果并自动回答，完成后即可追问。停止自动回传不会取消工具；取消执行请使用任务卡。" : chatState.active ? "可选择纠正当前工作或排队后续任务；纠正在已派发操作结束后生效，不会扩大权限。" : "上下文保留近期原文和所选资料；同意压缩时按 token 估算与请求容量生成旧历史摘要，原始记录保留。可用 /compact 手动压缩。";
 }
 function initChat() {

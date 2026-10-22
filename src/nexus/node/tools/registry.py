@@ -12,6 +12,7 @@ from nexus.node.tools.list_directory import list_directory
 from nexus.node.tools.system_info import system_info
 from nexus.node.tools.files import read_file, find_files, preview_write, write_file
 from nexus.node.tools.commands import run_command
+from nexus.node.tools.images import read_image
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,8 @@ def execute_tool(command: CommandExecute, config: NodeConfig) -> ToolResult:
             result = list_directory(command.arguments, root, config.max_result_bytes)
         elif command.tool == "command.run":
             result = run_command(command.arguments, root, config.commands)
+        elif command.tool == "filesystem.read_image":
+            result = read_image(command.arguments, root)
         else:
             result = {"filesystem.read_lines":read_lines,"filesystem.glob":glob_files,"filesystem.grep":grep_files,"filesystem.edit_preview":preview_edit,"filesystem.edit":edit_file,"filesystem.read":read_file,"filesystem.search":find_files,"filesystem.write_preview":preview_write,"filesystem.write":write_file}[command.tool](command.arguments, root)
     else:

@@ -8,9 +8,9 @@ from pydantic import Field, StrictBool, StrictInt, StrictStr, model_validator
 
 from nexus.contracts.base import CommandDigest, StrictContract
 
-ToolName = Literal["system.info", "filesystem.list", "filesystem.read", "filesystem.search", "filesystem.write_preview", "filesystem.write", "command.run", "filesystem.read_lines", "filesystem.glob", "filesystem.grep", "filesystem.edit_preview", "filesystem.edit", "interaction.observe", "interaction.act"]
-ToolKey = Literal["system.info@1", "filesystem.list@1", "filesystem.read@1", "filesystem.search@1", "filesystem.write_preview@1", "filesystem.write@1", "command.run@1", "filesystem.read_lines@1", "filesystem.glob@1", "filesystem.grep@1", "filesystem.edit_preview@1", "filesystem.edit@1", "interaction.observe@1", "interaction.act@1"]
-MUTATING_TOOLS = frozenset({"filesystem.write", "filesystem.edit", "command.run", "interaction.act"})
+ToolName = Literal["system.info", "filesystem.list", "filesystem.read", "filesystem.search", "filesystem.write_preview", "filesystem.write", "command.run", "filesystem.read_lines", "filesystem.glob", "filesystem.grep", "filesystem.edit_preview", "filesystem.edit", "interaction.observe", "interaction.act", "filesystem.read_image", "plugin.call"]
+ToolKey = Literal["system.info@1", "filesystem.list@1", "filesystem.read@1", "filesystem.search@1", "filesystem.write_preview@1", "filesystem.write@1", "command.run@1", "filesystem.read_lines@1", "filesystem.glob@1", "filesystem.grep@1", "filesystem.edit_preview@1", "filesystem.edit@1", "interaction.observe@1", "interaction.act@1", "filesystem.read_image@1", "plugin.call@1"]
+MUTATING_TOOLS = frozenset({"filesystem.write", "filesystem.edit", "command.run", "interaction.act", "plugin.call"})
 CommandId = Annotated[StrictStr, Field(pattern=r"^[a-z][a-z0-9_-]{0,39}$")]
 
 

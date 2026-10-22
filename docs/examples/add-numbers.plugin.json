@@ -1,0 +1,20 @@
+{
+  "manifest": {
+    "schema_version": 1,
+    "plugin_id": "user.add_numbers",
+    "version": "1.0.0",
+    "name": "整数加法示例",
+    "description": "独立测试和宿主执行使用相同源码。",
+    "license": "MIT",
+    "runtime": "python",
+    "tools": [{
+      "name": "add",
+      "description": "返回两个整数之和。",
+      "effect": "execute",
+      "input_schema": {"type":"object","properties":{"a":{"type":"integer"},"b":{"type":"integer"}},"required":["a","b"],"additionalProperties":false},
+      "output_schema": {"type":"object","properties":{"sum":{"type":"integer"}},"required":["sum"],"additionalProperties":false}
+    }]
+  },
+  "source": "def handle(tool, input, context):\n    return {'sum': input['a'] + input['b']}\n",
+  "tests": [{"tool":"add","input":{"a":2,"b":3},"expected":{"sum":5}}]
+}

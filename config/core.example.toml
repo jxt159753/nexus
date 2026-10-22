@@ -5,11 +5,13 @@ host = '127.0.0.1'
 port = 8000
 # Explicit loopback development. Remote access requires local_http=false and TLS.
 local_http = true
-origins = ['http://127.0.0.1:8000']
+# The Windows app loads its bundled UI from this secure Tauri origin.
+origins = ['http://127.0.0.1:8000', 'https://tauri.localhost']
 
 # Optional M2. Keep disabled until DEEPSEEK_API_KEY is safely set on Core.
 [models]
 chat_enabled = false # M3: explicitly enable after configuring Core's existing DeepSeek key
+chat_images_enabled = false # Enable only after the UI discloses image result transmission
 chat_input_bytes = 32768 # complete serialized request
 chat_context_window_tokens = 1000000
 chat_input_tokens = 32768

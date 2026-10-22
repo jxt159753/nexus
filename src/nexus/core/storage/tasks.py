@@ -210,6 +210,11 @@ class TaskRepository:
             if work_step_id is not None:
                 from nexus.core.security.work import operation
                 await operation(conn, work_step_id, "task:"+str(task_id), now)
+                if request.intent=='execute_plugin':
+                    # Reserve the bounded nested effects before dispatch. An
+                    # unknown result cannot release this reservation for retry.
+                    for index in range(request.arguments.max_subcalls):
+                        await operation(conn,work_step_id,f'plugin-subcall:{task_id}:{index}',now)
                 await conn.execute("INSERT INTO chat_work_tasks VALUES(?,?,?)", (str(task_id), str(work_step_id), work_role))
                 field = "preview_task_id" if work_role == "preview" else "task_id"
                 await conn.execute(f"UPDATE chat_work_steps SET {field}=?,status='waiting' WHERE step_id=?", (str(task_id), str(work_step_id)))

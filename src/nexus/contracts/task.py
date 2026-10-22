@@ -1,3 +1,4 @@
+from nexus.plugins.contracts import PluginNodeArguments
 
 from typing import Annotated, Literal
 from uuid import UUID
@@ -5,6 +6,7 @@ from uuid import UUID
 from pydantic import Field, StrictInt
 
 from nexus.contracts.interaction import ObserveArguments, InteractArguments
+from nexus.contracts.images import ImageReadArguments
 from nexus.contracts.base import StrictContract
 from nexus.contracts.basic import FileLinesArguments, FileGlobArguments, FileGrepArguments, FileEditPreviewArguments, FileEditArguments, FileReadArguments, FileSearchArguments, FilePreviewArguments, FileWriteArguments, CommandRunArguments
 
@@ -43,6 +45,11 @@ class ListDirectoryRequest(TaskMetadata):
 class FileReadRequest(TaskMetadata):
     intent: Literal["read_file"]
     arguments: FileReadArguments
+
+
+class ImageReadRequest(TaskMetadata):
+    intent: Literal["read_image"]
+    arguments: ImageReadArguments
 
 
 class FileSearchRequest(TaskMetadata):
@@ -100,7 +107,12 @@ class InteractRequest(TaskMetadata):
     arguments: InteractArguments
 
 
+class PluginNodeRequest(TaskMetadata):
+    intent: Literal["execute_plugin"]
+    arguments: PluginNodeArguments
+
+
 TaskRequest = Annotated[
-    SystemInfoRequest | ListDirectoryRequest | FileReadRequest | FileSearchRequest | FilePreviewRequest | FileWriteRequest | CommandRunRequest | FileLinesRequest | FileGlobRequest | FileGrepRequest | FileEditPreviewRequest | FileEditRequest | ObserveRequest | InteractRequest,
+    SystemInfoRequest | ListDirectoryRequest | FileReadRequest | FileSearchRequest | FilePreviewRequest | FileWriteRequest | CommandRunRequest | FileLinesRequest | FileGlobRequest | FileGrepRequest | FileEditPreviewRequest | FileEditRequest | ObserveRequest | InteractRequest | ImageReadRequest | PluginNodeRequest,
     Field(discriminator="intent"),
 ]

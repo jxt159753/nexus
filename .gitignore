@@ -1,4 +1,4 @@
-﻿.venv/
+.venv/
 __pycache__/
 *.pyc
 .env
@@ -25,3 +25,9 @@ dist/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Windows desktop app build artifacts
+/apps/windows/node_modules/
+/apps/windows/src-tauri/target/
+/apps/windows/src-tauri/binaries/*.exe
+/apps/windows/src-tauri/gen/

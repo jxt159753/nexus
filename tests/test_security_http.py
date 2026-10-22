@@ -150,6 +150,11 @@ def test_transport_configuration_rejects_insecure_or_nonexact_origins(origin, lo
         TransportPolicy(frozenset({origin}), local_http=local)
 
 
+def test_local_transport_accepts_https_app_origin_alongside_loopback_http():
+    policy = TransportPolicy(frozenset({"http://127.0.0.1:8000", "https://tauri.localhost"}), local_http=True)
+    assert "https://tauri.localhost" in policy.origins
+
+
 def test_secure_mode_rejects_plain_http_and_local_mode_is_explicit(world, application):
     with TestClient(application, base_url="http://nexus.test") as client:
         assert login(client, world).status_code == 403

@@ -47,6 +47,8 @@ def test_known_task_and_preview_failures_reach_model_with_original_error(world, 
         assert feedback["error_code"] == "RESULT_INVALID"
         assert feedback["error"]["message"] == "Target parent is unavailable"
         assert done["status"] == "completed" and done["work_steps"][0]["status"] == "failed"
+        assert done["presentation"]["final_text"] == done["response_text"]
+        assert not done["presentation"]["collapse_process"]
         if preview:
             assert feedback["phase"] == "preview" and feedback["write_executed"] is False
             assert done["work_steps"][0]["task_id"] is None

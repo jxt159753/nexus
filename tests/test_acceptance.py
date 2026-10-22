@@ -113,6 +113,9 @@ def backup(source: Path, target: Path):
     with target.open("xb"):
         pass
     with closing(sqlite3.connect(source.as_uri() + "?mode=rw", uri=True)) as src:
+        # Trigger pager/WAL recovery and verify the stopped source before the
+        # first backup read (Windows SQLite can defer recovery until a query).
+        assert src.execute('PRAGMA quick_check').fetchall()==[('ok',)]
         with closing(sqlite3.connect(target)) as dest:
             src.backup(dest)
             assert dest.execute("PRAGMA quick_check").fetchall() == [("ok",)]

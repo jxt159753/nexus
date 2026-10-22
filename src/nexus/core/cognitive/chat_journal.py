@@ -144,6 +144,7 @@ class ChatJournal:
                 raise AccessDenied("POLICY_DENIED")
             # Old memory consent never becomes implicit permission to reuse a paraphrase.
             await memory_context.validate_turn(conn,row)
+            await self.chat.attachments.validate_turn(conn,row)
             records.append({"turn_id":row["turn_id"],"conversation_id":row["conversation_id"],"revision":row["revision"],"text":row["text"],"response":row["response_text"]})
         if len(canonical(records).encode())>8192:
             raise AccessDenied("MODEL_INPUT_LIMIT")

@@ -231,3 +231,22 @@ def test_one_operation_grant_still_allows_final_answer_but_no_more_effects(world
         await chat.process_one();await chat.process_one()
         assert (await chat.get(world.owner,turn["turn_id"]))["status"] == "completed"
     asyncio.run(run())
+
+
+def test_completed_tool_turn_is_reused_in_followup_context(world, monkeypatch):
+    app = app_for(world, monkeypatch)
+    async def run():
+        chat = app.state.chat
+        conv, _, turn = await setup(app, world, [{"intent": "get_node_status", "arguments": {}}])
+        await chat.process_one()
+        await chat.process_one()
+        assert (await chat.get(world.owner, turn["turn_id"]))["status"] == "completed"
+        history = await chat.history(world.owner, conv["conversation_id"])
+        follow = await chat.submit(world.owner, conv["conversation_id"], ChatSubmission(
+            request_id=uuid4(), expected_revision=history["conversation"]["revision"],
+            text="继续说明", allow_model=True,
+        ))
+        assert follow["context_count"] == 1
+        await chat.process_one()
+        assert any(message.get("content") == "继续说明" for message in chat.provider.calls[-1][0])
+    asyncio.run(run())

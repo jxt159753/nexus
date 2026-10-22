@@ -387,7 +387,9 @@ class ToolService:
                     await self.executions.store(node, UUID(record["execution_id"]), record["artifact_digest"],
                         {"outcome": "failed", "error_code": "SANDBOX_NOT_RECEIVED", "stopped": True})
                     await self._recover_business_result(UUID(record["execution_id"]))
-            if not await self.executions.unsettled(node):
+            async with self.database.transaction(write=False) as conn:
+                plugin_unknown=await one(conn,"SELECT 1 FROM plugin_sandbox_executions WHERE node_id=? AND status IN ('sent','unknown') LIMIT 1",(str(node),))
+            if not await self.executions.unsettled(node) and not plugin_unknown:
                 connection = self.transport.connections.get(node)
                 if connection is not None:
                     connection.blocked = False

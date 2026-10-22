@@ -46,7 +46,7 @@ def test_cached_status_rebind_ack_and_network_execution(tmp_path):
                     assert ws.request.headers["Authorization"] == "Bearer " + token.get_secret_value()
                     hello = parse_message(await ws.recv())
                     assert hello.type == "node.hello"
-                    assert set(hello.payload.model_dump()) == {"node_id", "node_version", "tools", "roots", "boot_id", "command_digests", "interaction_digests"}
+                    assert set(hello.payload.model_dump()) == {"node_id", "node_version", "tools", "roots", "boot_id", "command_digests", "interaction_digests",'plugin_digest','plugin_tools'}
                     assert hello.payload.command_digests == {}
                     session = welcome()
                     await ws.send(wire_message("node.welcome", session))

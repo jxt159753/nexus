@@ -10,8 +10,9 @@ from uuid import UUID, uuid4
 
 from nexus.contracts.chat import CHAT_PROPOSAL, ChatActionDecision, ChatPlanPreview, ChatResultConsent, ChatResultPreview, ChatSubmission, ConversationCreate, ConversationUpdate
 from nexus.contracts.extensions import digest_value
-from nexus.core.cognitive import chat_skills, chat_journal, chat_compaction
+from nexus.core.cognitive import chat_skills, chat_journal, chat_compaction, chat_presentation
 from nexus.core.cognitive.chat_work import WorkService
+from nexus.core.cognitive.attachments import AttachmentService
 from nexus.core.cognitive.chat_context import request_size, history_message, pressure, prune_tools
 from nexus.core.memory import context as memory_context
 from nexus.core.memory.service import project_owned
@@ -40,6 +41,7 @@ def public_turn(row: sqlite3.Row, *, detail: bool = False) -> dict:
     value = dict(row)
     value["history_summary"] = json.loads(value.pop("history_summary_json"))
     value["references"] = json.loads(value.pop("references_json"))
+    value["attachments"] = json.loads(value.pop("attachments_json"))
     value["memory_references"] = json.loads(value.pop("memory_refs_json"))
     request = json.loads(value.pop("request_json"))
     context = json.loads(value.pop("context_json"))
@@ -76,8 +78,17 @@ class ChatService:
         self.active: tuple[str, asyncio.Task[ModelReply]] | None = None
         self.failed = False
         self.skills = None
+        self.attachments = AttachmentService(self)
         self.work = WorkService(self)
         self.journal = chat_journal.ChatJournal(self)
+        from nexus.core.plugins.service import PluginService
+        self.plugins = PluginService(self)
+
+    async def snapshot(self, conn, row: sqlite3.Row, *, detail: bool = False) -> dict:
+        value = public_turn(row, detail=detail)
+        value["work_steps"] = await self.work.steps(conn, value["turn_id"])
+        value["presentation"] = await chat_presentation.presentation(conn, value)
+        return value
 
     async def conversation(self, conn, principal: Principal, conversation_id: UUID | str) -> sqlite3.Row:
         await self.owner(conn, principal)
@@ -140,10 +151,10 @@ class ChatService:
             conversation = await self.conversation(conn, principal, conversation_id)
             rows = await conn.execute_fetchall(TURN_SELECT + " WHERE t.conversation_id=? AND t.rowid<? ORDER BY t.rowid DESC LIMIT 20", (str(conversation_id), before))
             active = await one(conn, f"SELECT turn_id FROM chat_turns WHERE conversation_id=? AND {ACTIVE} ORDER BY rowid LIMIT 1", (str(conversation_id),))
-            value = {"conversation": dict(conversation), "active_turn_id": active[0] if active else None, "turns": [public_turn(row) for row in reversed(rows)]}
+            value = {"conversation": dict(conversation), "active_turn_id": active[0] if active else None, "turns": [await self.snapshot(conn, row) for row in reversed(rows)]}
+            from nexus.core.security.modes import effective
+            value['permission'] = await effective(conn, conversation_id)
             value["work_grant"] = await self.work.describe(conn,conversation_id)
-            for turn in value["turns"]:
-                turn["work_steps"] = await self.work.steps(conn,turn["turn_id"])
         for turn in value["turns"]:
             if turn["skill_run_id"]:
                 turn["skill_run"] = await self.skills.get(principal, UUID(turn["skill_run_id"]))
@@ -155,8 +166,7 @@ class ChatService:
             row = await one(conn, TURN_SELECT + " WHERE t.turn_id=? AND t.owner_id=?", (str(turn_id), str(principal.identity_id)))
             if row is None:
                 raise LookupError("chat turn not found")
-            value = public_turn(row, detail=True)
-            value["work_steps"] = await self.work.steps(conn,turn_id)
+            value = await self.snapshot(conn, row, detail=True)
         if value["skill_run_id"]:
             value["skill_run"] = await self.skills.get(principal, UUID(value["skill_run_id"]))
         return value
@@ -198,7 +208,7 @@ class ChatService:
             if old:
                 if old["conversation_id"] != str(conversation_id) or canonical(ChatSubmission.model_validate_json(old["request_json"]).model_dump(mode="json")) != encoded:
                     raise Conflict("IDEMPOTENCY_CONFLICT")
-                return public_turn(old)
+                return await self.snapshot(conn, old)
             if not value.allow_model:
                 raise AccessDenied("MODEL_CONSENT_REQUIRED")
             if not self.config.enabled or not self.config.chat_enabled or self.provider is None:
@@ -230,6 +240,12 @@ class ChatService:
             if recent[0] >= 10 or total[0] >= 10000 or total[1] >= 268000000 or count >= 200:
                 raise Conflict("BUSY")
             messages = [{"role": "user", "content": value.text}]
+            attachments = None
+            if value.attachment_ids:
+                attachments = await self.attachments.selection(conn,principal,conversation_id,value.attachment_ids)
+                if attachments["attachments_digest"] != value.attachments_digest:
+                    raise Conflict("IDEMPOTENCY_CONFLICT")
+                messages = [self.attachments.message(attachments,value.text)]
             refs = []
             if value.memory_ids:
                 snapshot = await memory_context.selection(conn, principal.identity_id, conversation["project_id"], value.memory_ids)
@@ -256,8 +272,9 @@ class ChatService:
                 available = (await one(conn, "SELECT count(*) FROM chat_turns WHERE conversation_id=? AND status='completed'", (str(conversation_id),)))[0]
                 rows = await conn.execute_fetchall("SELECT * FROM chat_turns WHERE conversation_id=? AND status='completed' ORDER BY rowid DESC LIMIT 40", (str(conversation_id),))
                 for row in rows:
-                    # Referenced data and model paraphrases are not silently reused
-                    # under an old memory consent. Select those memories again.
+                    # Explicit memory/reference data is not silently reused under
+                    # an old consent. Ordinary completed turns, including tool
+                    # turns approved for context reuse, participate in history.
                     if not await chat_compaction.reusable_turn(conn, row):
                         break
                     if selected >= 10:
@@ -290,11 +307,19 @@ class ChatService:
             await conn.execute("UPDATE chat_turns SET skill_catalog_json=? WHERE turn_id=?", (canonical(skills), turn_id))
             await conn.execute("UPDATE chat_turns SET memory_refs_json=?,queue_after_turn_id=?,history_summary_json=?,references_json=? WHERE turn_id=?", (canonical(refs),previous[0] if previous else None,canonical(history_summary),canonical(references),turn_id))
             await conn.execute("UPDATE chat_turns SET context_sources_json=? WHERE turn_id=?", (canonical(context_sources),turn_id))
+            if attachments:
+                await conn.execute("UPDATE chat_turns SET attachments_json=? WHERE turn_id=?",(canonical(attachments["attachments"]),turn_id))
+                for identifier in value.attachment_ids:
+                    await conn.execute("INSERT INTO chat_turn_attachments(turn_id,attachment_id) VALUES(?,?)",(turn_id,str(identifier)))
+                await audit(conn,str(principal.identity_id),None,"chat.attachments_consented",now)
             if work_grant_id:
                 await conn.execute("UPDATE chat_turns SET work_grant_id=?,work_catalog_json=? WHERE turn_id=?",(work_grant_id,canonical(work_catalog),turn_id))
-            await conn.execute("UPDATE conversations SET revision=revision+1,title=? WHERE conversation_id=?", (" ".join(value.text.split())[:40] if count == 0 and conversation["auto_title"] else conversation["title"], str(conversation_id)))
+            title = " ".join(value.text.split())[:40]
+            if not title and attachments:
+                title = ("附件："+attachments["attachments"][0]["filename"])[:40]
+            await conn.execute("UPDATE conversations SET revision=revision+1,title=? WHERE conversation_id=?", (title if count == 0 and conversation["auto_title"] else conversation["title"], str(conversation_id)))
             await audit(conn, str(principal.identity_id), None, "chat.consented", now)
-            return public_turn(await one(conn, TURN_SELECT + " WHERE t.turn_id=?", (turn_id,)))
+            return await self.snapshot(conn, await one(conn, TURN_SELECT + " WHERE t.turn_id=?", (turn_id,)))
 
     def action_digest(self, row, proposal, policy_version):
         request=json.loads(row["request_json"])
@@ -389,7 +414,7 @@ class ChatService:
                 if not row["result_digest"] or row["result_digest"] != value.result_digest:
                     raise Conflict("IDEMPOTENCY_CONFLICT")
                 if row["phase"] == "summary":
-                    return public_turn(await one(conn, TURN_SELECT+" WHERE t.turn_id=?", (str(turn_id),)))
+                    return await self.snapshot(conn, await one(conn, TURN_SELECT+" WHERE t.turn_id=?", (str(turn_id),)))
                 conversation = await self.conversation(conn, principal, row["conversation_id"])
                 if conversation["archived"] or conversation["revision"] != value.expected_revision or row["status"] != "completed":
                     raise Conflict("IDEMPOTENCY_CONFLICT")
@@ -402,7 +427,7 @@ class ChatService:
                     raise Conflict("IDEMPOTENCY_CONFLICT")
                 await queue_summary(conn, row, timestamp(utc_now()))
                 await audit(conn, row["owner_id"], row["task_id"], "chat.result_consented", utc_now())
-                return public_turn(await one(conn, TURN_SELECT+" WHERE t.turn_id=?", (str(turn_id),)))
+                return await self.snapshot(conn, await one(conn, TURN_SELECT+" WHERE t.turn_id=?", (str(turn_id),)))
 
     async def cancel(self, principal: Principal, turn_id: UUID | str) -> dict:
         async with self.harness.operation:
@@ -495,6 +520,7 @@ class ChatService:
                 error = None
                 try:
                     await memory_context.validate_turn(conn, row)
+                    await self.attachments.validate_turn(conn,row)
                     refs=json.loads(row["references_json"])
                     if refs:
                         conversation=await one(conn,"SELECT project_id FROM conversations WHERE conversation_id=?",(row["conversation_id"],))
@@ -529,7 +555,7 @@ class ChatService:
                 compact_noop = False
                 try:
                     request = json.loads(row["request_json"])
-                    if request.get("allow_compaction"):
+                    if not error and request.get("allow_compaction"):
                         projected = prune_tools(messages) if pressure(self.config,messages,**options)["pressured"] else messages
                         if projected != messages:
                             messages = projected
@@ -549,11 +575,15 @@ class ChatService:
                     error = error or exc.code
                 if not plan:
                     messages=[*messages,*pending_corrections]
-                if not pressure(self.config,messages,**options)["fits"]:
+                if not error and not pressure(self.config,messages,**options)["fits"]:
                     error = "MODEL_INPUT_LIMIT"
                 if not await chat_journal.capacity(conn):
                     error = "BUSY"
                 owner = await one(conn, "SELECT 1 FROM identities WHERE identity_id=? AND role='owner' AND revoked_at IS NULL", (row["owner_id"],))
+                if not error and self.plugins.config.enabled:
+                    from nexus.core.plugins.lifecycle import budget as plugin_budget
+                    try: reservation=await plugin_budget(conn,self,row['turn_id'],reservation)
+                    except AccessDenied as exc: error=exc.code
                 error = error or ("AUTH_REQUIRED" if not owner else "MODEL_DISABLED" if not self.config.chat_enabled or self.provider is None else await budget_error(conn, self.config, now, reservation=reservation))
                 if not summary and row["expires_at"] <= timestamp(now):
                     error = "DEADLINE_EXCEEDED"

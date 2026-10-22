@@ -40,7 +40,7 @@ def test_v12_chat_history_cost_and_request_snapshot_survive_v13_upgrade(tmp_path
             assert conn.execute(f'SELECT {names} FROM "{table}" ORDER BY rowid').fetchall() == before[table]
         assert conn.execute("SELECT skill_catalog_json,skill_plan_json,skill_run_id FROM chat_turns").fetchone() == ("[]", None, None)
         assert conn.execute("SELECT cost_status,reserved_microunits,skill_run_id FROM model_calls").fetchone() == ("unknown", 50000, None)
-        assert conn.execute("SELECT max(version) FROM schema_migrations").fetchone()[0] == 20
+        assert conn.execute("SELECT max(version) FROM schema_migrations").fetchone()[0] == 26
     backups = list(tmp_path.glob("core.sqlite3.before-v13-*.sqlite3"))
     assert len(backups) == 1
     with closing(sqlite3.connect(backups[0])) as conn:

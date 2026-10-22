@@ -43,6 +43,14 @@ class NodeRuntime:
             self._lock.close()
             raise
         self._worker = ManagedWorker()
+        self.plugins = None
+        if self.config.plugins.enabled:
+            from nexus.plugins.node_runtime import PluginRuntime
+            try:
+                self.plugins = PluginRuntime(self.config)
+            except BaseException:
+                self._lock.close()
+                raise
 
     def _recover(self) -> None:
         for receipt in self.receipts.unresolved():
@@ -66,6 +74,8 @@ class NodeRuntime:
         if not self._slot.acquire(timeout=15):
             raise RuntimeError("worker stop not confirmed; Node lock retained")
         try:
+            if self.plugins is not None:
+                self.plugins.close()
             self._lock.close()
         finally:
             self._slot.release()
@@ -161,8 +171,16 @@ class NodeRuntime:
             budget = min(deadline - time.monotonic(), (command.expires_at - self._now()).total_seconds())
             if budget <= 0:
                 raise ExecutionStopped("timeout")
-            raw = self._worker.run(WorkerRequest(command=command, config=self.config, job_name=job_name).model_dump_json().encode("utf-8"), job_name, budget, cancel)
-            result = RESULT.validate_json(raw)
+            if command.tool == 'plugin.call':
+                if self.plugins is None:
+                    raise ValueError('plugin runtime is disabled')
+                output = self.plugins.execute(command.arguments, deadline, cancel, job_name)
+                value = command.model_dump(mode='json',include={'session_id','task_id','attempt_id','tool','tool_version','command_digest'})
+                value.update(observed_at=self._now().isoformat(),outcome='succeeded',result=output.model_dump(mode='json'))
+                result = RESULT.validate_json(json.dumps(value))
+            else:
+                raw = self._worker.run(WorkerRequest(command=command, config=self.config, job_name=job_name).model_dump_json().encode("utf-8"), job_name, budget, cancel)
+                result = RESULT.validate_json(raw)
             if (result.task_id != command.task_id or result.attempt_id != command.attempt_id
                     or result.command_digest != command.command_digest or result.tool != command.tool
                     or result.tool_version != command.tool_version or result.session_id != command.session_id):

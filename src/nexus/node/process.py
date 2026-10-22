@@ -30,8 +30,9 @@ class ManagedWorker:
         overflow = threading.Event()
         write_failed = threading.Event()
         try:
+            args = [sys.executable, "--worker"] if getattr(sys, "frozen", False) else [sys.executable, "-B", "-m", "nexus.node.worker"]
             process = subprocess.Popen(
-                [sys.executable, "-B", "-m", "nexus.node.worker"],
+                args,
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                 shell=False, close_fds=True, creationflags=subprocess.CREATE_NO_WINDOW,
             )

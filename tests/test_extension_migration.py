@@ -34,7 +34,7 @@ def test_nonempty_v10_upgrade_preserves_ledger_and_creates_extension_tables(tmp_
     with closing(sqlite3.connect(path)) as conn:
         assert conn.execute("PRAGMA quick_check").fetchone()[0] == "ok"
         assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
-        assert conn.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 20
+        assert conn.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 26
         for table, rows in before.items():
             if table == "schema_migrations":
                 continue

@@ -15,9 +15,24 @@ def request_size(config, messages, **options):
 
 def estimated_tokens(value):
     """Dependency-free text estimate, not a provider tokenizer or cost receipt."""
+    image_count = 0
+
+    def text_surface(item):
+        nonlocal image_count
+        if isinstance(item, dict):
+            if item.get("type") == "image_url":
+                image_count += 1
+                return {"type": "image_url", "notice": "bounded image snapshot"}
+            return {key: text_surface(child) for key, child in item.items()}
+        if isinstance(item, list):
+            return [text_surface(child) for child in item]
+        return item
+
+    value = text_surface(value)
     text = canonical(value)
     ascii_count = sum(ord(char) < 128 for char in text)
-    return math.ceil(ascii_count / 4 + (len(text) - ascii_count) / 1.5) + 16
+    # deepseek-flash currently documents at most 1024 input tokens per image.
+    return math.ceil(ascii_count / 4 + (len(text) - ascii_count) / 1.5) + 16 + image_count * 1024
 
 
 def pressure(config, messages, **options):

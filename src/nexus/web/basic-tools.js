@@ -1,6 +1,6 @@
 "use strict";
 const basicState={nodes:[],preview:null,retry:null};
-const toolLabels={get_system_info:"读取系统信息",list_directory:"列出 workspace 目录",read_file:"读取文本文件",find_files:"查找文件",preview_file_write:"预览文件差异",write_file:"写入文件",run_command:"运行受控命令"};
+const toolLabels={get_system_info:"读取系统信息",list_directory:"列出 workspace 目录",read_file:"读取文本文件",find_files:"查找文件",preview_file_write:"预览文件差异",write_file:"写入文件",run_command:"运行受控命令",read_image:"读取工作区图片"};
 function basicReset() {
   basicState.nodes=[]; basicState.retry=null; $("basic-tool-form").reset();
   $("basic-command").replaceChildren(new Option("此设备暂无受控命令",""));

@@ -109,7 +109,26 @@ function putTask(task, detail) {
   chatRender();
   basicUpdatePreview();
 }
-function taskCard({task, detail}) {
+function displayJson(value, limit=12000) {
+  if (window.NexusImages?.safeJson) return window.NexusImages.safeJson(value, limit);
+  let raw = "";
+  try { raw = JSON.stringify(value, (key, item) => key === "data_base64" ? "[base64 已省略]" : item, 2) || ""; } catch { raw = "[无法序列化的记录]"; }
+  return raw.length > limit ? raw.slice(0, limit) + "…" : raw;
+}
+function renderTaskResult(container, result) {
+  if (!result) return;
+  if (result.image && window.NexusImages) {
+    const evidence = window.NexusImages.createImageEvidence(result);
+    if (evidence) { container.append(evidence); return; }
+    const metadata = window.NexusImages.createImageMetadata(result);
+    if (metadata) { container.append(metadata); return; }
+    container.append(el("p", "图片结果未通过严格白名单校验，不显示预览或内联数据；执行状态以任务记录为准。", "hint"));
+    return;
+  }
+  if (result.image) { container.append(el("p", "图片读取组件尚未加载；不显示内联图片数据。", "hint")); return; }
+  container.append(el("pre", displayJson(result)));
+}
+function taskCard({task, detail}, options={}) {
     const card = el("article", undefined, "task"); card.dataset.taskId = task.task_id;
     const heading = el("div", undefined, "section-heading");
     heading.append(el("h3", toolLabels[task.request.intent] || task.request.intent));
@@ -119,7 +138,10 @@ function taskCard({task, detail}) {
     if (task.project_id) card.append(el("small", `项目：${project ? project.name : task.project_id}`));
     if (task.cancel_requested) card.append(el("p", terminal.has(task.status) ? "已记录取消请求；以最终执行证据为准。" : "已请求取消，等待节点确认实际停止。", "hint"));
     if (task.execution_outcome === "unknown") card.append(el("p", "执行结果未知 · Core 正在保留证据并对账", "hint"));
-    if (task.result) card.append(el("pre", JSON.stringify(task.result, null, 2)));
+    if (task.result && !(options && options.omitResult)) {
+      if (task.result.image && (task.status !== "succeeded" || task.execution_outcome === "unknown")) card.append(el("p", "任务未成功或结果未知；不显示图片预览，仅保留真实执行状态。", "hint"));
+      else renderTaskResult(card, task.result);
+    }
     if (task.error) card.append(el("p", `${task.error.code} · ${task.error.message}`, "hint"));
     if (task.verification) card.append(el("p", `验证级别：${task.verification}`, "hint"));
     if (task.result && task.result.truncated) card.append(el("p", "结果已截断，以上不是完整目录。", "hint"));
@@ -145,7 +167,7 @@ function taskCard({task, detail}) {
       const value = await api("/api/v1/tasks/" + task.task_id);
       let block = card.querySelector(".evidence");
       if (block) {block.remove(); return;}
-      block = el("pre", JSON.stringify({attempts:value.attempts, approvals:value.approvals, events:value.events}, null, 2), "evidence");
+      block = el("pre", displayJson({attempts:value.attempts, approvals:value.approvals, events:value.events}), "evidence");
       card.append(block);
     });
     buttons.append(more); card.append(buttons); return card;
