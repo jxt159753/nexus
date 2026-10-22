@@ -18,7 +18,7 @@
 | 已确定的扩展策略 | 既有 Tool/Skill 审批保留至新链路接入；新插件 normal 批准具体版本，full 在当前有效预授权下测试通过后自动安装/升级/启用，落盘记录且执行前重查。模型不能修改权限模式 |
 | 前端协作约定 | 用户进一步明确今后所有前端修改均先提出要求，由用户直接控制 DSH 实施；Codex 提供后端、接口和接入要求，不自行改前端或自动派发 DSH。P54 的 [DSH 接入要求](DSH-BUILTIN-TOOLS-FRONTEND.md) 已由 P55 按用户直接指令实施；P56 的[附件前端工作单](CHAT-ATTACHMENTS-FRONTEND.md) 已由用户直接指令在 DSH 完成，本轮未自动派发 |
 | 本轮附件界面追加 | 用户直接要求在 Web `/app`、旧控制台和 Windows 随包 UI 接入附件，并保留 Markdown、presentation v1、工具结果与三维首页并行改动。已完成选择/拖放/粘贴、稳定 request_id、逐轮 model-preview 同意、历史恢复、Windows Base64 专用桥与安装版大文件验证；未部署生产，未做真实付费图片理解或 Android 真机 |
-| 后续实现入口 | P50 已部署，GitHub 沿用原分支和草稿 PR；真实模型质量与设备重连待用户验证。独立 App 仍按用户直接控制 DSH 的约定推进，Search/Fetch 真实供应商、Android、最终验收及原 I/O 根因等未结项不因此关闭 |
+| 后续实现入口 | P57–P61 后端和独立 Node 已部署，源码已推送原分支和草稿 PR。插件前端/原生桥由用户控制 DSH；真实 Search/Fetch 已补验，Android、最终用户验收及独立历史问题仍按各项记录处理 |
 
 “已实现”表示已有相应代码和列明的技术证据；“已上线”表示已有部署记录；“已验收”只表示用户明确确认。三者分别记录，不能互相替代。“进行中”表示阶段仍有工作，不表示本次正在后台开发。
 
@@ -62,7 +62,7 @@
 | 项目与可控记忆 | 项目内会话/任务/结果、明确保存/替代/撤销记忆、逐轮预览并同意外发、待办与修订证据 | 已上线；不自动扫描项目文件。[M6 使用](m6-projects-tools.md) |
 | 受控基础工具与宿主插件 | UTF-8 读写、查找、差异与旧内容核对；原生 Shell/终端按任务和模式授权 | 文件工具受 workspace 限制，宿主命令按当前 Windows 用户权限运行；原固定 run_command 不再进入新聊天目录，保留历史解码。[插件设计](plugins.md) |
 | 聊天中的有限工作 | 配置范围内直接调用基础工具和已启用 Tool/Skill，支持一批多个独立函数 | 每轮 4 动作/5 次模型交换，默认内部范围 5 分钟/20 操作，旧显式授权兼容。[使用](chat-work.md)、[追加验证](M6-WORK-FIX-VERIFICATION.md) |
-| 网页搜索与抓取 | 聊天自动搜索公开资料、读取页面并保留来源链接 | DeepSeek 固定独立 API，费用共用原账本，10 秒/有界内容/未知不重试；已上线，实际供应商付费请求未实测。[验证](M6-WORK-FIX-VERIFICATION.md) |
+| 网页搜索与抓取 | 聊天自动搜索公开资料、读取页面并保留来源链接 | DeepSeek 固定独立 API，费用共用原账本，10 秒/有界内容/未知不重试；2026-10-22 原生插件真实搜索和抓取均成功。[验证](PLUGINS-VERIFICATION.md) |
 | 节点状态工具 | 查看在线/离线、忙闲、心跳年龄及有效能力 | Core 有时点连接观测，离线忙闲未知；不采样硬件负载。[设计](decisions/0018-scoped-chat-work.md) |
 | 上下文投影与能力详情 | 请求完整大小准入、整轮裁剪、保留完整工具证据、按需查看已批准 Tool/Skill 契约 | Core 侧随 P49 上线；不增加设备权限，预算按当前压缩同意与共享上限管理。[设计](decisions/0020-dsh-context-harness.md)、[验证](DSH-REFERENCE-VERIFICATION.md) |
 | 上下文自动/手动压缩 | 按 token 压力生成有来源的旧历史摘要、保留近期原文，或发送 `/compact` | Core 已上线；每轮需压缩同意，最多一次额外摘要，共用费用上限。原文保留，token 是启发式估算，真实摘要质量待补验。[使用](context-compaction.md)、[验证](CONTEXT-COMPACTION-VERIFICATION.md) |
@@ -109,7 +109,7 @@ M 表示面向用户的一组产品能力；S 表示内部开发子阶段；P �
 | M3 聊天与工具结果 | 连续聊天、管理会话、确认工具、同意回传后生成最终回答 | **已上线，待真机补验及最终用户验收** |
 | M4 自定义工具与流程 | 生成、测试、逐版批准并复用新的 Tool/Skill | **功能及隔离/恢复已部署验证；真实生成 Tool 已批准启用；Android 细节及最终用户验收待确认** |
 | M5 从聊天完成多步任务 | 直接说出目标，核对有限计划后复用已启用能力完成任务 | **实现与获批上线完成；具体 Skill 批准启用、真实模型/新版沙箱组合、Android 及最终验收待补** |
-| M6 项目与可控记忆 | 项目内会话与进展、逐轮选定记忆、可追溯待办、基础工具及会话工作 | **已部署并有真实模型读写/命令证据；TLS/恢复补验通过；网页 API 真实请求、Android 及最终用户验收待补** |
+| M6 项目与可控记忆 | 项目内会话与进展、逐轮选定记忆、可追溯待办、基础工具及会话工作 | **已部署，真实模型读写/命令及网页 API 通过；TLS/恢复补验通过；Android 及最终用户验收待补** |
 | M7 提醒与周期任务 | 在明确时间和范围内提醒或检查，随时可暂停 | **P57–P61 已批准并实现有限插件后端；专门界面、系统通知与完整阶段未据此批准** |
 | M8 客户端、设备执行与语音 | 用户已提出 Windows/Android 双端 App 目标；本机执行与语音分别规划 | **双端方案交接已有记录；具体工程方案及 M8B/C 未批准实施** |
 
@@ -265,7 +265,7 @@ M4 必需功能与隔离/恢复已有技术证据，具体版本仍须批准且�
 
 P56（2026-10-21）本地后端交付：用户明确要求图片和文件上传，随后选择全部文件可上传、解析分批补齐。新增单件 16 MiB 的原件保存/下载、UTF-8/图片有界预览、其他内容明确未解析、逐轮选择/摘要同意与调用前复查；Core 不依赖 Node 接收上传，图片复用固定独立 helper，原 32 KiB 请求及费用上限保留。迁移022升级前备份并保留旧历史/未知费用；无前端或 Windows 桥修改。相关回归201、最终边界源码37、最终固定包92项通过；独立真实 Core 重启后大于2 MiB原件保留且模型调用0，182个包内运行资源与构建时源码一致。包 SHA-256 `b33eca82cced0744f7dd9d4b94728f5692b9434477309e2c8143025c3f4e804b`；详细环境、中间夹具失败及未验项见[验证记录](CHAT-ATTACHMENTS-VERIFICATION.md)。本项后端自检完成；上传按钮、Windows原生桥及安装版已于同日由用户控制 DSH 按[要求](CHAT-ATTACHMENTS-FRONTEND.md)接入，详见下段。
 
-P56（2026-10-22）前端、旧控制台与 Windows 原生桥本地接入：用户直接指令在现有 `/app`、旧控制台和随包 UI 加入附件，保留 Markdown、presentation v1、工具结果和三维首页。实现选择/多选/拖放/粘贴、任意二进制与空文件、按会话隔离的稳定 request_id、失败/取消/超时后核对服务器再以原键重试、真实进度百分比、逐轮 model-preview 与显式同意、仅附件空文本、历史清单恢复、同源图片快照白底预览及未解析/截断标注；未同意前不新增轮次或模型调用。Windows 新增专用 `attachment_request` 桥，只允许两个 Base64 附件端点，流式限长（23 MiB，含 4/3 编码与有限元数据）、75 秒、可取消；Cookie/CSRF/Origin 校验沿用原桥，未放大通用 API 限额。实际 Edge 155.0.4283.62 浏览器夹具 1 项（含旧控制台与 390×844）通过；安装版 NSIS SHA-256 `54aff24ef76fa4459ea1307f34bc6be47280af6eb86a554aaca0a1a3cc993c2d`，WebView2 Edg/155.0.4283.62，5,243,201 字节上传与下载 SHA-256 一致，取消、断网重试、重启恢复及登录过期均通过；Rust 桥单元 2 项、相关 Python 回归 64 项通过。使用合成 Provider，仅验证请求准入与范围，未进行真实付费图片理解；429 实时触发、30/75 秒超时、Android 真机、生产迁移022及最终用户验收未验证。详细证据见[前端验证](CHAT-ATTACHMENTS-FRONTEND-VERIFICATION.md)。
+P56（2026-10-22）前端、旧控制台与 Windows 原生桥本地接入：用户直接指令在现有 `/app`、旧控制台和随包 UI 加入附件，保留 Markdown、presentation v1、工具结果和三维首页。实现选择/多选/拖放/粘贴、任意二进制与空文件、按会话隔离的稳定 request_id、失败/取消/超时后核对服务器再以原键重试、真实进度百分比、逐轮 model-preview 与显式同意、仅附件空文本、历史清单恢复、同源图片快照白底预览及未解析/截断标注；未同意前不新增轮次或模型调用。Windows 新增专用 `attachment_request` 桥，只允许两个 Base64 附件端点，流式限长（23 MiB，含 4/3 编码与有限元数据）、75 秒、可取消；Cookie/CSRF/Origin 校验沿用原桥，未放大通用 API 限额。实际 Edge 155.0.4283.62 浏览器夹具 1 项（含旧控制台与 390×844）通过；安装版 NSIS SHA-256 `5496eedc5b5f31f6857619fa8b70aa4faf5dd62716bf25f5144b840544ea9e55`，WebView2 Edg/155.0.4283.62，5,243,201 字节上传与下载 SHA-256 一致，取消、断网重试、重启恢复及登录过期均通过；Rust 桥单元 2 项、相关 Python 回归 64 项通过。使用合成 Provider，仅验证请求准入与范围，未进行真实付费图片理解；429 实时触发、30/75 秒超时、Android 真机、生产迁移022及最终用户验收未验证。详细证据见[前端验证](CHAT-ATTACHMENTS-FRONTEND-VERIFICATION.md)。
 
 边界：记忆保存与逐轮外发同意独立。P44 按最新要求替代 P41/P42 新文件任务的逐次确认默认，配置 workspace 内读写/查找直接执行，内部预览、路径、摘要及读回保留；旧待确认任务不自动执行。每轮最多 4 动作/5 次模型交换，模型与网页共用 USD 0.05、每日 USD 1/100 次 API，不自动提取记忆。设计见 [ADR 0019](decisions/0019-workspace-defaults-web-tools.md)，操作见[聊天工作](chat-work.md)。
 
@@ -376,9 +376,10 @@ P55（2026-10-21）前端本地交付：用户直接指令 DSH 在现有 `/app`�
 | 位置 | 最近记录的版本 | 含义 |
 | --- | --- | --- |
 | P57–P61 原生插件 Core / Windows Node | `plugins-20261022`，schema026；wheel `189e7e73…e75b`，Node `6fcddb72…b7bf` | 已备份并上线，真实自写插件及 runsc/Node 执行通过；默认 normal，前端/桥待 DSH，详见 [验证](PLUGINS-VERIFICATION.md) |
+| P57–P61 GitHub 源码 | `2ebbc486`，沿用 `codex/m6-chat-work` 和 [草稿 PR #1](https://github.com/jxt159753/nexus/pull/1) | 固定运行资源与部署 wheel 对应（文本行尾规范化），保留并行前端工作区改动；未合并 main，后续说明修订另有提交 |
 | 云端唯一 Core 与设备状态快照 | P51 回执与时钟修复，Core 数据库 020；Windows Node 同包在线 | 旧阻塞经真实回执解除，超时/未知保留；3 个实际工具验证通过，47 任务/21 会话/36 轮/54 次调用，派发未暂停；Sandbox 仍离线 |
 | 本地 M6 P45–P48 候选 | 基于既有工作区追加 DSH 文件工具、会话日志与配置目标；schema 019 | 源码 833/2、固定包 57 与界面 2 项通过；未提交或部署，具体限制见本轮验证 |
-| 本地 Windows 附件安装包 | SHA-256 `54aff24ef76fa4459ea1307f34bc6be47280af6eb86a554aaca0a1a3cc993c2d` | 随包 `/app` 接入附件；安装版 5,243,201 字节上传/下载 SHA-256 一致，详见[前端验证](CHAT-ATTACHMENTS-FRONTEND-VERIFICATION.md)；未部署生产 |
+| 本地 Windows 附件安装包 | SHA-256 `5496eedc5b5f31f6857619fa8b70aa4faf5dd62716bf25f5144b840544ea9e55` | 随包 `/app` 接入附件；安装版 5,243,201 字节上传/下载 SHA-256 一致，详见[前端验证](CHAT-ATTACHMENTS-FRONTEND-VERIFICATION.md)；未部署生产 |
 | M4 发布快照 | `codex/m4-self-extension`，以 `694d4ec` 为父基线 | 从固定 M4 wheel 提取源码并单独提交，当前工作区的 M5 改动排除 |
 | 最终 M4 安装包 | SHA-256 `6f4a88b8c056ac17b52d8e99f0d6a8ded8440099438af86025f4322fe3270b34` | 105 文件匹配；Linux 588/2；完整命令和限制见 [补充验证](M4-COMPLETION.md) |
 | M5 安装包（历史） | SHA-256 `42f51704fd8fe1d8acb19a98f18608b6f9598526351974fefb94aa483663592a` | `/opt/nexus/releases/m5-20261020`；当次云端 108 文件与 25 依赖锁定匹配、27 项通过；源码现随下列 M6 GitHub 交付提供 |
@@ -387,7 +388,7 @@ P55（2026-10-21）前端本地交付：用户直接指令 DSH 在现有 `/app`�
 | M6 工作区/网页 Core 包（历史） | SHA-256 `0952d92d9ee53c3bbbbee4a967c92a215f9c1bd912086ea621876eb99f96bfa8` | `/opt/nexus/releases/m6-work-fix-20261020`，128 资源；Windows 204、Linux 212，完整回归及补验限制见追加验证 |
 | P49 Core 包（历史） | SHA-256 `5f6393a98352df0ea4311dbc636cab9e8e3a4a566b77ebbadefd8bdc2732a84f` | `/opt/nexus/releases/context-20261021`、141 资源；schema017→020，配置/权限/密钥不变，详见[本轮验证](CONTEXT-COMPACTION-VERIFICATION.md) |
 | P50 Core 包（历史） | SHA-256 `fb011c9b5aa02f32a90d5a3db7de2292df8718bde19fa6beb88e0c0c93b69e9c` | `/opt/nexus/releases/continuity-20261021`、141 资源、schema020；备份、旧行与账本核对通过，详见[修复验证](CHAT-CONTINUITY-VERIFICATION.md) |
-| 当前 P51 Core / Windows Node 包 | SHA-256 `bade76b64ce4f5e5b7e2262029548fb07d46dbd58105c170a66de8dd381d3760` | `/opt/nexus/releases/recovery-clock-20261021`、141 资源、schema020；旧执行槽解除，真实目录/固定命令成功，详见[修复验证](RECOVERY-EVIDENCE-VERIFICATION.md) |
+| P51 Core / Windows Node 包（历史） | SHA-256 `bade76b64ce4f5e5b7e2262029548fb07d46dbd58105c170a66de8dd381d3760` | `/opt/nexus/releases/recovery-clock-20261021`、141 资源、schema020；旧执行槽解除，真实目录/固定命令成功，详见[修复验证](RECOVERY-EVIDENCE-VERIFICATION.md) |
 | M6 GitHub 交付 | `codex/m6-chat-work`，沿用 [草稿 PR #1](https://github.com/jxt159753/nexus/pull/1) | 追加源码 `d64fc5f`，包含依赖的 M5/M6/P45–P48 与 P49、脱敏证据；未合并 main，不上传生产配置/数据库/凭证 |
 
 示例默认关闭模型、聊天和自扩展；已有生产启用记录不等于所有新安装环境自动可用。当前价格快照有效至 2026-10-25 UTC 日结束，即北京时间 2026-10-26 08:00；到期后停止新模型调用，需要人工核对更新，不自动扩大预算。
