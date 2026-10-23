@@ -1,0 +1,85 @@
+{
+  "release": "/opt/nexus/releases/tool-arguments-20261023",
+  "wheel_sha256": "540fb3f0b6c534ece397b1141f098d1454fc03f4d3acf682bb04e8579888f79c",
+  "runtime_files_checked": 213,
+  "changed_backend_files": 8,
+  "service": "active",
+  "single_core": true,
+  "pid": 302324,
+  "schema": 26,
+  "paused": false,
+  "historical_records_preserved": true,
+  "counts": {
+    "tasks": 61,
+    "task_attempts": 59,
+    "conversations": 33,
+    "chat_turns": 60,
+    "model_calls": 103,
+    "identities": 3,
+    "grants": 28,
+    "memory_entries": 0,
+    "plugin_versions": 19,
+    "extension_versions": 1,
+    "chat_exchanges": 58
+  },
+  "model_calls": 103,
+  "unknown_cost_calls": 4,
+  "no_new_model_calls": true,
+  "cost_limits_enabled": false,
+  "chat_max_output_tokens": 256000,
+  "timeout_seconds": 30,
+  "daily_calls": 100,
+  "linux_tests": 256,
+  "backup": "/var/backups/nexus/before-tool-arguments-20261023T055744Z",
+  "backup_sha256": "04a9430d9832cb1d2de05a3be809ac720e6c89c8c24c2c8abe1d119f68521597",
+  "recorded_at": "2026-10-23T13:57:00+08:00",
+  "task": "P64",
+  "node_online": false,
+  "source_failure": {
+    "turn_id": "222fa3f3-9aef-475b-9da3-7a42a8872c69",
+    "created_at": "2026-10-23T01:10:07.938404+00:00",
+    "error_code": "MODEL_RESPONSE_INVALID",
+    "max_tokens": 256000,
+    "failed_exchange_input_tokens": 3582,
+    "failed_exchange_output_tokens": 4223,
+    "specific_validation_cause": "not recoverable from old record",
+    "write_tasks_created": 0
+  },
+  "tests": {
+    "windows_regression": {
+      "passed": 110,
+      "seconds": 93.54
+    },
+    "windows_final": {
+      "passed": 18,
+      "seconds": 10.03
+    },
+    "linux_fixed_package": {
+      "passed": 256,
+      "seconds": 86.78
+    }
+  },
+  "validated_cases": [
+    "UTF-8 bytes greater than 12000 despite valid character count",
+    "character limit",
+    "invalid JSON",
+    "reject entire mixed batch without effects",
+    "corrected temporary file preview/write/readback",
+    "five-exchange ceiling",
+    "unavailable function remains fatal",
+    "cancel/revoke/restart/daily call admission"
+  ],
+  "not_validated": [
+    "live model website generation",
+    "live Node write",
+    "user acceptance"
+  ],
+  "excluded_parallel_changes": [
+    "frontend",
+    "voice",
+    "native Skill/MCP",
+    "Node",
+    "dependencies",
+    "database migrations"
+  ]
+}

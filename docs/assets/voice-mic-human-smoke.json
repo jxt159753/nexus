@@ -1,0 +1,34 @@
+{
+  "schema": "nexus.voice.mic-smoke.v1",
+  "generated_at": "2026-10-22T23:40:00+08:00",
+  "simulated": false,
+  "real_microphone": true,
+  "live_human": false,
+  "source": "A prerecorded human speech sample was played through Realtek speakers and captured acoustically by the Realtek microphone array.",
+  "limitations": [
+    "Not a live human speaking into the microphone.",
+    "No wake word, no TTS response, no barge-in in this run.",
+    "Not full acceptance evidence."
+  ],
+  "device": {
+    "input": "Realtek HD Audio Mic Array input",
+    "output": "Realtek HD Audio output with SST",
+    "sample_rate": 48000
+  },
+  "capture": {
+    "seconds": 8.03,
+    "rms": 0.01164,
+    "peak": 0.173
+  },
+  "asr": {
+    "model": "fun-asr-realtime-2026-02-28",
+    "first_partial_ms": 524,
+    "final_ms": 992,
+    "final_text": "曹操为什么要组队？",
+    "partials": [
+      "好瓷",
+      "好扫卫",
+      "好扫卫什么要组队"
+    ]
+  }
+}

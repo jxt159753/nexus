@@ -1,0 +1,73 @@
+{
+  "recorded_at": "2026-10-22T12:30:00Z",
+  "scope": "local source + local real Core + frozen Windows Node + rebuilt Windows App",
+  "backend_or_security_changes": "none; no model budget, permission policy, TLS or CSRF bypass",
+  "core": {
+    "mode": "local loopback test Core, plugins enabled, schema 026",
+    "endpoints": [
+      "GET/PUT /api/v1/permissions/default",
+      "GET/PUT /api/v1/chat/conversations/{id}/permission",
+      "GET /api/v1/plugins",
+      "GET /api/v1/plugins/versions/{id}",
+      "POST /api/v1/plugins/versions/{id}/test",
+      "POST /api/v1/plugins/versions/{id}/decision",
+      "GET /api/v1/plugins/conversations/{id}",
+      "PUT /api/v1/plugins/conversations/{id}/plan",
+      "PATCH/DELETE /api/v1/plugins/conversations/{id}/schedules/{schedule_id}",
+      "PATCH /api/v1/plugins/conversations/{id}/goals/{goal_id}",
+      "GET /api/v1/plugins/deliverables/{id}"
+    ]
+  },
+  "permissions": {
+    "global_normal_full_revision": "passed",
+    "conversation_inherit_override": "passed",
+    "global_change_only_uncovered_conversations_follow": "passed",
+    "concurrent_stale_revision_conflict": "passed (HTTP 409, page re-read revision 6)",
+    "full_scope_disclosure": "passed",
+    "model_reply_cannot_toggle": "by construction: no model/plugin endpoint for mode changes"
+  },
+  "plugins": {
+    "list_detail_bundled_vs_passed": "passed",
+    "test_unavailable_displays_no_success": "passed (qualified_sandbox_unavailable)",
+    "enable_disable": "passed (builtin.present)",
+    "full_auto_enable": "passed with local Core + simulated sandbox transport; not a real runsc test",
+    "normal_mode_test_passed_requires_owner_approve_then_enable": "UI states implemented; real runsc approval pending"
+  },
+  "chat_work": {
+    "ask_user_question_structured_options": "passed in /app and legacy console; answer bound to step_id/revision and did not alter permission mode",
+    "shell_exit_code_cwd_truncation": "passed with frozen Windows Node (exit 3, output frozen-ok)",
+    "background_job_stop": "passed: Core received job_kill result status=cancelled/execution_stopped=true; UI waited for confirmation",
+    "present_preview_download": "passed: authenticated download_url, SHA-256 matched, text shown as plain text",
+    "refresh_no_auto_rerun": "no POST/execute on load or refresh; all actions require explicit buttons"
+  },
+  "automation": {
+    "todos_goals_schedules_events": "passed with seeded Core records",
+    "asia_shanghai_and_original_time": "passed",
+    "plan_mode": "passed",
+    "schedule_pause_delete": "passed (DB paused=1, deleted=1)",
+    "goal_pause": "passed"
+  },
+  "browser_checks": {
+    "app_desktop": "Edge, 1440x1000 and 1200x900",
+    "app_390": "390x844; horizontal overflow 0 on home, plugin page, plugin list and chat",
+    "keyboard": "plugins button focused + Enter opened page; Escape closed it",
+    "legacy_console": "1440x1000 and 390x844; tabs via keyboard; no horizontal overflow",
+    "windows_app": "installed App via WebView2 CDP Edg/155.0.4283.62 at 1600x900; plugin page and native deliverable preview/download passed"
+  },
+  "windows": {
+    "installer_sha256": "aaacaa868c680c182070b2f0250f9105074ec62c63021cd8fb6cca9366cca2a2",
+    "bundled_node_sha256": "6fcddb72e83253aaf6668bac98db828e7001d886d57275b0d4ffa18e02b7b7bf",
+    "installed_app": "E:/NEXUS/var/frontend-check/installed/nexus-windows.exe",
+    "node_config_merge_unit_tests": "3 node tests + 4 bridge tests passed",
+    "node_identity_duplicate": "App start was blocked by the independent Node data-directory lock; UI reported the App Node did not take over plugin execution. No old App Node was presented as the new plugin executor.",
+    "restored_credentials": "local test App login temporarily wrote test owner/node credentials; both were restored from var/remote/secrets/*.dpapi and the temporary App node.toml was removed"
+  },
+  "not_verified": [
+    "real runsc sandbox for full auto-enable (transport was simulated in a local Core)",
+    "real paid model generation and real generation-test failure through the model",
+    "production deployment of the new UI",
+    "Android真机",
+    "App 启动旧 Node 的完整配置迁移操作（当前独立 Node 仍在线，未停止生产执行端）",
+    "MCP/LSP/browser targets in the App-local Node config"
+  ]
+}

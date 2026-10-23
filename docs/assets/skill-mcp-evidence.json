@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-23",
+  "scope": "P65 native Skill Shell and managed MCP backend",
+  "environment": {"os": "Windows 11 build 26200", "python": "3.13.9", "transport": "controlled local HTTP/WS plus stdio and HTTP JSON/SSE MCP"},
+  "checks": {
+    "targeted": {"passed": 42, "seconds": 46.84},
+    "backend_initial": {"passed": 177, "failed": 2, "seconds": 115.32, "failure_reason": "old tests hard-coded migration count 26 instead of current 28"},
+    "storage_after_assertion_update": {"passed": 21, "seconds": 7.06},
+    "final_shell_skill_protocols": {"passed": 18, "seconds": 24.14},
+    "final_permission_api_skills": {"passed": 18, "seconds": 21.84},
+    "source_and_frozen_independent_processes": {"passed": 2, "seconds": 22.58},
+    "temporary_frozen_node_processes_remaining": 0,
+    "real_model_calls": 0,
+    "real_github_server_install": false,
+    "production_changed": false,
+    "frontend_changed_by_this_task": false,
+    "committed_or_pushed_by_this_task": false
+  },
+  "frozen_node": {"size": 40003542, "sha256": "4d1afd956489ec1f106ca0cfb845c1a92d4828baf37821bd481ba2bbb1aa0fc5", "installed": false},
+  "evidence": ["real Unicode Shell result", "normal exact Task approval and full preauthorization", "nonzero exit stops next Skill step", "Shell install then MCP register and discover", "catalog change rejects call before effect", "HTTP JSON and SSE tool calls", "Core restart preserves active catalog and completed Skill", "failed update preserves old active configuration", "removal disables active lookup", "invalid discovery digest cannot advance Skill", "pre-MCP command canonical identity preserved"],
+  "limits": ["no persistent stdio memory session", "bounded schema subset and 64-tool/20KiB catalog", "no OAuth or general credential injection", "Skill foreground Shell remains bounded to at most 10000ms", "old Skill version approval is retained"],
+  "acceptance": "local technical self-check only; user acceptance and production upgrade pending"
+}

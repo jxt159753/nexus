@@ -101,6 +101,7 @@ class WorkService:
         self.database = chat.database
         from nexus.core.cognitive.web_work import WebWork
         self.web = WebWork(self)
+        self.feedback_pending = set()
 
     async def grant(self, principal, conversation_id, value):
         async with self.chat.harness.operation, self.database.transaction() as conn:
@@ -171,7 +172,7 @@ class WorkService:
         if value.workspace_work:
             # Existing configured workspace + persisted identity grants are the
             # authorization. This internal scope is not an extra user approval.
-            if not {"read_file","find_files","write_file","read","glob","grep","edit","web_search","web_fetch","read_image","plugin_inspect","plugin_execute"}.intersection(item["name"] for item in directory["catalog"]):
+            if not {"read_file","find_files","write_file","read","glob","grep","edit","web_search","web_fetch","read_image","plugin_inspect","plugin_execute","skill_create"}.intersection(item["name"] for item in directory["catalog"]):
                 raise AccessDenied("POLICY_DENIED")
             now=utc_now()
             if (await one(conn,"SELECT count(*) FROM chat_work_grants"))[0]>=10000:
@@ -193,12 +194,9 @@ class WorkService:
         if row["work_round"] > 4:
             raise AccessDenied("WORK_OPERATION_LIMIT")
         calls = await chat_compaction.root_calls(conn,row["turn_id"])
-        if sum(call["web_step_id"] is None and not call["compaction_call"] for call in calls) != row["work_round"] or any(call["cost_status"] != "calculated" or call["outcome"] != "completed" for call in calls):
+        if sum(call["web_step_id"] is None and not call["compaction_call"] for call in calls) != row["work_round"]:
             raise AccessDenied("BUDGET_EXCEEDED")
-        remaining = self.chat.config.task_cost_microunits-sum(call["cost_microunits"] for call in calls)
-        worst=(32768*self.chat.config.input_price+self.chat.config.chat_max_output_tokens*self.chat.config.output_price+999999)//1000000
-        if remaining < worst:
-            raise AccessDenied("BUDGET_EXCEEDED")
+        remaining = chat_compaction.remaining(self.chat.config, calls)
         messages = json.loads(row["work_messages_json"] or row["context_surface_json"] or row["context_json"])
         if json.loads(row["request_json"]).get("allow_compaction"):
             return remaining, messages
@@ -213,6 +211,8 @@ class WorkService:
         return remaining, projected
 
     async def proposed(self,conn,row,reply,now):
+        if row["phase"] == "summary":
+            raise AccessDenied("POLICY_DENIED")
         count=(await one(conn,"SELECT count(*) FROM chat_work_steps WHERE turn_id=?",(row["turn_id"],)))[0]
         calls=reply.work_calls or ((reply.proposal,reply.native_tool_call),)
         if row["work_round"] >= 4 or not 1<=len(calls)<=4-count:
@@ -229,6 +229,26 @@ class WorkService:
             await conn.execute("INSERT INTO chat_work_steps(step_id,turn_id,step_index,proposal_json,native_json,status,created_at) VALUES(?,?,?,?,?,'pending',?)",(str(uuid4()),row["turn_id"],count+index,canonical(proposal),canonical(native),timestamp(now)))
         messages.append({"role":"assistant","content":reply.content or None,"tool_calls":[native for _,native in checked]})
         await conn.execute("UPDATE chat_turns SET work_status='waiting',work_messages_json=? WHERE turn_id=?",(canonical(messages),row["turn_id"]))
+
+    async def rejected(self,conn,row,reply,now):
+        """Known argument rejection has no execution; use the existing exchange budget."""
+        count=(await one(conn,"SELECT count(*) FROM chat_work_steps WHERE turn_id=?",(row["turn_id"],)))[0]
+        if row["work_round"] >= 4 or not 1 <= len(reply.rejected_calls) <= 4-count or not reply.validation_errors:
+            raise AccessDenied("WORK_STEP_LIMIT")
+        await permissions.valid_grant(conn,row["work_grant_id"],now,owner_id=row["owner_id"],scope=self.chat.harness.scope(UUID(json.loads(row["request_json"])["node_id"])))
+        messages=json.loads(row["work_messages_json"] or row["context_json"])
+        identifiers=[native["id"] for native in reply.rejected_calls]
+        old_ids={call["id"] for message in messages for call in message.get("tool_calls",[])}
+        if len(set(identifiers)) != len(identifiers) or old_ids.intersection(identifiers):
+            raise AccessDenied("MODEL_RESPONSE_INVALID")
+        messages.append({"role":"assistant","content":reply.content or None,"tool_calls":list(reply.rejected_calls)})
+        for index,native in enumerate(reply.rejected_calls):
+            evidence={"status":"failed","phase":"arguments","execution_outcome":"not_started","batch_executed":False,
+                      "error_code":"INVALID_TOOL_ARGUMENTS","errors":[item for item in reply.validation_errors if item["index"]==index],
+                      "message":"整批调用均未执行。按工具契约修正参数；write_file 每个文件正文最多 12000 UTF-8 字节，可精简或在剩余动作内拆文件。"}
+            messages.append({"role":"tool","tool_call_id":native["id"],"content":canonical(evidence)})
+        await conn.execute("UPDATE chat_turns SET work_round=work_round+1,work_messages_json=? WHERE turn_id=?",(canonical(messages),row["turn_id"]))
+        await audit(conn,row["owner_id"],None,"chat.tool_arguments_rejected",now)
 
     async def answer(self,principal,turn_id,value):
         async with self.chat.harness.operation, self.database.transaction() as conn:
@@ -260,6 +280,7 @@ class WorkService:
             await audit(conn,str(principal.identity_id),None,"chat.work_"+decision,utc_now())
 
     async def abort(self,conn,turn_id,error,now):
+        self.feedback_pending.add(turn_id)
         self.web.cancel(turn_id)
         await cancel_children(conn,turn_id,now)
         await conn.execute("UPDATE chat_work_steps SET status='stopped' WHERE turn_id=? AND status IN ('pending','waiting','permission')",(turn_id,))
@@ -322,6 +343,17 @@ class WorkService:
                     else:
                         await self.abort(conn,step["turn_id"],error,now)
 
+        from nexus.core.cognitive import chat_feedback
+        for turn_id in tuple(self.feedback_pending):
+            self.feedback_pending.discard(turn_id)
+            async with self.chat.harness.operation, self.database.transaction() as conn:
+                try:
+                    if await chat_feedback.queue(self, conn, turn_id, utc_now()) is False:
+                        self.feedback_pending.add(turn_id)
+                except AccessDenied:
+                    # No extra outbound consent or budget is inferred for feedback.
+                    pass
+
     async def advance_step(self,step):
         now=utc_now()
         async with self.database.transaction() as conn:
@@ -356,6 +388,10 @@ class WorkService:
         proposal=json.loads(step["proposal_json"])
         node_id=UUID(grant["node_id"])
         intent=proposal["intent"]
+        if intent == "skill_create":
+            from nexus.core.cognitive.work_creation import create_skill
+            await create_skill(self.chat, step, principal, node_id)
+            return
         if intent in {'plugin_inspect','plugin_execute','plugin_install'}:
             await self.chat.plugins.work_step(step,principal,node_id,proposal)
             return

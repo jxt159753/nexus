@@ -153,7 +153,7 @@ function chatPresentationPanel(turn,p) {
   }
   if (p.process_truncated) details.append(el("p","较早的公开摘要已裁剪；完整记录仍在 Core 的执行日志中。","hint"));
   if (p.live_text) {
-    details.append(el("p","正在生成","hint"));
+    details.append(el("p",p.phase==="responding" ? "正在生成" : "已保留的回复片段","hint"));
     const live=el("div",undefined,"chat-process-text"); live.append(chatContent(p.live_text)); details.append(live);
   }
   return details;
@@ -176,21 +176,26 @@ function chatRender() {
       question.append(el("strong","你"),el("div",turn.text,"chat-prose"));
       answer.append(el("strong","NEXUS"));
       if (presentation) {
+        if (presentation.final_text!==null) answer.append(el("strong",presentation.phase==="completed" ? "最终回答" : "本轮反馈"),chatContent(presentation.final_text));
         answer.append(chatPresentationPanel(turn,presentation));
-        if (presentation.final_text!==null) answer.append(el("strong","最终回答"),chatContent(presentation.final_text));
       } else {
         answer.append(chatContent(turn.phase==="summary" ? (turn.initial_response_text || "已确认只读动作。") : turn.response_text || (turn.work_status==="waiting" ? "正在执行本轮工作，请查看下方实际进度。" : turn.work_status==="permission" ? "需要你的答复，请查看下方具体请求。" : turn.proposal ? "已提出只读动作，等待你的决定。" : turn.status==="queued" ? "等待模型…" : turn.status==="generating" ? "正在生成…" : "尚无回复内容")));
       }
-      const cost=turn.cost_status==="unknown" ? " · 费用未知，保留预留" : turn.cost_microunits!=null ? ` · 费用上界 $${turn.cost_microunits/1000000}` : "";
+      const cost=turn.cost_status==="unknown" ? " · 部分费用待核对" : turn.cost_microunits!=null ? ` · 费用上界 $${turn.cost_microunits/1000000}` : "";
       const replyStatus=presentation ? presentation.label : (turn.work_status==="waiting" ? "工作进行中" : turn.work_status==="permission" ? "等待你的答复" : turn.skill_plan && turn.phase==="reply" ? "流程建议已生成" : chatLabels[turn.status]);
-      answer.append(el("p",`${replyStatus}${turn.error_code ? " · "+turn.error_code : ""}${cost}${turn.web_call_count ? ` · 网页请求 ${turn.web_call_count} 次（计入费用）` : ""}${turn.context_truncated ? " · 部分历史或工具上下文已裁剪，完整执行结果见工作记录" : ""}`,"hint"));
+      answer.append(el("p",`${replyStatus}${cost}${turn.web_call_count ? ` · 网页请求 ${turn.web_call_count} 次` : ""}${turn.context_truncated ? " · 部分历史或工具上下文已裁剪，完整执行结果见工作记录" : ""}`,"hint"));
+      if (turn.error_code) {
+        const failure=el("details");
+        failure.append(el("summary","技术详情"),el("pre",turn.error_code));
+        answer.append(failure);
+      }
       const inspect=el("button","查看本轮发送内容","quiet");
       inspect.onclick=action(async()=>{const value=await api(`/api/v1/chat/turns/${turn.turn_id}`); const details=el("pre",JSON.stringify({messages:value.turn.context_messages,skill_catalog:value.turn.skill_catalog,work_catalog:value.turn.work_catalog,work_messages:value.turn.work_messages,result_messages:value.turn.result_context_messages},null,2)); inspect.replaceWith(details);});
       answer.append(inspect);
       chatJournalButton(turn,answer);
       const failureHints={MODEL_RESPONSE_INVALID:"模型返回的格式无法校验，本轮已停止。",MODEL_TOOL_CALL_LIMIT:"模型提出的动作超过本轮剩余额度，未执行这批动作。",MODEL_REQUEST_FAILED:"模型连接或响应解析失败，本轮已停止。",MODEL_TIMEOUT:"等待模型响应超时，本轮已停止。",MODEL_OUTCOME_UNKNOWN:"未收到完整模型响应或用量，实际费用无法确认；这不表示设备已经执行。"};
-      if (failureHints[turn.error_code]) answer.append(el("p",failureHints[turn.error_code],"hint"));
-      if (turn.error_code?.startsWith("WEB_")) answer.append(el("p","网页请求未完成，未自动重试；不能确定计费时保留该次预留。","hint"));
+      if (!presentation?.final_text && failureHints[turn.error_code]) answer.append(el("p",failureHints[turn.error_code],"hint"));
+      if (!presentation?.final_text && turn.error_code?.startsWith("WEB_")) answer.append(el("p","这次网页请求没有取得可用内容；已有资料仍然保留。","hint"));
       if (turn.work_grant_id) answer.append(chatWorkCards(turn));
       if (turn.allow_skills && turn.status==="completed" && !turn.proposal) answer.append(el("p","本轮没有选出可执行流程，未创建设备执行。可核对可用能力或补充目标。","hint"));
       if (turn.skill_plan) answer.append(chatSkillCard(turn,!chatState.active && turn===turns.at(-1)));

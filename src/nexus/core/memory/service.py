@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 from nexus.contracts.records import MemoryCreate, ProjectCreate
 from nexus.core.security.service import assert_owner
 from nexus.core.security.types import Principal
+from nexus.core.memory import automatic
 from nexus.core.storage.database import Database, audit, one, timestamp, utc_now
 from nexus.core.storage.tasks import Conflict, canonical
 
@@ -50,6 +51,7 @@ class Records:
                 raise ValueError("verification time cannot be in the future")
             if (await one(conn, "SELECT count(*) FROM memory_entries"))[0] >= 10000:
                 raise Conflict("BUSY")
+            old = None
             if value.supersedes_id:
                 old = await one(conn, "SELECT * FROM memory_entries WHERE memory_id=? AND owner_id=?", (str(value.supersedes_id), str(principal.identity_id)))
                 if old is None:
@@ -70,6 +72,11 @@ class Records:
                 # created_at is the final column; superseded/retracted remain NULL.
                 timestamp(now),
             ))
+            if old is not None and old["auto_category"]:
+                if not automatic.SECRET.search(value.content):
+                    await conn.execute("UPDATE memory_entries SET auto_category=?,auto_policy_revision=? WHERE memory_id=?",
+                                       (old["auto_category"], old["auto_policy_revision"], str(memory_id)))
+                await automatic.invalidate(conn, principal.identity_id, now)
             await audit(conn, str(principal.identity_id), None, "memory.consented", now)
             return dict(await one(conn, "SELECT * FROM memory_entries WHERE memory_id=?", (str(memory_id),)))
 
@@ -82,6 +89,8 @@ class Records:
                 raise LookupError("memory not found")
             if row["retracted_at"] is None:
                 await conn.execute("UPDATE memory_entries SET retracted_at=? WHERE memory_id=?", (timestamp(now), str(memory_id)))
+                if row["auto_category"]:
+                    await automatic.invalidate(conn, principal.identity_id, now)
                 await audit(conn, str(principal.identity_id), None, "memory.retracted", now)
             return dict(await one(conn, "SELECT * FROM memory_entries WHERE memory_id=?", (str(memory_id),)))
 

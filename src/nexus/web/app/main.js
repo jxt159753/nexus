@@ -52,6 +52,7 @@ import {
 } from "./render.js";
 
 import { initVisualization } from "./visualization.js";
+import { initVoice, stopVoice } from "./voice.js";
 
 const $ = (id) => document.getElementById(id);
 let pollTimer = null;
@@ -600,6 +601,7 @@ function confirmLogout() {
       { label: "退出", className: "quiet danger", onClick: () => runAction(async () => {
         closeSheet();
         closeSettings();
+        await stopVoice();
         await logout();
         showLogin();
       }) },
@@ -726,6 +728,7 @@ bindUI({
 
 state.ready = false;
 bindEvents();
+initVoice({ refresh, openChat });
 setUnauthorizedHandler(() => {
   if (!booting) showLogin("会话已过期，请重新登录");
 });

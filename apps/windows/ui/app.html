@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>NEXUS · 对话</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="stylesheet" href="./app.css?v=20261022c">
+  <script src="./native-bridge.js"></script>
+  <script type="importmap">
+    {"imports": {"three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/"}}
+  </script>
+  <script type="module" src="./main.js?v=20261022c"></script>
+</head>
+<body>
+  <div id="login" class="login" hidden>
+    <section class="login-card" aria-labelledby="login-title">
+      <div class="brand-mark" aria-hidden="true">N</div>
+      <p class="eyebrow">NEXUS · PERSONAL CONTROL</p>
+      <h1 id="login-title">连接你的 Core</h1>
+      <p class="muted">聊天、执行与记录来自同一个 Core。</p>
+      <form id="login-form">
+        <div id="core-field" hidden>
+          <label for="core-url">Core 地址</label>
+          <input id="core-url" type="url" required autocomplete="url" placeholder="https://core.example.com">
+        </div>
+        <label for="token">Owner 凭证</label>
+        <input id="token" type="password" required minlength="43" maxlength="128" autocomplete="off" placeholder="输入本地登记的 Owner 令牌">
+        <label id="remember-field" class="remember" hidden>
+          <input id="remember" type="checkbox" checked> 记住此设备
+        </label>
+        <button class="primary full" type="submit">进入对话</button>
+      </form>
+      <p id="login-error" class="error" role="alert" hidden></p>
+      <p class="hint">记住此设备时，令牌保存在 Windows 凭据管理器；不保存模型密钥。退出登录会清除。</p>
+    </section>
+  </div>
+
+  <div id="shell" class="shell" hidden>
+    <header class="topbar">
+      <button id="home-button" class="brand" type="button" aria-label="返回过程视图">
+        <span class="brand-mark small" aria-hidden="true">N</span>
+        <span>NEXUS</span>
+      </button>
+      <div class="topbar-spacer"></div>
+      <span id="connection" class="connection" role="status">连接中</span>
+      <button id="pending-button" class="pending" type="button" hidden>
+        待处理 <span id="pending-count">0</span>
+      </button>
+      <button id="plugins-button" class="icon-button" type="button" aria-label="权限与插件">▣</button>
+      <button id="settings-button" class="icon-button" type="button" aria-label="设置">⚙</button>
+    </header>
+
+    <main id="home-view" class="home">
+      <section id="visual-placeholder" class="visual" aria-label="Core 与 Node 三维视图">
+        <div id="visual-canvas" class="visual-canvas"></div>
+        <div class="viz-legend" aria-hidden="true">
+          <span><i class="viz-dot core"></i>Core</span>
+          <span><i class="viz-dot online"></i>Node</span>
+          <span><i class="viz-dot active"></i>执行</span>
+          <span><i class="viz-dot awaiting"></i>审批</span>
+          <span><i class="viz-dot error"></i>异常</span>
+        </div>
+        <p class="viz-hint">拖动旋转 · 滚轮缩放 · 点击查看</p>
+      </section>
+
+      <section id="dock" class="dock" aria-label="快速对话">
+        <div class="dock-head">
+          <button id="dock-open" class="dock-title" type="button">
+            <span id="dock-conversation">新对话</span>
+            <span class="chev" aria-hidden="true">›</span>
+          </button>
+          <span id="dock-state" class="hint">就绪</span>
+        </div>
+        <div id="dock-thread" class="dock-thread"></div>
+        <div id="dock-pending" class="pending-card" hidden></div>
+        <div id="dock-attachments" class="attachments dock-attachments" aria-label="待发送附件" hidden></div>
+        <div id="dock-chips" class="chips"></div>
+        <form id="dock-form" class="composer">
+          <label class="sr-only" for="dock-text">消息</label>
+          <textarea id="dock-text" rows="1" maxlength="2000" placeholder="对 NEXUS 说点什么…"></textarea>
+          <div class="composer-actions">
+            <button id="dock-attach" type="button" class="quiet attach-button" aria-label="添加附件" title="添加文件或粘贴图片">＋</button>
+            <button id="dock-scope" type="button" class="quiet">本次范围</button>
+            <button id="dock-stop" type="button" class="quiet danger" hidden>停止回复</button>
+            <button id="dock-new" type="button" class="quiet">新会话</button>
+            <button id="dock-expand" type="button" class="quiet">完整对话</button>
+            <button id="dock-send" type="submit" class="primary">发送</button>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <section id="chat-view" class="chat-view" hidden>
+      <aside id="conversation-panel" class="conversations" aria-label="会话">
+        <div class="conversations-head">
+          <strong>会话</strong>
+          <button id="new-conversation" class="icon-button" type="button" aria-label="新建会话">＋</button>
+        </div>
+        <div id="conversation-list" class="conversation-list"></div>
+        <div class="conversations-foot">
+          <button id="archive-toggle" class="quiet full" type="button">查看归档</button>
+        </div>
+      </aside>
+
+      <section class="chat-main">
+        <header class="chat-head">
+          <button id="chat-back" class="icon-button" type="button" aria-label="返回过程视图">←</button>
+          <button id="chat-drawer" class="icon-button mobile-only" type="button" aria-label="打开会话列表">☰</button>
+          <div class="chat-title-wrap">
+            <h1 id="chat-title">对话</h1>
+            <p id="chat-sub" class="hint">—</p>
+          </div>
+          <button id="chat-menu" class="icon-button" type="button" aria-label="会话操作">⋯</button>
+        </header>
+        <button id="chat-older" class="quiet full chat-older" type="button" hidden>加载更早消息</button>
+        <div id="chat-messages" class="messages" role="log" aria-live="polite" aria-label="聊天记录"></div>
+        <div id="chat-attachments" class="attachments chat-attachments" aria-label="待发送附件" hidden></div>
+        <div id="chat-chips" class="chips chat-chips"></div>
+        <form id="chat-form" class="composer chat-composer">
+          <label class="sr-only" for="chat-text">消息</label>
+          <textarea id="chat-text" rows="2" maxlength="2000" placeholder="输入消息…"></textarea>
+          <div class="composer-actions">
+            <button id="chat-attach" type="button" class="quiet attach-button" aria-label="添加附件" title="添加文件、拖入或粘贴图片">＋ 附件</button>
+            <button id="chat-scope" type="button" class="quiet">本次范围</button>
+            <button id="chat-stop" type="button" class="quiet danger" hidden>停止回复</button>
+            <button id="chat-send" type="submit" class="primary">发送</button>
+          </div>
+        </form>
+      </section>
+    </section>
+
+    <aside id="settings" class="settings" hidden aria-label="设置">
+      <header class="settings-head">
+        <strong>设置</strong>
+        <button id="settings-close" class="icon-button" type="button" aria-label="关闭设置">×</button>
+      </header>
+      <div id="settings-body" class="settings-body"></div>
+    </aside>
+
+    <aside id="plugin-view" class="plugin-view" hidden aria-label="权限与原生插件">
+      <header class="plugin-view-head">
+        <div>
+          <p class="eyebrow">OWNER CONTROL</p>
+          <strong>权限与原生插件</strong>
+        </div>
+        <button id="plugin-close" class="icon-button" type="button" aria-label="关闭权限与插件页">×</button>
+      </header>
+      <nav id="plugin-tabs" class="plugin-tabs" aria-label="权限与插件视图"></nav>
+      <div id="plugin-body" class="plugin-body"></div>
+    </aside>
+
+    <aside id="viz-drawer" class="viz-drawer" hidden aria-label="对象详情">
+      <header class="viz-drawer-head">
+        <strong id="viz-drawer-title">详情</strong>
+        <button id="viz-drawer-close" class="icon-button" type="button" aria-label="关闭详情">×</button>
+      </header>
+      <div id="viz-drawer-body" class="viz-drawer-body"></div>
+    </aside>
+
+    <div id="sheet" class="sheet" hidden>
+      <div class="sheet-backdrop" data-close-sheet></div>
+      <section class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+        <header class="sheet-head">
+          <h2 id="sheet-title">本次需要你决定</h2>
+          <button id="sheet-close" class="icon-button" type="button" aria-label="关闭">×</button>
+        </header>
+        <div id="sheet-body" class="sheet-body"></div>
+        <footer id="sheet-actions" class="sheet-actions"></footer>
+      </section>
+    </div>
+
+    <input id="attachment-input" type="file" multiple hidden aria-label="选择附件">
+    <p id="notice" class="notice" role="status" aria-live="polite" hidden></p>
+  </div>
+</body>
+</html>

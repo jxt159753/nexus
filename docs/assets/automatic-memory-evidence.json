@@ -1,0 +1,400 @@
+{
+  "release": "/opt/nexus/releases/persona-memory-live-20261023-28206fc5",
+  "wheel_sha256": "28206fc514490d6950081056f6d87f5d32ddc6de7361f6fa59600dc5ae4ab710",
+  "runtime_resources_checked": 237,
+  "schema": 29,
+  "single_core_pid": 983920,
+  "config_unchanged": true,
+  "historical_records_preserved": true,
+  "model_calls": [
+    {
+      "call_id": "0f4aaad3-387c-4c44-86e2-8bfbdb351cb6",
+      "model": "deepseek-flash",
+      "cost_microunits": 456,
+      "cost_status": "calculated",
+      "outcome": "completed",
+      "input_tokens": 986,
+      "output_tokens": 133,
+      "label": "personal-save",
+      "turn_id": "533c142d-6d7e-4cfd-82ed-da0ffccb15df"
+    },
+    {
+      "call_id": "01c625c4-6ec2-4b89-81ae-58f3ee052001",
+      "model": "deepseek-flash",
+      "cost_microunits": 466,
+      "cost_status": "calculated",
+      "outcome": "completed",
+      "input_tokens": 1031,
+      "output_tokens": 130,
+      "label": "personal-save-fixed",
+      "turn_id": "4b736a47-2237-4a50-8003-50947f5a493b"
+    },
+    {
+      "call_id": "ded2038e-734a-4c39-826d-05976fd35355",
+      "model": "deepseek-flash",
+      "cost_microunits": 486,
+      "cost_status": "calculated",
+      "outcome": "completed",
+      "input_tokens": 1031,
+      "output_tokens": 147,
+      "label": "personal-save-final",
+      "turn_id": "cf10e82a-23a0-428f-85bd-2220891fd73a"
+    },
+    {
+      "call_id": "4859b287-4fe0-4601-87d0-d05455e9cc35",
+      "model": "deepseek-flash",
+      "cost_microunits": 506,
+      "cost_status": "calculated",
+      "outcome": "completed",
+      "input_tokens": 1346,
+      "output_tokens": 85,
+      "label": "personal-recall",
+      "turn_id": "b2be07a0-13b5-4da3-8e3f-d511ceb046dd"
+    },
+    {
+      "call_id": "d0b7977b-29b4-448c-9ba5-c427274c6038",
+      "model": "deepseek-flash",
+      "cost_microunits": 605,
+      "cost_status": "calculated",
+      "outcome": "completed",
+      "input_tokens": 1347,
+      "output_tokens": 167,
+      "label": "project-save",
+      "turn_id": "c66e3526-2869-4365-99b7-8063ff7250b0"
+    },
+    {
+      "call_id": "3a9f1ade-11fa-441c-b4bc-1d0feae3c039",
+      "model": "deepseek-flash",
+      "cost_microunits": 516,
+      "cost_status": "calculated",
+      "outcome": "completed",
+      "input_tokens": 1537,
+      "output_tokens": 45,
+      "label": "project-same",
+      "turn_id": "2ec9f96e-a68b-40f8-afdb-20651ceb4263"
+    },
+    {
+      "call_id": "4ba39e34-348a-4c9e-83ad-a76c3021a922",
+      "model": "deepseek-flash",
+      "cost_microunits": 507,
+      "cost_status": "calculated",
+      "outcome": "completed",
+      "input_tokens": 1346,
+      "output_tokens": 86,
+      "label": "project-other",
+      "turn_id": "29d91bf5-1262-4e7e-bceb-2d81097e10c8"
+    },
+    {
+      "call_id": "5a4b31db-de30-4b6a-90fb-d32242c6332c",
+      "model": "deepseek-flash",
+      "cost_microunits": 369,
+      "cost_status": "calculated",
+      "outcome": "completed",
+      "input_tokens": 1205,
+      "output_tokens": 6,
+      "label": "do-not-remember",
+      "turn_id": "dafe4ea7-c91a-4c36-a2c8-3ddbdade5f86"
+    },
+    {
+      "call_id": "54933ff1-7087-479f-9fa4-3e9d09008382",
+      "model": "deepseek-flash",
+      "cost_microunits": 478,
+      "cost_status": "calculated",
+      "outcome": "completed",
+      "input_tokens": 1360,
+      "output_tokens": 58,
+      "label": "secret-exclusion",
+      "turn_id": "dd3801e5-4a50-4cf3-a4e0-22afa581ade2"
+    },
+    {
+      "call_id": "e7f751d4-bb9f-4320-bf95-d210ae9a4601",
+      "model": "deepseek-flash",
+      "cost_microunits": 322,
+      "cost_status": "calculated",
+      "outcome": "completed",
+      "input_tokens": 688,
+      "output_tokens": 96,
+      "label": "disabled",
+      "turn_id": "de8233b4-213a-4010-8597-896af5a5258b"
+    },
+    {
+      "call_id": "5a4759b1-fdad-43a4-a624-0b6dac6aa5fb",
+      "model": "deepseek-flash",
+      "cost_microunits": 385,
+      "cost_status": "calculated",
+      "outcome": "completed",
+      "input_tokens": 1154,
+      "output_tokens": 32,
+      "label": "corrected-recall",
+      "turn_id": "afbc56cd-daa7-4684-b974-47a6440f6750"
+    },
+    {
+      "call_id": "52fc1b5a-3413-4331-a6b0-1f0e158a6160",
+      "model": "deepseek-flash",
+      "cost_microunits": 426,
+      "cost_status": "calculated",
+      "outcome": "completed",
+      "input_tokens": 1158,
+      "output_tokens": 65,
+      "label": "retracted-recall",
+      "turn_id": "5925bec3-bf03-49cc-b2f6-22492a762198"
+    },
+    {
+      "call_id": "110455b1-86ab-44f8-8286-7d4fde56aced",
+      "model": "deepseek-flash",
+      "cost_microunits": 358,
+      "cost_status": "calculated",
+      "outcome": "completed",
+      "input_tokens": 1007,
+      "output_tokens": 46,
+      "label": "persona-casual",
+      "turn_id": "d549e948-b439-42fc-968f-be259fa892ad"
+    },
+    {
+      "call_id": "442873c2-5c8a-4e70-b8d3-b1961644180d",
+      "model": "deepseek-flash",
+      "cost_microunits": 382,
+      "cost_status": "calculated",
+      "outcome": "completed",
+      "input_tokens": 1080,
+      "output_tokens": 48,
+      "label": "memory-capabilities",
+      "turn_id": "8eb617fc-9586-4263-b2cd-c871e7d32494"
+    },
+    {
+      "call_id": "36f185ae-f6bc-44da-9675-dec6f5aad199",
+      "model": "deepseek-flash",
+      "cost_microunits": 534,
+      "cost_status": "calculated",
+      "outcome": "completed",
+      "input_tokens": 1077,
+      "output_tokens": 175,
+      "label": "persona-judgment",
+      "turn_id": "28d6451a-16c9-469a-9132-34838eba6b7a"
+    }
+  ],
+  "request_checks": [
+    {
+      "label": "personal-save",
+      "request_sha256": "e5c5782bb8cfd33a25d16f7b1d5a0ced3fb9c394259f7c9b80fd74e5ae9a896e",
+      "references": [],
+      "saved_ids": []
+    },
+    {
+      "label": "personal-save-fixed",
+      "request_sha256": "303fa5cc56321b96a75d2eb2e9a4bcb5c330f5baf439046a3fae6d6731e190b3",
+      "references": [],
+      "saved_ids": []
+    },
+    {
+      "label": "personal-save-final",
+      "request_sha256": "303fa5cc56321b96a75d2eb2e9a4bcb5c330f5baf439046a3fae6d6731e190b3",
+      "references": [],
+      "saved_ids": [
+        "b8f871ec-ef81-47af-a645-73c39cc881e3",
+        "5d418785-ba3a-4431-908a-f2ae71ab7a74"
+      ]
+    },
+    {
+      "label": "personal-recall",
+      "request_sha256": "a89858ac97e143dce135f02d1e48860417173f56340811e98c75181bfedabf26",
+      "references": [
+        "5d418785-ba3a-4431-908a-f2ae71ab7a74",
+        "b8f871ec-ef81-47af-a645-73c39cc881e3"
+      ],
+      "saved_ids": []
+    },
+    {
+      "label": "project-save",
+      "request_sha256": "789266395c453b50d330b40aad60204ff6163a4c3b9efb6e850f6c71f4c24806",
+      "references": [
+        "5d418785-ba3a-4431-908a-f2ae71ab7a74",
+        "b8f871ec-ef81-47af-a645-73c39cc881e3"
+      ],
+      "saved_ids": [
+        "bd272e7b-df6c-46bd-84d4-bf6c040be909"
+      ]
+    },
+    {
+      "label": "project-same",
+      "request_sha256": "4e332eb68cfce66986064a9ec90824f5440c6f2cea033fe9b95e87d60a141dbc",
+      "references": [
+        "bd272e7b-df6c-46bd-84d4-bf6c040be909",
+        "5d418785-ba3a-4431-908a-f2ae71ab7a74",
+        "b8f871ec-ef81-47af-a645-73c39cc881e3"
+      ],
+      "saved_ids": []
+    },
+    {
+      "label": "project-other",
+      "request_sha256": "0c362f0e32b41d037f0eb30fb3c246ba30cac10cc5d9c1e2fed6e171523f2d18",
+      "references": [
+        "5d418785-ba3a-4431-908a-f2ae71ab7a74",
+        "b8f871ec-ef81-47af-a645-73c39cc881e3"
+      ],
+      "saved_ids": []
+    },
+    {
+      "label": "do-not-remember",
+      "request_sha256": "393d6e52c6bcd9a472cc021c9237cbe616c7b242c72ed1fb52ae0a4094ddc207",
+      "references": [
+        "b8f871ec-ef81-47af-a645-73c39cc881e3"
+      ],
+      "saved_ids": []
+    },
+    {
+      "label": "secret-exclusion",
+      "request_sha256": "4a8423ea14a1c5ebc19f1a4c5bced77855b5b9cc9c7347158031768519d88526",
+      "references": [
+        "5d418785-ba3a-4431-908a-f2ae71ab7a74",
+        "b8f871ec-ef81-47af-a645-73c39cc881e3"
+      ],
+      "saved_ids": []
+    },
+    {
+      "label": "disabled",
+      "request_sha256": "b525875aacbaee37dc46a0dfb911d33aec8b55332eae36e77d102b8b52a43008",
+      "references": [],
+      "saved_ids": []
+    },
+    {
+      "label": "corrected-recall",
+      "request_sha256": "de7512e0b5d012a7330e5f11c61f1b15d0a13f14f0189c1e84f687621c0909ee",
+      "references": [
+        "0ca2cd40-9c17-4711-985c-f697c0011688"
+      ],
+      "saved_ids": []
+    },
+    {
+      "label": "retracted-recall",
+      "request_sha256": "0fb9997e82ce21c0b8c48d09bc40a5d1190322ac9473bc781a05795eb70a06ff",
+      "references": [
+        "0ca2cd40-9c17-4711-985c-f697c0011688"
+      ],
+      "saved_ids": []
+    },
+    {
+      "label": "persona-casual",
+      "request_sha256": "d3c848add4277c516ca922c18a22ee87ad2050599b6603242c5272e87f5228b0",
+      "references": [],
+      "saved_ids": []
+    },
+    {
+      "label": "memory-capabilities",
+      "request_sha256": "8b8895cacf3292157c93393959233d4e726a8730ed7dfc95e694b053ebd3c133",
+      "references": [],
+      "saved_ids": []
+    },
+    {
+      "label": "persona-judgment",
+      "request_sha256": "1897d211d4de217d9218152b59d2d4b5890b5894da5e16492d94d3291e08e2e5",
+      "references": [],
+      "saved_ids": []
+    }
+  ],
+  "total_test_calls": 15,
+  "test_cost_microunits": 6796,
+  "global_calls": 157,
+  "historical_unknown_cost_calls": 5,
+  "policy_enabled": true,
+  "policy_revision": 8,
+  "policy_enabled_at": "2026-10-23T08:59:26.172872+00:00",
+  "policy_events": [
+    {
+      "revision": 1,
+      "kind": "policy_enabled",
+      "created_at": "2026-10-23T08:46:22.810903+00:00"
+    },
+    {
+      "revision": 2,
+      "kind": "policy_disabled",
+      "created_at": "2026-10-23T08:59:23.926418+00:00"
+    },
+    {
+      "revision": 3,
+      "kind": "policy_enabled",
+      "created_at": "2026-10-23T08:59:26.172872+00:00"
+    },
+    {
+      "revision": 4,
+      "kind": "context_invalidated",
+      "created_at": "2026-10-23T08:59:32.703304+00:00"
+    },
+    {
+      "revision": 5,
+      "kind": "context_invalidated",
+      "created_at": "2026-10-23T08:59:34.906169+00:00"
+    },
+    {
+      "revision": 6,
+      "kind": "context_invalidated",
+      "created_at": "2026-10-23T08:59:51.832599+00:00"
+    },
+    {
+      "revision": 7,
+      "kind": "context_invalidated",
+      "created_at": "2026-10-23T08:59:51.880492+00:00"
+    },
+    {
+      "revision": 8,
+      "kind": "context_invalidated",
+      "created_at": "2026-10-23T08:59:51.916523+00:00"
+    }
+  ],
+  "test_memories_retracted": 4,
+  "test_conversations_archived": 15,
+  "backup": "/var/backups/nexus/after-persona-memory-real-20261023T090455Z",
+  "backup_sha256": "233fb193d0f61e33219820b02e55666dcc63684f4d7e89a51ce5317395b2694a",
+  "date": "2026-10-23",
+  "scope": "P78 personality + P79 future-only automatic memory",
+  "checks": {
+    "personal_cross_conversation": true,
+    "project_isolation_and_same_project_recall": true,
+    "optout_secret_disabled_exclusion": true,
+    "correction_retraction_real_context": true,
+    "synthetic_memory_cleanup": true,
+    "casual_reply_no_emotion_memory": true,
+    "enabled_memory_capability_explained": true,
+    "independent_judgment_reply_received": true
+  },
+  "first_enable_at": "2026-10-23T08:46:22.810903+00:00",
+  "regression": {
+    "linux_initial": {
+      "passed": 332,
+      "skipped": 1,
+      "seconds": 113.34
+    },
+    "linux_final": {
+      "passed": 131,
+      "seconds": 44.15
+    },
+    "windows_final": {
+      "passed": 64,
+      "seconds": 14.66
+    },
+    "automatic_memory_cases": 42
+  },
+  "failed_real_checks": [
+    {
+      "label": "personal-save",
+      "problem": "provider split marker and JSON over two lines; metadata leaked, no memory saved"
+    },
+    {
+      "label": "personal-save-fixed",
+      "problem": "provider placed metadata after prose; metadata leaked, no memory saved"
+    }
+  ],
+  "real_quality_limits": [
+    "Background extraction retained occupation but omitted the card-signature detail; unretained content was not invented on recall.",
+    "These bounded examples do not prove all semantic classifications, languages, secrets, synonyms, or long-term personality consistency."
+  ],
+  "frontend": "Existing frontend retained; automatic switch and richer memory feedback still assigned to user-controlled DSH.",
+  "projects": "Two clearly named isolated verification projects retained; their chat and memory evidence is archived/retracted, not destructively deleted.",
+  "packaging": "Based on current voice wheel; 12 changed/new backend/schema resources, 237 total. Additive migration 028 included for contiguous loader compatibility; no MCP runtime or endpoints shipped.",
+  "samples": {
+    "persona-casual": "那就不聊工作。忙了一整天，脑子转不动是很正常的，先让自己松一松。\n\n想说点什么都行，随便的、没头没尾的也都可以；不想说，就安静待会儿也不错。",
+    "persona-judgment": "不会。全都最高优先级，等于没有优先级——你只是把排序问题挪到了执行的那一刻，而且通常是在最没空想的时候。\n\n具体会这样坏掉：\n- 真正紧急的事和“顺手就能做完”的事混在一起，你的判断力被消耗在反复比较上；\n- 一旦时间不够，你会砍掉哪件？往往砍掉的是最费功夫、但最有价值的那件；\n- 全高优先级的清单会给你一种“我有很多重要事”的错觉，反而放松了开始的那一下。\n\n更管用的做法是分三档就够了：今天必须推进一步的（3 件以内）、其余可做可不做的、明确不做或延期的。判断标准别用“重要不重要”，用“今天不做会怎样”。\n\n如果你愿意，把清单发我，我帮你按这个口径排一遍。",
+    "memory-capabilities": "自动记忆是开着的。以后你明确说出的长期偏好、个人背景或持续事项，我会自动提取并交给系统核对保存，不需要再去编辑器里逐条手动保存。你仍然可以随时查看、纠正或撤销。",
+    "project-other": "不知道。我这边没有关于“手稿整理项目”的长期目标或内部代号的信息。自动参考记忆里只有你的职业是图书整理员，以及你偏好“青杉式”的讲述风格；这些都不含项目代号或目标。\n\n如果你之前在其他对话里提过，那些内容没有出现在本轮上下文里，我就不去猜了。你直接告诉我，或者把相关记录贴过来都行。"
+  }
+}

@@ -183,6 +183,8 @@ class PluginHTTP:
                 result={'goal_id':str(record_id),'status':value.changes['status']}
             authority=await one(conn,'SELECT * FROM plugin_authorities WHERE authority_id=?',(str(record_id),))
             if authority and resume:
+                from nexus.core.plugins.lifecycle import previous_round,budget
+                if authority['state']!='active': await previous_round(conn,authority)
                 from nexus.core.security.modes import effective
                 from nexus.core.security.service import scope_digest
                 from nexus.core.cognitive.work_catalog import catalog
@@ -193,6 +195,7 @@ class PluginHTTP:
                 mode=await effective(conn,str(conversation_id))
                 cursor=(await one(conn,"SELECT coalesce(max(event_id),0) FROM control_events WHERE kind='cancel_all'"))[0]
                 await conn.execute("UPDATE plugin_authorities SET state='active',permission_fingerprint=?,cancel_cursor=? WHERE authority_id=?",(mode['fingerprint'],cursor,str(record_id)))
+                if authority['state']!='active': await budget(conn,self.service.chat,authority['last_turn_id'],self.service.chat.config.model_reservation())
             elif authority:
                 await conn.execute("UPDATE plugin_authorities SET state='paused' WHERE authority_id=?",(str(record_id),))
                 turn=await one(conn,'SELECT status,work_status FROM chat_turns WHERE turn_id=?',(authority['last_turn_id'],))

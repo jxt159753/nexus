@@ -42,6 +42,24 @@ async def operation(conn, step_id, key, now):
     await conn.execute("UPDATE chat_work_grants SET used_operations=used_operations+1 WHERE grant_id=?",(grant["grant_id"],))
 
 
+async def creation_step(conn, step_id, now, *, scope):
+    """Candidate creation is a scoped mutation, even without device execution."""
+    step, grant = await allowed_step(conn, step_id, now, scope=scope)
+    if step["permission_decision"] == "reject":
+        raise AccessDenied("WORK_USER_DECLINED")
+    if step["status"] == "permission":
+        raise AccessDenied("WORK_CONFIRMATION_REQUIRED")
+    if grant["profile"] != "standard":
+        raise AccessDenied("POLICY_DENIED")
+    if (await one(conn, "SELECT plan_mode FROM conversations WHERE conversation_id=?", (grant["conversation_id"],)))[0]:
+        raise AccessDenied("PLAN_MODE_READ_ONLY")
+    if (await one(conn, "SELECT paused FROM system_state WHERE singleton=1"))[0]:
+        raise AccessDenied("BUSY")
+    if await one(conn, "SELECT 1 FROM chat_controls WHERE turn_id=? AND kind='steer' AND applied_call_id IS NULL", (step["turn_id"],)):
+        raise AccessDenied("WORK_STOPPED")
+    return step, grant
+
+
 async def task_step(conn, task_id):
     row=await one(conn,"SELECT step_id FROM chat_work_tasks WHERE task_id=?",(str(task_id),))
     if row:

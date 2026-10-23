@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 
 from nexus.contracts.extensions import canonical, digest_value
 from nexus.core.models.chat import request_body
+from nexus.core.models.config import CHAT_MAX_TEXT_BYTES
 from nexus.core.memory import context as memory_context
 from nexus.core.security import work as permissions
 from nexus.core.security.types import AccessDenied
@@ -39,7 +40,8 @@ WHERE t.status='queued' AND t.recovery_required=0 AND NOT EXISTS(
 async def capacity(conn):
     size = await one(conn,"SELECT coalesce(sum(length(CAST(request_body AS BLOB))+length(CAST(partial_text AS BLOB))+coalesce(length(CAST(response_json AS BLOB)),0)),0) FROM chat_exchanges")
     compact = await one(conn,"SELECT coalesce(sum(length(CAST(source_messages_json AS BLOB))+length(CAST(summary_text AS BLOB))),0) FROM chat_compactions")
-    return size[0]+compact[0]+262144 <= 268435456
+    # JSON escaping can expand response text sixfold; partial_text is separate.
+    return size[0]+compact[0]+7*CHAT_MAX_TEXT_BYTES+262144 <= 268435456
 
 
 async def begin(conn, config, row, call_id, messages, options, now):
@@ -53,8 +55,10 @@ async def begin_payload(conn, turn_id, call_id, body, now):
     await conn.execute("INSERT INTO chat_exchanges(call_id,turn_id,request_body,request_sha256,created_at) VALUES(?,?,?,?,?)",(call_id,turn_id,body,hashlib.sha256(body.encode()).hexdigest(),timestamp(now)))
 
 
-async def finish(conn, call_id, reply, partial, status, now):
-    await conn.execute("UPDATE chat_exchanges SET response_json=?,partial_text=?,outcome=?,finished_at=? WHERE call_id=? AND outcome='started'",(canonical(asdict(reply)) if reply else None,partial,status if status in {"completed","failed","stopped","interrupted"} else "unknown",timestamp(now),call_id))
+async def finish(conn, call_id, reply, partial, status, now, *, failure=None):
+    response = asdict(reply) if reply else {"content": partial, "complete": False, **failure} if failure else None
+    outcome = "failed" if reply and getattr(reply, "rejected_calls", ()) else status
+    await conn.execute("UPDATE chat_exchanges SET response_json=?,partial_text=?,outcome=?,finished_at=? WHERE call_id=? AND outcome='started'",(canonical(response) if response is not None else None,partial,outcome if outcome in {"completed","failed","stopped","interrupted"} else "unknown",timestamp(now),call_id))
 
 
 async def corrections(conn, turn_id):

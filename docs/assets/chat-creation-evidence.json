@@ -1,0 +1,1559 @@
+{
+  "recorded_date": "2026-10-23",
+  "scope": "P77 chat capability creation, deployment and bounded real model verification",
+  "technical_validation_complete": true,
+  "user_final_acceptance": false,
+  "model_verification": {
+    "provider": "deepseek",
+    "model": "deepseek-flash",
+    "calls": 26,
+    "cost_microunits": 65368,
+    "cost_status": "calculated",
+    "new_unknown_cost_calls": 0,
+    "prior_unknown_cost_calls_preserved": 5
+  },
+  "deployments": [
+    {
+      "history": {
+        "tasks": {
+          "rows": 64,
+          "sha256": "7b8c58470661c5b14978633a6099b24f18277a42ef2913a0f26345c8896a59fa"
+        },
+        "task_attempts": {
+          "rows": 62,
+          "sha256": "f9989d79f27066ef0299bbc1a9951668117bcd9247deaf653938123ced9153fc"
+        },
+        "conversations": {
+          "rows": 34,
+          "sha256": "44ab931d1bf082ec6ab377c3f2151c1199a708ec2d34cf7104659aa8e23c8ce1"
+        },
+        "chat_turns": {
+          "rows": 62,
+          "sha256": "f782db630e8ed5d0196b1df94764183da3d8a323c07ce7b9447f7f98ec597fa4"
+        },
+        "model_calls": {
+          "rows": 111,
+          "sha256": "9cbcca62b01aff1866bafab7d9209b80688e87315eaef91a97e5da572e42e5c6"
+        },
+        "identities": {
+          "rows": 3,
+          "sha256": "e215e0904c4c4d0adbde98915dca70513b441413fdd2bef7dcab28e9a7b456b2"
+        },
+        "grants": {
+          "rows": 28,
+          "sha256": "7b1305fd62c3ec4acf8a77be99b45a17012c7c77480d0ba5d7c00b06de807c85"
+        },
+        "memory_entries": {
+          "rows": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "plugin_versions": {
+          "rows": 19,
+          "sha256": "465dd16571cecd2b779a931f6d3c87ccc71624487db13bb459b6cb2535ef1e37"
+        },
+        "extension_versions": {
+          "rows": 1,
+          "sha256": "a8f3a732086ee0b412dc0b82320d3f26c6a69f2db24936cf378f1c2c9e26f8fe"
+        },
+        "chat_exchanges": {
+          "rows": 66,
+          "sha256": "2a45cd11204ff1ba5fa3a6b82173081bd137a1e9b4a8a56ea89fe73451522809"
+        }
+      },
+      "paused": false,
+      "model_calls": 111,
+      "unknown_cost_calls": 5,
+      "autonomy_rows": {
+        "plugin_goals": 0,
+        "plugin_schedules": 0,
+        "plugin_schedule_events": 0,
+        "plugin_wakeups": 0
+      },
+      "active_authorities": 0,
+      "release": "/opt/nexus/releases/chat-creation-20261023",
+      "wheel_sha256": "9205b66c5e151a3808e601d5fbe412df1bae9d190202f1a0df02b67d7e647b40",
+      "runtime_files_checked": 215,
+      "changed_backend_files": [
+        "nexus/contracts/work.py",
+        "nexus/core/cognitive/chat_work.py",
+        "nexus/core/cognitive/work_catalog.py",
+        "nexus/core/extensions/service.py",
+        "nexus/core/models/chat.py",
+        "nexus/core/plugins/service.py",
+        "nexus/core/plugins/testing.py",
+        "nexus/core/security/work.py",
+        "nexus/core/cognitive/work_creation.py"
+      ],
+      "service": "active",
+      "single_core": true,
+      "pid": 669500,
+      "schema": 26,
+      "backup": "/var/backups/nexus/before-chat-creation-20261023T074824Z",
+      "backup_sha256": "ea357ed91fa981dd7a7dfefff8e6d850cdc6e73f54dd52d41610b4e7f4b330a5",
+      "historical_records_preserved": true,
+      "no_new_model_calls": true,
+      "recorded_at": "2026-10-23T07:48:33.044832+00:00",
+      "test_summary": "338 passed, 4 skipped in 169.65s (0:02:49)"
+    },
+    {
+      "history": {
+        "tasks": {
+          "rows": 65,
+          "sha256": "b59756def737c050de7735646a29a2591775cf8e61c56f4b31363c6705b0e9c6"
+        },
+        "task_attempts": {
+          "rows": 63,
+          "sha256": "af0f5d70f1dad5fc946f779b75ac48f7c223cd76013ee3c2eddd2f11c69c5026"
+        },
+        "conversations": {
+          "rows": 36,
+          "sha256": "27e4e98e38e2392fb539c8a4f247e0faff03c74aba11367317f6e148561588bb"
+        },
+        "chat_turns": {
+          "rows": 64,
+          "sha256": "ab97094cd4ca700d0986bd3790aa9fe4bc6190ab8bc43d9e772dfc1f542256f0"
+        },
+        "model_calls": {
+          "rows": 118,
+          "sha256": "77d79849b65311a4c0f9c9df54c6d7cfdbef9e7718df254c352f561fdc50d0b0"
+        },
+        "identities": {
+          "rows": 3,
+          "sha256": "e215e0904c4c4d0adbde98915dca70513b441413fdd2bef7dcab28e9a7b456b2"
+        },
+        "grants": {
+          "rows": 28,
+          "sha256": "7b1305fd62c3ec4acf8a77be99b45a17012c7c77480d0ba5d7c00b06de807c85"
+        },
+        "memory_entries": {
+          "rows": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "plugin_versions": {
+          "rows": 20,
+          "sha256": "7fda5edd96e62875eedbee059a425587ad283410e055129cbc6b574dd6789ca0"
+        },
+        "extension_versions": {
+          "rows": 2,
+          "sha256": "65f2dc0af6928156be44e52bc9e72b983db4358e3684df6ca67a529eb43656ed"
+        },
+        "chat_exchanges": {
+          "rows": 73,
+          "sha256": "c6d1cc2e0e00aa2d487c0c2f87fa416e81d6494357eba1c4bec4a99de2c55ead"
+        }
+      },
+      "paused": false,
+      "model_calls": 118,
+      "unknown_cost_calls": 5,
+      "autonomy_rows": {
+        "plugin_goals": 0,
+        "plugin_schedules": 0,
+        "plugin_schedule_events": 0,
+        "plugin_wakeups": 0
+      },
+      "active_authorities": 0,
+      "release": "/opt/nexus/releases/chat-creation-final-20261023",
+      "wheel_sha256": "17fe05b6cc24372ffd2b2fc32c7eb7d31ba68e42d55ab4eb78bdca78c46e9bef",
+      "runtime_files_checked": 215,
+      "changed_backend_files": [
+        "nexus/core/models/chat.py",
+        "nexus/core/cognitive/work_creation.py"
+      ],
+      "service": "active",
+      "single_core": true,
+      "pid": 689994,
+      "schema": 26,
+      "backup": "/var/backups/nexus/before-chat-creation-final-20261023T075303Z",
+      "backup_sha256": "22a92b012651a86d411da9fd35e84dc371c5469ce9998de2a20c834fc34ab94c",
+      "historical_records_preserved": true,
+      "no_new_model_calls": true,
+      "recorded_at": "2026-10-23T07:53:11.614487+00:00",
+      "test_summary": "104 passed, 1 skipped in 43.62s"
+    },
+    {
+      "history": {
+        "tasks": {
+          "rows": 66,
+          "sha256": "b0d357ddaa24cfd9fcf76d94c0cbfdaaa16f4ffa55ba7763f98757ee1c7e4d4e"
+        },
+        "task_attempts": {
+          "rows": 64,
+          "sha256": "92ab0f15592397d25584848e0b8bbf273081a78669ee3fde60889327449182f3"
+        },
+        "conversations": {
+          "rows": 39,
+          "sha256": "cf9dce87e8a1e131f1ae2dddbb7dcd54ec2e768932cc29eca6b083fe1b8281a3"
+        },
+        "chat_turns": {
+          "rows": 67,
+          "sha256": "821e91045f3450b9265d340f7210115cce2d76ad340577d15c4928007bcac995"
+        },
+        "model_calls": {
+          "rows": 129,
+          "sha256": "1fbec1ae234a09b055b4ba2652f753a2902abbd1b9f578eb6657aef1f2cff5f3"
+        },
+        "identities": {
+          "rows": 3,
+          "sha256": "e215e0904c4c4d0adbde98915dca70513b441413fdd2bef7dcab28e9a7b456b2"
+        },
+        "grants": {
+          "rows": 28,
+          "sha256": "7b1305fd62c3ec4acf8a77be99b45a17012c7c77480d0ba5d7c00b06de807c85"
+        },
+        "memory_entries": {
+          "rows": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "plugin_versions": {
+          "rows": 21,
+          "sha256": "9cd7f13363a6ef5e35c8135fff8c95a82272004cf2874776ac0e0bf55cfdfff2"
+        },
+        "extension_versions": {
+          "rows": 3,
+          "sha256": "5b200fb158d039d01fa7c080687499d0e6c1b0521a8c4eff466376793e9c26ef"
+        },
+        "chat_exchanges": {
+          "rows": 84,
+          "sha256": "440e150700b7b33920f30017c92e813e5f4da4ffd626fe98e99450deff3483e8"
+        }
+      },
+      "paused": false,
+      "model_calls": 129,
+      "unknown_cost_calls": 5,
+      "autonomy_rows": {
+        "plugin_goals": 0,
+        "plugin_schedules": 0,
+        "plugin_schedule_events": 0,
+        "plugin_wakeups": 0
+      },
+      "active_authorities": 0,
+      "release": "/opt/nexus/releases/chat-creation-validated-20261023",
+      "wheel_sha256": "de84354c2b610c76187fe4c929a7ba1101c262d3890804e9c6669f027b105e48",
+      "runtime_files_checked": 215,
+      "changed_backend_files": [
+        "nexus/core/models/chat.py"
+      ],
+      "service": "active",
+      "single_core": true,
+      "pid": 708357,
+      "schema": 26,
+      "backup": "/var/backups/nexus/before-chat-creation-validated-20261023T075741Z",
+      "backup_sha256": "f0df6cf7a3f9a76e0afd9d539c2e7e57309b871fb240a227cd707da21259578d",
+      "historical_records_preserved": true,
+      "no_new_model_calls": true,
+      "recorded_at": "2026-10-23T07:57:44.308011+00:00",
+      "test_summary": "66 passed in 20.78s"
+    }
+  ],
+  "final_production_check": {
+    "recorded_at": "2026-10-23T08:14:06.955958+00:00",
+    "service": "active",
+    "single_core": true,
+    "pid": 762301,
+    "release": "/opt/nexus/releases/voice-20261023-f931bf92",
+    "wheel_sha256": "f931bf922b845c5c0e4f119d5a043460e0554c7d22d2b707f41e1714ceffbdbb",
+    "runtime_files_checked": 234,
+    "p77_release": "/opt/nexus/releases/chat-creation-validated-20261023",
+    "p77_wheel_sha256": "de84354c2b610c76187fe4c929a7ba1101c262d3890804e9c6669f027b105e48",
+    "p77_changed_files_preserved": [
+      "nexus/contracts/work.py",
+      "nexus/core/cognitive/chat_work.py",
+      "nexus/core/cognitive/work_catalog.py",
+      "nexus/core/extensions/service.py",
+      "nexus/core/models/chat.py",
+      "nexus/core/plugins/service.py",
+      "nexus/core/plugins/testing.py",
+      "nexus/core/security/work.py",
+      "nexus/core/cognitive/work_creation.py"
+    ],
+    "p77_fixed_resources_checked": 215,
+    "config_sha256": "c41791d2519cb21ff548b8e375181413d91fde68e2d421d5977c92a5c15eccf5",
+    "schema": 27,
+    "paused": false,
+    "https_verified": true,
+    "history": {
+      "tasks": {
+        "rows": 70,
+        "sha256": "c2f5cbd64c7614f0697267b3d31734c1996b69436b8acde31e1ab39fa78745b9"
+      },
+      "task_attempts": {
+        "rows": 68,
+        "sha256": "58bb6b663af7a88439ed38638c8e829a930f4673e8764c2c38697638aeb8caef"
+      },
+      "conversations": {
+        "rows": 40,
+        "sha256": "36be60c47a6aaf2370cce7d0aa620902882ec6ae24268140ad2e4c3a3d977887"
+      },
+      "chat_turns": {
+        "rows": 70,
+        "sha256": "0154f966ff91682d7aec73acae19e0a7b84282619a2a44a861f6c922df2a9079"
+      },
+      "model_calls": {
+        "rows": 137,
+        "sha256": "eab81d0df00b97fb81dc2caaab3517e07832c3aea55bf84341d8e6487d9a4547"
+      },
+      "identities": {
+        "rows": 3,
+        "sha256": "e215e0904c4c4d0adbde98915dca70513b441413fdd2bef7dcab28e9a7b456b2"
+      },
+      "grants": {
+        "rows": 28,
+        "sha256": "7b1305fd62c3ec4acf8a77be99b45a17012c7c77480d0ba5d7c00b06de807c85"
+      },
+      "memory_entries": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "plugin_versions": {
+        "rows": 21,
+        "sha256": "2d534ae0c1490c6ea93be2d1b8c1ee3b0fac65248eb356d0fdf1008352f433db"
+      },
+      "extension_versions": {
+        "rows": 4,
+        "sha256": "f71ad709d3993d448c0140c028aa13271f31ffc6e3b195309bdd3a00167b89b6"
+      },
+      "chat_exchanges": {
+        "rows": 92,
+        "sha256": "9e4d9ddc837b45eb3d01a0aeee08b6b69efc87de96c9cfff58a54cb477b62fc2"
+      }
+    },
+    "model_calls": 137,
+    "unknown_cost_calls": 5,
+    "verification_ledger": [
+      {
+        "provider": "deepseek",
+        "model": "deepseek-flash",
+        "cost_status": "calculated",
+        "outcome": "completed",
+        "calls": 26,
+        "cost_microunits": 65368
+      }
+    ],
+    "post_validation_backup": "/var/backups/nexus/after-chat-creation-real-20261023T081406Z",
+    "post_validation_backup_sha256": "d4394054be33023ed0c1d30cdfccefea7211322c9b89fadf243b74ed9fa4d34a"
+  },
+  "scenarios": [
+    {
+      "case": "explicit-plugin",
+      "conversation_id": "5c239e11-3097-4640-b193-e217b306d9b4",
+      "turn_id": "94bea915-ddda-4cab-a337-2d1515e66730",
+      "status": "completed",
+      "calls": 5,
+      "cost_microunits": 11480,
+      "cost_status": "calculated",
+      "user_prompt": "请为我创建一个可复用的 NEXUS 原生插件，名为 user.creation_slug，版本1.0.0。它只有 slug 工具：接收 text 字符串，将两端空白去掉、转小写，再把任意连续空白替换为一个短横线，返回 {\"slug\":字符串}。仅用 Python 标准库、无文件或网络访问。请包含英文和空字符串测试，实际保存并测试，然后用 \"  Hello   NEXUS  \" 运行一次。不要只给源码；报告真实版本、测试与运行结果。",
+      "actions": [
+        {
+          "intent": "plugin_install",
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null,
+          "result": {
+            "data": {
+              "approval_required": false,
+              "approved": 1,
+              "builtin": 0,
+              "created_at": "2026-10-23T07:52:03.111495+00:00",
+              "description": "Converts text to a lowercase whitespace-collapsed slug using only the Python standard library. No file or network access.",
+              "digest": "8350a382fa0fbc6a95ae6a7b68e4ef2cf34c90c9f6d0b077be651bb62dab5692",
+              "enabled": 1,
+              "name": "Slug Creator",
+              "origin": "nexus-generated",
+              "plugin_id": "user.creation_slug",
+              "runtime": "python",
+              "test": {
+                "business_verified": false,
+                "cases": [
+                  {
+                    "actual": {
+                      "slug": "hello-nexus"
+                    },
+                    "case": 0,
+                    "matched": true
+                  },
+                  {
+                    "actual": {
+                      "slug": ""
+                    },
+                    "case": 1,
+                    "matched": true
+                  },
+                  {
+                    "actual": {
+                      "slug": "hello-nexus"
+                    },
+                    "case": 2,
+                    "matched": true
+                  }
+                ],
+                "environment": {
+                  "available": true,
+                  "image_digest": "753aed32346183e5820e0a9a0631339d213607d22fd000ed4ec0b85681512d16",
+                  "node_id": "4f70400a-30ad-497d-a447-f13011f11248",
+                  "platform": "kvm",
+                  "policy": "runsc-host-limits-v2",
+                  "runsc_digest": "be25aff8bad3f0ad4adafa525107b22475802c1c0f5a8ae334c5320fb697a21a",
+                  "runtime": "runsc",
+                  "type": "sandbox"
+                },
+                "release_digest": "8350a382fa0fbc6a95ae6a7b68e4ef2cf34c90c9f6d0b077be651bb62dab5692",
+                "verification": "isolated_contract_cases"
+              },
+              "test_status": "passed",
+              "tools": [
+                "slug"
+              ],
+              "version": "1.0.0",
+              "version_id": "a5bb3d08-493d-481b-86cf-c8734b4f78cb"
+            },
+            "status": "succeeded",
+            "verification": "isolated_contract_cases"
+          }
+        },
+        {
+          "intent": "plugin_execute",
+          "status": "succeeded",
+          "task_id": "04bfdade-6f9b-42b6-9938-becbc0e934bd",
+          "skill_run_id": null,
+          "result": {
+            "data": {
+              "slug": "hello-nexus"
+            },
+            "execution_outcome": "known",
+            "status": "succeeded",
+            "verification": "node_report_schema_checked"
+          }
+        }
+      ],
+      "candidate": {
+        "version_id": "a5bb3d08-493d-481b-86cf-c8734b4f78cb",
+        "test_status": "passed",
+        "capability_id": "user.creation_slug",
+        "revision_or_version": "1.0.0",
+        "digest": "8350a382fa0fbc6a95ae6a7b68e4ef2cf34c90c9f6d0b077be651bb62dab5692",
+        "test": {
+          "business_verified": false,
+          "cases": [
+            {
+              "actual": {
+                "slug": "hello-nexus"
+              },
+              "case": 0,
+              "matched": true
+            },
+            {
+              "actual": {
+                "slug": ""
+              },
+              "case": 1,
+              "matched": true
+            },
+            {
+              "actual": {
+                "slug": "hello-nexus"
+              },
+              "case": 2,
+              "matched": true
+            }
+          ],
+          "environment": {
+            "available": true,
+            "image_digest": "753aed32346183e5820e0a9a0631339d213607d22fd000ed4ec0b85681512d16",
+            "node_id": "4f70400a-30ad-497d-a447-f13011f11248",
+            "platform": "kvm",
+            "policy": "runsc-host-limits-v2",
+            "runsc_digest": "be25aff8bad3f0ad4adafa525107b22475802c1c0f5a8ae334c5320fb697a21a",
+            "runtime": "runsc",
+            "type": "sandbox"
+          },
+          "release_digest": "8350a382fa0fbc6a95ae6a7b68e4ef2cf34c90c9f6d0b077be651bb62dab5692",
+          "verification": "isolated_contract_cases"
+        }
+      },
+      "runs": []
+    },
+    {
+      "case": "explicit-skill",
+      "conversation_id": "c8572a76-68ec-4dac-bd6a-58d507b3b514",
+      "turn_id": "df487676-7342-49b5-9961-1137203129f5",
+      "status": "completed",
+      "calls": 2,
+      "cost_microunits": 5058,
+      "cost_status": "calculated",
+      "user_prompt": "请直接创建一个 NEXUS Skill，能力名 user.creation_machine_check，用于以后重复获取设备基础信息。固定一步读取所选设备的 system.info，返回该步完整结果，不读目录、不执行 Shell。请保存真实候选、说明与测试，报告具体版本及是否还需批准；暂不执行它。",
+      "actions": [
+        {
+          "intent": "skill_create",
+          "status": "failed",
+          "task_id": null,
+          "skill_run_id": null,
+          "result": {
+            "data": {
+              "approval_required": false,
+              "approval_status": "none",
+              "artifact_digest": "9723bc562417ef950bf16a97ced329fb726b5fd8eb47bc14001c7b4b9fe4fb83",
+              "capability_id": "user.creation_machine_check",
+              "created": true,
+              "enabled": false,
+              "execution": "not_run",
+              "review_url": "/api/v1/extensions/versions/4e41a522-fb97-427b-9c46-d6f2e4ba1a76",
+              "revision": 1,
+              "test": {
+                "artifact_digest": "9723bc562417ef950bf16a97ced329fb726b5fd8eb47bc14001c7b4b9fe4fb83",
+                "controller_version": "trusted-controller-v1",
+                "created_at": "2026-10-23T07:48:47.342372+00:00",
+                "environment_digest": "9ef02822ebdecb63027b410312fa2a25bbca4073aca25198d627893a571eeb4d",
+                "kind": "skill_standin",
+                "result": {
+                  "cases": [],
+                  "controller": "trusted-skill-v1",
+                  "passed": false,
+                  "reason": "ValueError"
+                },
+                "result_json": "{\"cases\":[],\"controller\":\"trusted-skill-v1\",\"passed\":false,\"reason\":\"ValueError\"}",
+                "status": "failed",
+                "test_id": "64996a4a-9a81-4489-8b07-5b0c9e896342",
+                "version_id": "4e41a522-fb97-427b-9c46-d6f2e4ba1a76"
+              },
+              "test_status": "failed",
+              "version_id": "4e41a522-fb97-427b-9c46-d6f2e4ba1a76"
+            },
+            "status": "failed",
+            "verification": "skill_contract_standins_only"
+          }
+        }
+      ],
+      "candidate": {
+        "version_id": "4e41a522-fb97-427b-9c46-d6f2e4ba1a76",
+        "test_status": "failed",
+        "capability_id": "user.creation_machine_check",
+        "revision_or_version": 1,
+        "digest": "9723bc562417ef950bf16a97ced329fb726b5fd8eb47bc14001c7b4b9fe4fb83",
+        "test": {
+          "test_id": "64996a4a-9a81-4489-8b07-5b0c9e896342",
+          "version_id": "4e41a522-fb97-427b-9c46-d6f2e4ba1a76",
+          "artifact_digest": "9723bc562417ef950bf16a97ced329fb726b5fd8eb47bc14001c7b4b9fe4fb83",
+          "environment_digest": "9ef02822ebdecb63027b410312fa2a25bbca4073aca25198d627893a571eeb4d",
+          "kind": "skill_standin",
+          "status": "failed",
+          "controller_version": "trusted-controller-v1",
+          "result_json": "{\"cases\":[],\"controller\":\"trusted-skill-v1\",\"passed\":false,\"reason\":\"ValueError\"}",
+          "created_at": "2026-10-23T07:48:47.342372+00:00",
+          "result": {
+            "cases": [],
+            "controller": "trusted-skill-v1",
+            "passed": false,
+            "reason": "ValueError"
+          }
+        }
+      },
+      "runs": []
+    },
+    {
+      "case": "gap-plugin",
+      "conversation_id": "97d3124f-a7ba-45c3-9ff1-796361e31831",
+      "turn_id": "0f1e2956-0f80-4b67-8f72-d2c4725bd229",
+      "status": "completed",
+      "calls": 4,
+      "cost_microunits": 10718,
+      "cost_status": "calculated",
+      "user_prompt": "我在反复处理下面这种批次标签，今后还会换一批输入，需要在 Nexus 中能按固定契约重复调用。当前任务：把输入的 labels 字符串数组按去两端空格并转小写后的值去重，保持第一次出现的次序，丢弃空串，返回 {\"labels\":数组,\"count\":数量}。请先判断现有可用能力能否直接满足；若缺少能复用的处理能力，请自行选择合适形式补齐并验证，完成本批 [\" Blue \",\"red\",\"BLUE\",\" \",\"Red\",\"green\"]。只处理传入数据，无文件、Shell、网络操作。",
+      "actions": [
+        {
+          "intent": "plugin_install",
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null,
+          "result": {
+            "data": {
+              "approval_required": false,
+              "approved": 1,
+              "builtin": 0,
+              "created_at": "2026-10-23T07:55:17.753548+00:00",
+              "description": "Normalizes a string array of labels by stripping both ends and lowercasing, drops empty results, deduplicates by the normalized value keeping first-occurrence order, and returns {\"labels\":[...],\"count\":n}. Pure in-memory processing with the standard library only; no file, shell or network access.",
+              "digest": "bb9d3cab1f58445a25af207bb7858ce85caaacf84f59ecef26ab8c600b96e37d",
+              "enabled": 1,
+              "name": "Label Dedupe",
+              "origin": "nexus-generated",
+              "plugin_id": "user.label_dedupe",
+              "runtime": "python",
+              "test": {
+                "business_verified": false,
+                "cases": [
+                  {
+                    "actual": {
+                      "count": 3,
+                      "labels": [
+                        "blue",
+                        "red",
+                        "green"
+                      ]
+                    },
+                    "case": 0,
+                    "matched": true
+                  },
+                  {
+                    "actual": {
+                      "count": 0,
+                      "labels": []
+                    },
+                    "case": 1,
+                    "matched": true
+                  },
+                  {
+                    "actual": {
+                      "count": 1,
+                      "labels": [
+                        "a"
+                      ]
+                    },
+                    "case": 2,
+                    "matched": true
+                  }
+                ],
+                "environment": {
+                  "available": true,
+                  "image_digest": "753aed32346183e5820e0a9a0631339d213607d22fd000ed4ec0b85681512d16",
+                  "node_id": "4f70400a-30ad-497d-a447-f13011f11248",
+                  "platform": "kvm",
+                  "policy": "runsc-host-limits-v2",
+                  "runsc_digest": "be25aff8bad3f0ad4adafa525107b22475802c1c0f5a8ae334c5320fb697a21a",
+                  "runtime": "runsc",
+                  "type": "sandbox"
+                },
+                "release_digest": "bb9d3cab1f58445a25af207bb7858ce85caaacf84f59ecef26ab8c600b96e37d",
+                "verification": "isolated_contract_cases"
+              },
+              "test_status": "passed",
+              "tools": [
+                "dedupe"
+              ],
+              "version": "1.0.0",
+              "version_id": "90abde81-ab16-4c12-a5f9-709e051bc561"
+            },
+            "status": "succeeded",
+            "verification": "isolated_contract_cases"
+          }
+        },
+        {
+          "intent": "plugin_execute",
+          "status": "succeeded",
+          "task_id": "195a84a0-fe7e-4f4f-9b96-f4c79b64dfeb",
+          "skill_run_id": null,
+          "result": {
+            "data": {
+              "count": 3,
+              "labels": [
+                "blue",
+                "red",
+                "green"
+              ]
+            },
+            "execution_outcome": "known",
+            "status": "succeeded",
+            "verification": "node_report_schema_checked"
+          }
+        }
+      ],
+      "candidate": {
+        "version_id": "90abde81-ab16-4c12-a5f9-709e051bc561",
+        "test_status": "passed",
+        "capability_id": "user.label_dedupe",
+        "revision_or_version": "1.0.0",
+        "digest": "bb9d3cab1f58445a25af207bb7858ce85caaacf84f59ecef26ab8c600b96e37d",
+        "test": {
+          "business_verified": false,
+          "cases": [
+            {
+              "actual": {
+                "count": 3,
+                "labels": [
+                  "blue",
+                  "red",
+                  "green"
+                ]
+              },
+              "case": 0,
+              "matched": true
+            },
+            {
+              "actual": {
+                "count": 0,
+                "labels": []
+              },
+              "case": 1,
+              "matched": true
+            },
+            {
+              "actual": {
+                "count": 1,
+                "labels": [
+                  "a"
+                ]
+              },
+              "case": 2,
+              "matched": true
+            }
+          ],
+          "environment": {
+            "available": true,
+            "image_digest": "753aed32346183e5820e0a9a0631339d213607d22fd000ed4ec0b85681512d16",
+            "node_id": "4f70400a-30ad-497d-a447-f13011f11248",
+            "platform": "kvm",
+            "policy": "runsc-host-limits-v2",
+            "runsc_digest": "be25aff8bad3f0ad4adafa525107b22475802c1c0f5a8ae334c5320fb697a21a",
+            "runtime": "runsc",
+            "type": "sandbox"
+          },
+          "release_digest": "bb9d3cab1f58445a25af207bb7858ce85caaacf84f59ecef26ab8c600b96e37d",
+          "verification": "isolated_contract_cases"
+        }
+      },
+      "runs": []
+    },
+    {
+      "case": "gap-skill",
+      "conversation_id": "35776fb0-e12f-4b85-9bfd-9974cfe09604",
+      "turn_id": "26c29496-58ae-4a82-a0c6-0b14d02d922e",
+      "status": "completed",
+      "calls": 4,
+      "cost_microunits": 11528,
+      "cost_status": "calculated",
+      "user_prompt": "以后每次检查工作环境，我都需要同一份可重复调用的固定流程：先读取所选设备系统信息，再列 workspace 的直接条目，最多5项，保留截断标志。请判断现有能力是否已能作为一个流程复用；缺少时自行选择合适的能力形式补齐并检查，让以后一次调用即可拿到按步骤分开的完整结果。这次只准备并验证这个可复用能力，若需要具体版本批准请报告，不提前执行；不读取文件正文或运行Shell。",
+      "actions": [],
+      "runs": []
+    },
+    {
+      "case": "explicit-skill-fixed",
+      "conversation_id": "18a30c5e-8272-4ab7-a056-69bad52d0e61",
+      "turn_id": "1c8f029a-6677-4be2-be0c-7ae59f84d07b",
+      "status": "completed",
+      "calls": 3,
+      "cost_microunits": 8202,
+      "cost_status": "calculated",
+      "user_prompt": "请直接创建一个 NEXUS Skill，能力名 user.creation_machine_check_v2，用于以后重复获取设备基础信息。固定一步读取所选设备的 system.info，返回该步完整结果，不读目录、不执行 Shell。请保存真实候选、说明与测试，报告具体版本及是否还需批准；暂不执行它。",
+      "actions": [
+        {
+          "intent": "skill_create",
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null,
+          "result": {
+            "data": {
+              "approval_available": true,
+              "approval_required": true,
+              "approval_status": "none",
+              "artifact_digest": "1ce8b45997103e875f6cf0ee3c4d121f6a54663be61c4428b43e8cfa9c89582c",
+              "capability_id": "user.creation_machine_check_v2",
+              "created": true,
+              "enabled": false,
+              "execution": "not_run",
+              "review_url": "/api/v1/extensions/versions/5f5f2535-5eb5-4cf4-ba2f-14219103e4cc",
+              "revision": 1,
+              "test": {
+                "artifact_digest": "1ce8b45997103e875f6cf0ee3c4d121f6a54663be61c4428b43e8cfa9c89582c",
+                "controller_version": "trusted-controller-v1",
+                "created_at": "2026-10-23T07:53:36.939701+00:00",
+                "environment_digest": "9ef02822ebdecb63027b410312fa2a25bbca4073aca25198d627893a571eeb4d",
+                "kind": "skill_standin",
+                "result": {
+                  "cases": [
+                    {
+                      "name": "normal",
+                      "observed": [
+                        {
+                          "id": "info",
+                          "output": {
+                            "architecture": "AMD64",
+                            "os_name": "Windows",
+                            "os_version": "test-double",
+                            "python_version": "3.13"
+                          }
+                        }
+                      ],
+                      "truncated": false
+                    },
+                    {
+                      "name": "truncated",
+                      "observed": [
+                        {
+                          "id": "info",
+                          "output": {
+                            "architecture": "AMD64",
+                            "os_name": "Windows",
+                            "os_version": "test-double",
+                            "python_version": "3.13"
+                          }
+                        }
+                      ],
+                      "truncated": true
+                    }
+                  ],
+                  "controller": "trusted-skill-v1",
+                  "passed": true
+                },
+                "result_json": "{\"cases\":[{\"name\":\"normal\",\"observed\":[{\"id\":\"info\",\"output\":{\"architecture\":\"AMD64\",\"os_name\":\"Windows\",\"os_version\":\"test-double\",\"python_version\":\"3.13\"}}],\"truncated\":false},{\"name\":\"truncated\",\"observed\":[{\"id\":\"info\",\"output\":{\"architecture\":\"AMD64\",\"os_name\":\"Windows\",\"os_version\":\"test-double\",\"python_version\":\"3.13\"}}],\"truncated\":true}],\"controller\":\"trusted-skill-v1\",\"passed\":true}",
+                "status": "passed",
+                "test_id": "add3c5c0-4f58-4c34-a5f4-46fb938dd1e0",
+                "version_id": "5f5f2535-5eb5-4cf4-ba2f-14219103e4cc"
+              },
+              "test_status": "passed",
+              "version_id": "5f5f2535-5eb5-4cf4-ba2f-14219103e4cc"
+            },
+            "status": "succeeded",
+            "verification": "skill_contract_standins_only"
+          }
+        }
+      ],
+      "candidate": {
+        "version_id": "5f5f2535-5eb5-4cf4-ba2f-14219103e4cc",
+        "test_status": "passed",
+        "capability_id": "user.creation_machine_check_v2",
+        "revision_or_version": 1,
+        "digest": "1ce8b45997103e875f6cf0ee3c4d121f6a54663be61c4428b43e8cfa9c89582c",
+        "test": {
+          "test_id": "add3c5c0-4f58-4c34-a5f4-46fb938dd1e0",
+          "version_id": "5f5f2535-5eb5-4cf4-ba2f-14219103e4cc",
+          "artifact_digest": "1ce8b45997103e875f6cf0ee3c4d121f6a54663be61c4428b43e8cfa9c89582c",
+          "environment_digest": "9ef02822ebdecb63027b410312fa2a25bbca4073aca25198d627893a571eeb4d",
+          "kind": "skill_standin",
+          "status": "passed",
+          "controller_version": "trusted-controller-v1",
+          "result_json": "{\"cases\":[{\"name\":\"normal\",\"observed\":[{\"id\":\"info\",\"output\":{\"architecture\":\"AMD64\",\"os_name\":\"Windows\",\"os_version\":\"test-double\",\"python_version\":\"3.13\"}}],\"truncated\":false},{\"name\":\"truncated\",\"observed\":[{\"id\":\"info\",\"output\":{\"architecture\":\"AMD64\",\"os_name\":\"Windows\",\"os_version\":\"test-double\",\"python_version\":\"3.13\"}}],\"truncated\":true}],\"controller\":\"trusted-skill-v1\",\"passed\":true}",
+          "created_at": "2026-10-23T07:53:36.939701+00:00",
+          "result": {
+            "cases": [
+              {
+                "name": "normal",
+                "observed": [
+                  {
+                    "id": "info",
+                    "output": {
+                      "architecture": "AMD64",
+                      "os_name": "Windows",
+                      "os_version": "test-double",
+                      "python_version": "3.13"
+                    }
+                  }
+                ],
+                "truncated": false
+              },
+              {
+                "name": "truncated",
+                "observed": [
+                  {
+                    "id": "info",
+                    "output": {
+                      "architecture": "AMD64",
+                      "os_name": "Windows",
+                      "os_version": "test-double",
+                      "python_version": "3.13"
+                    }
+                  }
+                ],
+                "truncated": true
+              }
+            ],
+            "controller": "trusted-skill-v1",
+            "passed": true
+          }
+        }
+      },
+      "runs": []
+    },
+    {
+      "case": "gap-skill-fixed",
+      "conversation_id": "2877ceeb-8f9d-45f8-844a-6633f9497e3c",
+      "turn_id": "a76418da-8280-4123-91ae-670117f43631",
+      "status": "completed",
+      "calls": 4,
+      "cost_microunits": 9942,
+      "cost_status": "calculated",
+      "user_prompt": "以后每次检查工作环境，我都需要同一份可重复调用的固定流程：先读取所选设备系统信息，再列 workspace 的直接条目，最多5项，保留截断标志。请判断现有能力是否已能作为一个流程复用；缺少时自行选择合适的能力形式补齐并检查，让以后一次调用即可拿到按步骤分开的完整结果。这次只准备并验证这个可复用能力，若需要具体版本批准请报告，不提前执行；不读取文件正文或运行Shell。",
+      "actions": [
+        {
+          "intent": "get_system_info",
+          "status": "succeeded",
+          "task_id": "2ab9a785-7b76-41a2-b397-e8723f097c51",
+          "skill_run_id": null,
+          "result": {
+            "data": {
+              "architecture": "AMD64",
+              "os_name": "Windows",
+              "os_version": "10.0.26200",
+              "python_version": "3.13.9"
+            },
+            "execution_outcome": "known",
+            "status": "succeeded",
+            "verification": "node_report_schema_checked"
+          }
+        },
+        {
+          "intent": "skill_create",
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null,
+          "result": {
+            "data": {
+              "approval_available": true,
+              "approval_required": true,
+              "approval_status": "none",
+              "artifact_digest": "c8cd3a6b695001e4780859782686aebdc3be1fe9819073cc0b4e844228b37d36",
+              "capability_id": "user.env_check_flow",
+              "created": true,
+              "enabled": false,
+              "execution": "not_run",
+              "review_url": "/api/v1/extensions/versions/07dac6e7-cacc-4315-a4a2-fe148980dabe",
+              "revision": 1,
+              "test": {
+                "artifact_digest": "c8cd3a6b695001e4780859782686aebdc3be1fe9819073cc0b4e844228b37d36",
+                "controller_version": "trusted-controller-v1",
+                "created_at": "2026-10-23T07:58:12.049459+00:00",
+                "environment_digest": "9ef02822ebdecb63027b410312fa2a25bbca4073aca25198d627893a571eeb4d",
+                "kind": "skill_standin",
+                "result": {
+                  "cases": [
+                    {
+                      "name": "normal",
+                      "observed": [
+                        {
+                          "id": "system",
+                          "output": {
+                            "architecture": "AMD64",
+                            "os_name": "Windows",
+                            "os_version": "test-double",
+                            "python_version": "3.13"
+                          }
+                        },
+                        {
+                          "id": "files",
+                          "output": {
+                            "entries": [
+                              {
+                                "kind": "file",
+                                "name": "alpha.txt"
+                              },
+                              {
+                                "kind": "file",
+                                "name": "beta.txt"
+                              },
+                              {
+                                "kind": "directory",
+                                "name": "docs"
+                              }
+                            ],
+                            "root_id": "workspace",
+                            "truncated": false
+                          }
+                        }
+                      ],
+                      "truncated": false
+                    },
+                    {
+                      "name": "truncated",
+                      "observed": [
+                        {
+                          "id": "system",
+                          "output": {
+                            "architecture": "AMD64",
+                            "os_name": "Windows",
+                            "os_version": "test-double",
+                            "python_version": "3.13"
+                          }
+                        },
+                        {
+                          "id": "files",
+                          "output": {
+                            "entries": [
+                              {
+                                "kind": "file",
+                                "name": "alpha.txt"
+                              },
+                              {
+                                "kind": "file",
+                                "name": "beta.txt"
+                              },
+                              {
+                                "kind": "directory",
+                                "name": "docs"
+                              }
+                            ],
+                            "root_id": "workspace",
+                            "truncated": true
+                          }
+                        }
+                      ],
+                      "truncated": true
+                    }
+                  ],
+                  "controller": "trusted-skill-v1",
+                  "passed": true
+                },
+                "result_json": "{\"cases\":[{\"name\":\"normal\",\"observed\":[{\"id\":\"system\",\"output\":{\"architecture\":\"AMD64\",\"os_name\":\"Windows\",\"os_version\":\"test-double\",\"python_version\":\"3.13\"}},{\"id\":\"files\",\"output\":{\"entries\":[{\"kind\":\"file\",\"name\":\"alpha.txt\"},{\"kind\":\"file\",\"name\":\"beta.txt\"},{\"kind\":\"directory\",\"name\":\"docs\"}],\"root_id\":\"workspace\",\"truncated\":false}}],\"truncated\":false},{\"name\":\"truncated\",\"observed\":[{\"id\":\"system\",\"output\":{\"architecture\":\"AMD64\",\"os_name\":\"Windows\",\"os_version\":\"test-double\",\"python_version\":\"3.13\"}},{\"id\":\"files\",\"output\":{\"entries\":[{\"kind\":\"file\",\"name\":\"alpha.txt\"},{\"kind\":\"file\",\"name\":\"beta.txt\"},{\"kind\":\"directory\",\"name\":\"docs\"}],\"root_id\":\"workspace\",\"truncated\":true}}],\"truncated\":true}],\"controller\":\"trusted-skill-v1\",\"passed\":true}",
+                "status": "passed",
+                "test_id": "068f5812-053c-4ef5-ba17-7a79138dd83d",
+                "version_id": "07dac6e7-cacc-4315-a4a2-fe148980dabe"
+              },
+              "test_status": "passed",
+              "version_id": "07dac6e7-cacc-4315-a4a2-fe148980dabe"
+            },
+            "status": "succeeded",
+            "verification": "skill_contract_standins_only"
+          }
+        }
+      ],
+      "candidate": {
+        "version_id": "07dac6e7-cacc-4315-a4a2-fe148980dabe",
+        "test_status": "passed",
+        "capability_id": "user.env_check_flow",
+        "revision_or_version": 1,
+        "digest": "c8cd3a6b695001e4780859782686aebdc3be1fe9819073cc0b4e844228b37d36",
+        "test": {
+          "test_id": "068f5812-053c-4ef5-ba17-7a79138dd83d",
+          "version_id": "07dac6e7-cacc-4315-a4a2-fe148980dabe",
+          "artifact_digest": "c8cd3a6b695001e4780859782686aebdc3be1fe9819073cc0b4e844228b37d36",
+          "environment_digest": "9ef02822ebdecb63027b410312fa2a25bbca4073aca25198d627893a571eeb4d",
+          "kind": "skill_standin",
+          "status": "passed",
+          "controller_version": "trusted-controller-v1",
+          "result_json": "{\"cases\":[{\"name\":\"normal\",\"observed\":[{\"id\":\"system\",\"output\":{\"architecture\":\"AMD64\",\"os_name\":\"Windows\",\"os_version\":\"test-double\",\"python_version\":\"3.13\"}},{\"id\":\"files\",\"output\":{\"entries\":[{\"kind\":\"file\",\"name\":\"alpha.txt\"},{\"kind\":\"file\",\"name\":\"beta.txt\"},{\"kind\":\"directory\",\"name\":\"docs\"}],\"root_id\":\"workspace\",\"truncated\":false}}],\"truncated\":false},{\"name\":\"truncated\",\"observed\":[{\"id\":\"system\",\"output\":{\"architecture\":\"AMD64\",\"os_name\":\"Windows\",\"os_version\":\"test-double\",\"python_version\":\"3.13\"}},{\"id\":\"files\",\"output\":{\"entries\":[{\"kind\":\"file\",\"name\":\"alpha.txt\"},{\"kind\":\"file\",\"name\":\"beta.txt\"},{\"kind\":\"directory\",\"name\":\"docs\"}],\"root_id\":\"workspace\",\"truncated\":true}}],\"truncated\":true}],\"controller\":\"trusted-skill-v1\",\"passed\":true}",
+          "created_at": "2026-10-23T07:58:12.049459+00:00",
+          "result": {
+            "cases": [
+              {
+                "name": "normal",
+                "observed": [
+                  {
+                    "id": "system",
+                    "output": {
+                      "architecture": "AMD64",
+                      "os_name": "Windows",
+                      "os_version": "test-double",
+                      "python_version": "3.13"
+                    }
+                  },
+                  {
+                    "id": "files",
+                    "output": {
+                      "entries": [
+                        {
+                          "kind": "file",
+                          "name": "alpha.txt"
+                        },
+                        {
+                          "kind": "file",
+                          "name": "beta.txt"
+                        },
+                        {
+                          "kind": "directory",
+                          "name": "docs"
+                        }
+                      ],
+                      "root_id": "workspace",
+                      "truncated": false
+                    }
+                  }
+                ],
+                "truncated": false
+              },
+              {
+                "name": "truncated",
+                "observed": [
+                  {
+                    "id": "system",
+                    "output": {
+                      "architecture": "AMD64",
+                      "os_name": "Windows",
+                      "os_version": "test-double",
+                      "python_version": "3.13"
+                    }
+                  },
+                  {
+                    "id": "files",
+                    "output": {
+                      "entries": [
+                        {
+                          "kind": "file",
+                          "name": "alpha.txt"
+                        },
+                        {
+                          "kind": "file",
+                          "name": "beta.txt"
+                        },
+                        {
+                          "kind": "directory",
+                          "name": "docs"
+                        }
+                      ],
+                      "root_id": "workspace",
+                      "truncated": true
+                    }
+                  }
+                ],
+                "truncated": true
+              }
+            ],
+            "controller": "trusted-skill-v1",
+            "passed": true
+          }
+        }
+      },
+      "runs": []
+    },
+    {
+      "case": "explicit-skill-fixed-execution",
+      "conversation_id": "18a30c5e-8272-4ab7-a056-69bad52d0e61",
+      "turn_id": "7634f3c2-d0da-4215-a171-d26869cf8357",
+      "status": "completed",
+      "calls": 2,
+      "cost_microunits": 4200,
+      "cost_status": "calculated",
+      "user_prompt": "用户已批准并启用 user.creation_machine_check_v2 的 revision 1，version_id=5f5f2535-5eb5-4cf4-ba2f-14219103e4cc。请现在实际调用这一个固定 Skill，输入为空对象，执行一次并报告真实分步结果。不要重新创建、改动或用其他工具替代它。目录结果若截断必须明确。",
+      "actions": [
+        {
+          "intent": "run_skill",
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": "7013b53c-038d-44ce-b934-57bc0993184e",
+          "result": {
+            "data": {
+              "info": {
+                "architecture": "AMD64",
+                "os_name": "Windows",
+                "os_version": "10.0.26200",
+                "python_version": "3.13.9"
+              }
+            },
+            "error": null,
+            "status": "succeeded",
+            "verification": "skill_steps_verified"
+          }
+        }
+      ],
+      "runs": [
+        {
+          "run_id": "7013b53c-038d-44ce-b934-57bc0993184e",
+          "version_id": "5f5f2535-5eb5-4cf4-ba2f-14219103e4cc",
+          "approval_id": "af67c9d2-0b17-4618-943d-ee0f7a650c10",
+          "artifact_digest": "1ce8b45997103e875f6cf0ee3c4d121f6a54663be61c4428b43e8cfa9c89582c",
+          "status": "succeeded",
+          "verification": "skill_steps_verified",
+          "result": {
+            "info": {
+              "architecture": "AMD64",
+              "os_name": "Windows",
+              "os_version": "10.0.26200",
+              "python_version": "3.13.9"
+            }
+          },
+          "steps": [
+            {
+              "run_id": "7013b53c-038d-44ce-b934-57bc0993184e",
+              "step_index": 1,
+              "step_id": "info",
+              "task_id": "70e91207-685d-4652-94af-c8a995d6a603",
+              "tool_run_id": null,
+              "status": "succeeded",
+              "created_at": "2026-10-23T08:01:52.721767+00:00",
+              "updated_at": "2026-10-23T08:01:53.793680+00:00",
+              "result": {
+                "os_name": "Windows",
+                "os_version": "10.0.26200",
+                "architecture": "AMD64",
+                "python_version": "3.13.9"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "gap-skill-fixed-execution",
+      "conversation_id": "2877ceeb-8f9d-45f8-844a-6633f9497e3c",
+      "turn_id": "65dfff1a-2c78-42d8-84a9-c8fb45d152b0",
+      "status": "completed",
+      "calls": 2,
+      "cost_microunits": 4240,
+      "cost_status": "calculated",
+      "user_prompt": "用户已批准并启用 user.env_check_flow 的 revision 1，version_id=07dac6e7-cacc-4315-a4a2-fe148980dabe。请现在实际调用这一个固定 Skill，输入为空对象，执行一次并报告真实分步结果。不要重新创建、改动或用其他工具替代它。目录结果若截断必须明确。",
+      "actions": [
+        {
+          "intent": "run_skill",
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": "615fa4c1-5904-4577-a385-84709c22bed0",
+          "result": {
+            "data": {
+              "files": {
+                "entries": [
+                  {
+                    "kind": "file",
+                    "name": "demo.txt"
+                  },
+                  {
+                    "kind": "file",
+                    "name": "hello.py"
+                  },
+                  {
+                    "kind": "file",
+                    "name": "nexus.html"
+                  },
+                  {
+                    "kind": "file",
+                    "name": "rock_paper_scissors.py"
+                  },
+                  {
+                    "kind": "file",
+                    "name": "system_info.txt"
+                  }
+                ],
+                "root_id": "workspace",
+                "truncated": false
+              },
+              "system": {
+                "architecture": "AMD64",
+                "os_name": "Windows",
+                "os_version": "10.0.26200",
+                "python_version": "3.13.9"
+              }
+            },
+            "error": null,
+            "status": "succeeded",
+            "verification": "skill_steps_verified"
+          }
+        }
+      ],
+      "runs": [
+        {
+          "run_id": "615fa4c1-5904-4577-a385-84709c22bed0",
+          "version_id": "07dac6e7-cacc-4315-a4a2-fe148980dabe",
+          "approval_id": "d874e88c-7a8f-4b3c-b291-fdb668018a05",
+          "artifact_digest": "c8cd3a6b695001e4780859782686aebdc3be1fe9819073cc0b4e844228b37d36",
+          "status": "succeeded",
+          "verification": "skill_steps_verified",
+          "result": {
+            "files": {
+              "entries": [
+                {
+                  "kind": "file",
+                  "name": "demo.txt"
+                },
+                {
+                  "kind": "file",
+                  "name": "hello.py"
+                },
+                {
+                  "kind": "file",
+                  "name": "nexus.html"
+                },
+                {
+                  "kind": "file",
+                  "name": "rock_paper_scissors.py"
+                },
+                {
+                  "kind": "file",
+                  "name": "system_info.txt"
+                }
+              ],
+              "root_id": "workspace",
+              "truncated": false
+            },
+            "system": {
+              "architecture": "AMD64",
+              "os_name": "Windows",
+              "os_version": "10.0.26200",
+              "python_version": "3.13.9"
+            }
+          },
+          "steps": [
+            {
+              "run_id": "615fa4c1-5904-4577-a385-84709c22bed0",
+              "step_index": 1,
+              "step_id": "system",
+              "task_id": "64f92d91-eb97-41e9-985f-27750d961b4d",
+              "tool_run_id": null,
+              "status": "succeeded",
+              "created_at": "2026-10-23T08:06:17.654913+00:00",
+              "updated_at": "2026-10-23T08:06:18.697780+00:00",
+              "result": {
+                "os_name": "Windows",
+                "os_version": "10.0.26200",
+                "architecture": "AMD64",
+                "python_version": "3.13.9"
+              }
+            },
+            {
+              "run_id": "615fa4c1-5904-4577-a385-84709c22bed0",
+              "step_index": 2,
+              "step_id": "files",
+              "task_id": "94c92c16-9983-4003-8a71-d8ab1b0a1f3c",
+              "tool_run_id": null,
+              "status": "succeeded",
+              "created_at": "2026-10-23T08:06:17.654913+00:00",
+              "updated_at": "2026-10-23T08:06:20.030512+00:00",
+              "result": {
+                "root_id": "workspace",
+                "entries": [
+                  {
+                    "name": "demo.txt",
+                    "kind": "file"
+                  },
+                  {
+                    "name": "hello.py",
+                    "kind": "file"
+                  },
+                  {
+                    "name": "nexus.html",
+                    "kind": "file"
+                  },
+                  {
+                    "name": "rock_paper_scissors.py",
+                    "kind": "file"
+                  },
+                  {
+                    "name": "system_info.txt",
+                    "kind": "file"
+                  }
+                ],
+                "truncated": false
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "node_receipts": {
+    "recorded_at": "2026-10-23T08:09:08.068201+00:00",
+    "tasks": [
+      {
+        "case": "explicit-plugin",
+        "task_id": "04bfdade-6f9b-42b6-9938-becbc0e934bd",
+        "attempt_id": "7ce1d687-57c1-4fc0-b2f7-c07e4e8a12ef",
+        "command_digest": "0ed0530928dbdf7df84996f6b6b8c31317f0e3296c99446e9d0436f63948eec4",
+        "node_receipt_matches": true,
+        "acknowledged": true,
+        "execution_stopped": true,
+        "attempt_count": 1,
+        "dispatch_count": 1,
+        "result": {
+          "root_id": "workspace",
+          "release_digest": "8350a382fa0fbc6a95ae6a7b68e4ef2cf34c90c9f6d0b077be651bb62dab5692",
+          "tool": "slug",
+          "data": {
+            "slug": "hello-nexus"
+          },
+          "verification": "plugin_contract_checked"
+        }
+      },
+      {
+        "case": "gap-plugin",
+        "task_id": "195a84a0-fe7e-4f4f-9b96-f4c79b64dfeb",
+        "attempt_id": "b78b5b24-9872-4ea9-ad98-dac2542760ac",
+        "command_digest": "6b8d1847a384a5386d7e81a21079fe9cfd8ade21b06ac443c1473f7fb8489b06",
+        "node_receipt_matches": true,
+        "acknowledged": true,
+        "execution_stopped": true,
+        "attempt_count": 1,
+        "dispatch_count": 1,
+        "result": {
+          "root_id": "workspace",
+          "release_digest": "bb9d3cab1f58445a25af207bb7858ce85caaacf84f59ecef26ab8c600b96e37d",
+          "tool": "dedupe",
+          "data": {
+            "labels": [
+              "blue",
+              "red",
+              "green"
+            ],
+            "count": 3
+          },
+          "verification": "plugin_contract_checked"
+        }
+      },
+      {
+        "case": "gap-skill-fixed",
+        "task_id": "2ab9a785-7b76-41a2-b397-e8723f097c51",
+        "attempt_id": "51942845-ce15-4e30-9a8a-5b1367d14c68",
+        "command_digest": "05a02cf7ee0ea7ff2db75cebb96853f606d353f5bacbb20e57bb28add3f4df2b",
+        "node_receipt_matches": true,
+        "acknowledged": true,
+        "execution_stopped": true,
+        "attempt_count": 1,
+        "dispatch_count": 1,
+        "result": {
+          "os_name": "Windows",
+          "os_version": "10.0.26200",
+          "architecture": "AMD64",
+          "python_version": "3.13.9"
+        }
+      },
+      {
+        "case": "explicit-skill-fixed-execution",
+        "task_id": "70e91207-685d-4652-94af-c8a995d6a603",
+        "attempt_id": "a25f8145-9793-482f-96e8-6dfe1cac4ebf",
+        "command_digest": "69f350ae9792e74898ca969db7368160eb311f5c28af1eb12520f2a6abd1ce5c",
+        "node_receipt_matches": true,
+        "acknowledged": true,
+        "execution_stopped": true,
+        "attempt_count": 1,
+        "dispatch_count": 1,
+        "result": {
+          "os_name": "Windows",
+          "os_version": "10.0.26200",
+          "architecture": "AMD64",
+          "python_version": "3.13.9"
+        }
+      },
+      {
+        "case": "gap-skill-fixed-execution",
+        "task_id": "64f92d91-eb97-41e9-985f-27750d961b4d",
+        "attempt_id": "7b84f1f4-ff87-4592-a644-145854f6c1ac",
+        "command_digest": "ad701a0cb12f7bfc73d214e07c2e3f6c9d9af4fbc465fac7d939a0783a694749",
+        "node_receipt_matches": true,
+        "acknowledged": true,
+        "execution_stopped": true,
+        "attempt_count": 1,
+        "dispatch_count": 1,
+        "result": {
+          "os_name": "Windows",
+          "os_version": "10.0.26200",
+          "architecture": "AMD64",
+          "python_version": "3.13.9"
+        }
+      },
+      {
+        "case": "gap-skill-fixed-execution",
+        "task_id": "94c92c16-9983-4003-8a71-d8ab1b0a1f3c",
+        "attempt_id": "c5ca8ed4-b565-4f14-b38e-03a962d57b65",
+        "command_digest": "cd2fcc1c1342d0cea3f92f1460ae1e0629571e7895a85db37d80ecaee1062431",
+        "node_receipt_matches": true,
+        "acknowledged": true,
+        "execution_stopped": true,
+        "attempt_count": 1,
+        "dispatch_count": 1,
+        "result": {
+          "root_id": "workspace",
+          "entries": [
+            {
+              "name": "demo.txt",
+              "kind": "file"
+            },
+            {
+              "name": "hello.py",
+              "kind": "file"
+            },
+            {
+              "name": "nexus.html",
+              "kind": "file"
+            },
+            {
+              "name": "rock_paper_scissors.py",
+              "kind": "file"
+            },
+            {
+              "name": "system_info.txt",
+              "kind": "file"
+            }
+          ],
+          "truncated": false
+        }
+      }
+    ],
+    "independent_output_assertions_passed": true,
+    "workspace_listing_matches_direct_read": true
+  },
+  "cleanup": {
+    "plugins": [
+      {
+        "case": "explicit-plugin",
+        "version_id": "a5bb3d08-493d-481b-86cf-c8734b4f78cb",
+        "test_plugin_disabled": true,
+        "mode_restored": true,
+        "archived": true
+      },
+      {
+        "case": "gap-plugin",
+        "version_id": "90abde81-ab16-4c12-a5f9-709e051bc561",
+        "test_plugin_disabled": true,
+        "mode_restored": true,
+        "archived": true
+      }
+    ],
+    "skills": [
+      {
+        "case": "explicit-skill-fixed",
+        "version_id": "5f5f2535-5eb5-4cf4-ba2f-14219103e4cc",
+        "execution_turn_id": "7634f3c2-d0da-4215-a171-d26869cf8357",
+        "disabled": true,
+        "archived": true
+      },
+      {
+        "case": "gap-skill-fixed",
+        "version_id": "07dac6e7-cacc-4315-a4a2-fe148980dabe",
+        "execution_turn_id": "65dfff1a-2c78-42d8-84a9-c8fb45d152b0",
+        "disabled": true,
+        "archived": true
+      }
+    ],
+    "readback": [
+      {
+        "case": "explicit-plugin",
+        "version_id": "a5bb3d08-493d-481b-86cf-c8734b4f78cb",
+        "enabled": false,
+        "test_status": "passed"
+      },
+      {
+        "case": "gap-plugin",
+        "version_id": "90abde81-ab16-4c12-a5f9-709e051bc561",
+        "enabled": false,
+        "test_status": "passed"
+      },
+      {
+        "case": "explicit-skill-fixed",
+        "version_id": "5f5f2535-5eb5-4cf4-ba2f-14219103e4cc",
+        "enabled": false,
+        "test_status": "passed"
+      },
+      {
+        "case": "gap-skill-fixed",
+        "version_id": "07dac6e7-cacc-4315-a4a2-fe148980dabe",
+        "enabled": false,
+        "test_status": "passed"
+      }
+    ],
+    "global_permission": {
+      "mode": "normal",
+      "revision": 1
+    }
+  },
+  "final_connections": {
+    "windows_online": true,
+    "sandbox": [
+      {
+        "node_id": "4f70400a-30ad-497d-a447-f13011f11248",
+        "runtime": "runsc",
+        "image_digest": "753aed32346183e5820e0a9a0631339d213607d22fd000ed4ec0b85681512d16",
+        "status": {
+          "available": true,
+          "reason": null,
+          "image_digest": "753aed32346183e5820e0a9a0631339d213607d22fd000ed4ec0b85681512d16",
+          "runtime_version": "runsc version release-20261012.0\nspec: 1.2.1",
+          "boot_id": "956caf50-5bb6-478c-ba0c-70cde4057a7b"
+        }
+      }
+    ],
+    "paused": false
+  },
+  "limitations": [
+    "The first explicit Skill candidate failed contract stand-in validation; never enabled or run.",
+    "The first gap Skill request failed argument validation; no version was created.",
+    "Skill examples were regenerated after two bounded prompt corrections; this is not a claim of first-attempt reliability.",
+    "Gap discovery means model choice within a user-requested reusable task; no background autonomous goal creation.",
+    "Skill contract stand-ins are separate from the later real Windows execution, requiring exact-version user approval.",
+    "The model once incorrectly described the Core as Windows; the Core is Ubuntu and the execution Node is Windows.",
+    "Model cost is calculated in the product ledger, not reconciled against a provider invoice.",
+    "No production failure/rollback drill, new front-end implementation, native Skill/MCP deployment, or broader M9 implementation in P77.",
+    "A parallel voice release subsequently retained all nine P77 backend files byte-for-byte; it changed the production schema to 027."
+  ]
+}

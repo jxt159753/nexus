@@ -13,6 +13,7 @@ from nexus.contracts.chat import SkillArguments, SkillProposal
 from nexus.contracts.language import SystemProposal, DirectoryProposal
 from nexus.contracts.web import WebSearchArguments, WebFetchArguments
 from nexus.plugins.contracts import PluginInspectProposal, PluginExecuteProposal, PluginInstallProposal
+from nexus.contracts.extensions import SkillGeneration
 
 
 class WorkGrantCreate(StrictContract):
@@ -114,6 +115,23 @@ class CapabilityProposal(StrictContract):
     arguments: CapabilityArguments
 
 
+class SkillCreateArguments(StrictContract):
+    reason: StrictStr = Field(min_length=1, max_length=500)
+    skill: SkillGeneration
+
+    @model_validator(mode="after")
+    def tested_plan(self):
+        ids = [step.id for step in self.skill.steps]
+        if not self.reason.strip() or not self.skill.tests or any(case.expected_steps != ids for case in self.skill.tests):
+            raise ValueError("creation requires a reason and tests covering the ordered steps")
+        return self
+
+
+class SkillCreateProposal(StrictContract):
+    intent: Literal["skill_create"]
+    arguments: SkillCreateArguments
+
+
 class WebSearchProposal(StrictContract):
     intent: Literal["web_search"]
     arguments: WebSearchArguments
@@ -154,4 +172,4 @@ class InteractProposal(StrictContract):
     arguments: WorkInteractArguments
 
 
-WORK_PROPOSAL = TypeAdapter(Annotated[SystemProposal | DirectoryProposal | ReadProposal | SearchProposal | WriteProposal | CommandProposal | StatusProposal | SkillProposal | ToolProposal | CapabilityProposal | WebSearchProposal | WebFetchProposal | LinesProposal | GlobProposal | GrepProposal | EditProposal | ObserveProposal | InteractProposal | ImageProposal | TimeProposal | JobListProposal | JobOutputProposal | PluginInspectProposal | PluginExecuteProposal | PluginInstallProposal, Field(discriminator="intent")])
+WORK_PROPOSAL = TypeAdapter(Annotated[SystemProposal | DirectoryProposal | ReadProposal | SearchProposal | WriteProposal | CommandProposal | StatusProposal | SkillProposal | ToolProposal | CapabilityProposal | SkillCreateProposal | WebSearchProposal | WebFetchProposal | LinesProposal | GlobProposal | GrepProposal | EditProposal | ObserveProposal | InteractProposal | ImageProposal | TimeProposal | JobListProposal | JobOutputProposal | PluginInspectProposal | PluginExecuteProposal | PluginInstallProposal, Field(discriminator="intent")])

@@ -74,7 +74,7 @@ def test_streaming_final_stays_provisional_until_commit(world, monkeypatch):
         await asyncio.wait_for(worker, 3)
         stopped = (await chat.get(world.owner, turn["turn_id"]))["presentation"]
         assert stopped["phase"] == "stopped" and stopped["live_text"] == final.text[:4]
-        assert stopped["final_text"] is None and not stopped["collapse_process"]
+        assert "停止" in stopped["final_text"] and not stopped["collapse_process"]
         assert final.closed
 
     asyncio.run(run())
@@ -95,7 +95,8 @@ def test_plain_reply_and_incomplete_or_failed_partial_are_distinct(world, monkey
         if phase == "completed":
             assert display["final_text"] == provider.text
         else:
-            assert display["final_text"] is None and display["live_text"]
+            assert display["final_text"] and display["live_text"]
+            assert "MODEL_" not in display["final_text"]
 
     asyncio.run(run())
 

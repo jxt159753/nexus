@@ -520,7 +520,7 @@ function renderWorkStep(turn, step) {
   const result = step?.result || null;
   const data = result?.data;
   const label = TOOL_LABELS[intent] || intent || "步骤";
-  const box = card(`${step.step_index + 1}. ${label}`, statusBadge(step.status));
+  const box = card(`${step.step_index}. ${label}`, statusBadge(step.status));
   const args = stepArguments(step);
   if (args) box.append(el("p", "hint", args));
 
@@ -570,7 +570,7 @@ function renderWorkStep(turn, step) {
   }
 
   const specialized = ["read_image", "get_current_time", "job_list", "job_output", "inspect_capability"].includes(intent);
-  if (!handled && result && !specialized && !step.task_id && !step.preview_task_id) {
+  if (!handled && successful && result && !specialized && !step.task_id && !step.preview_task_id) {
     renderResultData(box, result.data || result);
   }
   if (result?.verification) box.append(el("p", "hint", `验证级别：${result.verification}`));
@@ -580,7 +580,7 @@ function renderWorkStep(turn, step) {
   if (result?.status && result.status !== "succeeded" && !result.error_code) {
     box.append(el("p", "hint", `实际结果状态：${result.status}`));
   }
-  if (result?.error_code) box.append(el("p", "hint", `本次工具未完成：${result.error_code}`));
+  if (result?.error_code) box.append(el("p", "hint", result.message || errorHint(result.error_code) || "这一步未能完成，具体原因保留在技术详情中。"));
   if (result?.error?.message) box.append(el("p", "hint", result.error.message));
   if (step.permission_text) box.append(el("p", "hint", `你的答复：${step.permission_text}`));
   if (step.proposal || result) {
@@ -719,7 +719,7 @@ function errorHint(code) {
     MODEL_TIMEOUT: "等待模型响应超时，本轮已停止。",
     MODEL_OUTCOME_UNKNOWN: "未收到完整模型响应或用量，实际费用无法确认；这不表示设备已经执行。",
   };
-  return hints[code] || (String(code || "").startsWith("WEB_") ? "网页请求未完成，未自动重试；不能确定计费时保留该次预留。" : "");
+  return hints[code] || (String(code || "").startsWith("WEB_") ? "这次网页请求没有取得可用内容；已有资料仍然保留。" : "");
 }
 
 function presentationBadge(presentation) {
@@ -753,15 +753,23 @@ function renderPresentationBody(assistant, turn, presentation) {
   const status = el("div", "status-line");
   status.append(presentationBadge(presentation));
   if (turn.work_status && turn.work_status !== "permission") status.append(el("span", "hint", `工作：${turn.work_status}`));
-  if (turn.cost_status === "unknown") status.append(el("span", "hint", "费用未知，保留预留"));
+  if (turn.cost_status === "unknown") status.append(el("span", "hint", "部分费用待核对"));
   else if (turn.cost_microunits !== null && turn.cost_microunits !== undefined) status.append(el("span", "hint", money(turn.cost_microunits)));
   if (turn.web_call_count) status.append(el("span", "hint", `网页请求 ${turn.web_call_count} 次`));
   if (turn.context_truncated) status.append(el("span", "hint", "部分历史或工具上下文已裁剪"));
-  if (turn.error_code) status.append(el("span", "hint", turn.error_code));
   assistant.append(status);
 
   const hint = errorHint(turn.error_code);
-  if (hint) assistant.append(el("p", "hint", hint));
+  if (hint && !presentation.final_text) assistant.append(el("p", "hint", hint));
+
+  if (presentation.final_text !== null && presentation.final_text !== undefined) {
+    const final = el("section", "final-answer");
+    final.append(el("p", "final-label", presentation.phase === "completed" ? "最终回答" : "本轮反馈"));
+    const prose = el("div", "prose");
+    renderProse(prose, presentation.final_text);
+    final.append(prose);
+    assistant.append(final);
+  }
 
   const summaries = Array.isArray(presentation.process) ? presentation.process : [];
   const steps = Array.isArray(turn.work_steps) ? turn.work_steps : [];
@@ -796,7 +804,7 @@ function renderPresentationBody(assistant, turn, presentation) {
     }
     if (live) {
       const liveBox = el("section", "process-live");
-      liveBox.append(el("p", "process-live-label", "正在生成"));
+      liveBox.append(el("p", "process-live-label", presentation.phase === "responding" ? "正在生成" : "已保留的回复片段"));
       const prose = el("div", "prose");
       renderProse(prose, live);
       liveBox.append(prose);
@@ -806,15 +814,6 @@ function renderPresentationBody(assistant, turn, presentation) {
     const panel = el("section", "process-panel");
     panel.append(head, body);
     assistant.append(panel);
-  }
-
-  if (presentation.final_text !== null && presentation.final_text !== undefined) {
-    const final = el("section", "final-answer");
-    final.append(el("p", "final-label", "最终回答"));
-    const prose = el("div", "prose");
-    renderProse(prose, presentation.final_text);
-    final.append(prose);
-    assistant.append(final);
   }
 
   const proposal = renderProposal(turn);

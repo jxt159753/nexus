@@ -10,7 +10,9 @@ origins = ['http://127.0.0.1:8000', 'https://tauri.localhost']
 
 # Optional M2. Keep disabled until DEEPSEEK_API_KEY is safely set on Core.
 [models]
+cost_limits_enabled = true # owner can explicitly disable USD caps; usage audit and call/time limits remain
 chat_enabled = false # M3: explicitly enable after configuring Core's existing DeepSeek key
+chat_max_output_tokens = 256000 # DSH provider ceiling; actual request also fits its remaining USD budget
 chat_images_enabled = false # Enable only after the UI discloses image result transmission
 chat_input_bytes = 32768 # complete serialized request
 chat_context_window_tokens = 1000000
@@ -52,3 +54,15 @@ approval_ttl_hours = 168
 tools = ['system.info@1', 'filesystem.list@1']
 roots = ['workspace']
 resource_version = 1
+
+# Optional Windows voice. Credentials remain in Core's DASHSCOPE_API_KEY env.
+[voice]
+enabled = false
+provider = 'bailian'
+workspace_id = 'YOUR_WORKSPACE_ID'
+voice_id = 'YOUR_COSYVOICE_3_5_FLASH_VOICE_ID'
+tts_rate = 1.05
+# Per-device permission is independent of tool permissions.
+[nodes.'6909ccbe-2f7c-42ec-ab97-9fe1b03c425d'.voice]
+enabled = false
+features = ['capture', 'playback', 'wake', 'streaming_asr', 'streaming_tts', 'aec', 'device_switch']

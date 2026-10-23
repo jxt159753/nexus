@@ -1,0 +1,44 @@
+# NEXUS Windows voice runtime. Token is read from NEXUS_NODE_TOKEN.
+schema_version = 1
+start_on_launch = true
+# Disconnect/stop never reopens the microphone. Start a new authorized session.
+stay_alive = false
+
+[core]
+url = "wss://core.example.com"
+node_id = "00000000-0000-0000-0000-000000000000"
+token_env = "NEXUS_NODE_TOKEN"
+# Must match Core origins when the server enforces Origin.
+origin = "https://tauri.localhost"
+# Standalone real-provider use requires an owner-prepared session first.
+# request_id = "<request UUID returned from POST /api/v1/voice/sessions>"
+# conversation_id = "<the same conversation UUID>"
+
+[device]
+# Empty follows the current Windows default endpoint (headset/speaker changes
+# are picked up at next start). Prefer a stable name substring over an integer
+# index; a wrong index can play TTS on a different speaker.
+input = ""
+output = ""
+allow_fallback = false
+
+[audio]
+capture_rate = 48000
+uplink_rate = 16000
+uplink_batch_ms = 40
+downlink_rate = 22050
+output_rate = 48000
+playback_buffer_ms = 200
+# If AEC initialization fails, the UI reports half duplex and the interrupt
+# button remains available. Real speaker echo performance requires measurement.
+aec_enabled = true
+
+[wake]
+# Standby local KWS. The microphone is open while this is enabled; no audio is
+# sent to Core until a wake hit or a button activation.
+enabled = false
+model_dir = "models/kws"
+keywords = "config/voice-keywords.example.txt"
+keywords_score = 1.5
+threshold = 0.25
+trailing_blanks = 2

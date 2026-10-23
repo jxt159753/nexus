@@ -1,0 +1,11 @@
+.voice-status { display: flex; align-items: center; gap: 12px; margin: 0 24px 12px; padding: 12px 16px; border: 1px solid #5b8490; border-radius: 12px; background: #142126; }
+.voice-status[hidden] { display: none; }
+.voice-status > div { flex: 1; min-width: 0; }
+.voice-status strong::before { content: "● "; color: #7fe6d0; }
+.voice-status[data-state="listening"] strong::before { color: #ffb96b; }
+.voice-detail { margin: 4px 0 0; overflow-wrap: anywhere; }
+.voice-option { display: flex; align-items: flex-start; gap: 10px; margin: 16px 0; line-height: 1.5; }
+.voice-option input[type="checkbox"] { flex: 0 0 16px; width: 16px; height: 16px; min-height: 16px; margin: 3px 0 0; padding: 0; align-self: flex-start; }
+.voice-device { display: block; margin: 14px 0; }
+.voice-device select { display: block; width: 100%; margin-top: 6px; }
+@media (max-width: 600px) { .voice-status { margin: 0 10px 10px; padding: 10px; flex-wrap: wrap; } .voice-status > div { flex-basis: 100%; } }

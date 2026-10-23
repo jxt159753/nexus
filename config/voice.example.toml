@@ -1,0 +1,3 @@
+# 历史离线语音提案已被百炼 Core 媒体代理替代。
+# 运行时请复制 voice-runtime.example.toml；Core 请使用 core.example.toml。
+# 本文件不再提供另一套不可执行的配置，避免把旧离线字段当成当前实现。

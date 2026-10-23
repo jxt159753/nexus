@@ -187,7 +187,7 @@ class ExtensionService:
             "mode": "llm",
             "messages": messages,
             "max_output_tokens": self.config.max_output_tokens,
-            "reservation_microunits": self.models.task_cost_microunits,
+            "reservation_microunits": self.models.model_reservation(input_tokens=16384, output_tokens=self.config.max_output_tokens),
             "note": "Only this request, static contract, enabled Tool declarations and selected parent declaration are sent. No source, execution results or device files are included.",
         }
 
@@ -318,6 +318,50 @@ class ExtensionService:
             if row is None:
                 raise LookupError("extension version not found")
             return await self._with_state(conn, row)
+
+    async def accept_chat_skill(self, conn, principal, request_id, node_id, step_id, arguments) -> str:
+        """Store an already generated candidate in the caller's authorization transaction.
+
+        No nested generator/provider call and no implicit version approval. The
+        request links to the native work step and therefore its existing ledger.
+        """
+        self.require_enabled()
+        if not self.config.generation_enabled:
+            raise AccessDenied("GENERATION_DISABLED")
+        await self.owner(conn, principal)
+        generation = arguments.skill
+        encoded = canonical({"origin":"chat", "work_step_id":str(step_id),
+                             "node_id":str(node_id), **arguments.model_dump(mode="json")})
+        old = await one(conn, "SELECT * FROM extension_requests WHERE request_id=?", (str(request_id),))
+        if old is not None:
+            if old["owner_id"] != str(principal.identity_id) or old["request_json"] != encoded:
+                raise Conflict("IDEMPOTENCY_CONFLICT")
+            return old["candidate_version_id"]
+        now = utc_now()
+        count = await one(conn, "SELECT count(*) FROM extension_requests WHERE owner_id=?", (str(principal.identity_id),))
+        recent = await one(conn, "SELECT count(*) FROM extension_requests WHERE owner_id=? AND created_at>?", (str(principal.identity_id), timestamp(now-timedelta(minutes=1))))
+        if count[0] >= 200 or recent[0] >= 10:
+            raise Conflict("BUSY")
+        # Repeated model requests may reuse identical content, never overwrite it
+        # or repurpose an existing capability with another node/approval scope.
+        _, digest, _ = build_release(generation, capability_id=generation.manifest.capability_id,
+            revision=1, parent_version_id=None, environment=environment_for("skill", None))
+        existing = await one(conn, "SELECT v.*,r.node_id FROM extension_versions v JOIN extension_requests r USING(request_id) WHERE v.owner_id=? AND v.capability_id=? ORDER BY v.revision DESC LIMIT 1",
+            (str(principal.identity_id), generation.manifest.capability_id))
+        if existing is not None and (existing["artifact_digest"] != digest or existing["node_id"] != str(node_id)):
+            raise ValueError("capability already exists; creation cannot overwrite a version")
+        provenance = canonical({"mode":"chat", "work_step_id":str(step_id), "additional_model_call":False})
+        await conn.execute("INSERT INTO extension_requests(request_id,owner_id,kind,need,capability_id,node_id,request_json,outbound_json,preview_digest,preview_at,status,created_at,updated_at) VALUES(?,?,'skill',?,?,?,?,?,?,?,'draft',?,?)",
+            (str(request_id), str(principal.identity_id), arguments.reason, generation.manifest.capability_id,
+             str(node_id), encoded, provenance, digest_value(provenance), timestamp(now), timestamp(now), timestamp(now)))
+        if existing is None:
+            made = await self._make_candidate(conn, await one(conn, "SELECT * FROM extension_requests WHERE request_id=?", (str(request_id),)), generation)
+            version_id = made["version_id"]
+        else:
+            version_id = existing["version_id"]
+            await conn.execute("UPDATE extension_requests SET status='candidate',candidate_version_id=? WHERE request_id=?", (version_id, str(request_id)))
+        await audit(conn, str(principal.identity_id), None, "extension.chat_candidate_created", now)
+        return version_id
 
     async def _resolve_steps(self, conn, owner_id: str, generation: SkillGeneration) -> list[dict]:
         resolved = []
@@ -468,13 +512,14 @@ class ExtensionService:
                 if row["mode"] != "llm" or not self.config.generation_enabled or self.provider is None:
                     await conn.execute("UPDATE extension_requests SET status='failed',error_code='MODEL_DISABLED' WHERE request_id=?", (row["request_id"],))
                     return None
-                error = await budget_error(conn, self.models, now, reservation=self.models.task_cost_microunits)
+                reservation = self.models.model_reservation(input_tokens=16384, output_tokens=self.config.max_output_tokens)
+                error = await budget_error(conn, self.models, now, reservation=reservation)
                 if error is not None:
                     await conn.execute("UPDATE extension_requests SET status='failed',error_code=? WHERE request_id=?", (error, row["request_id"]))
                     return None
                 call_id = str(uuid4())
                 await conn.execute("INSERT INTO model_calls(call_id,provider,model,cost_status,created_at,owner_id,reserved_microunits,pricing_json,outcome,extension_request_id) VALUES(?, 'deepseek', ?, 'reserved', ?, ?, ?, ?, 'started', ?)", (
-                    call_id, MODEL, timestamp(now), row["owner_id"], self.models.task_cost_microunits,
+                    call_id, MODEL, timestamp(now), row["owner_id"], reservation,
                     canonical({"input": self.models.input_price, "output": self.models.output_price,
                                "currency": "USD", "valid_until": self.models.price_valid_until.isoformat()}),
                     row["request_id"],
@@ -503,7 +548,7 @@ class ExtensionService:
                 return
             candidate = None
             failure = error_code
-            if reply is not None and reply.complete and cost is not None and cost <= self.models.task_cost_microunits:
+            if reply is not None and reply.complete and cost is not None and (not self.models.cost_limits_enabled or cost <= self.models.task_cost_microunits):
                 try:
                     generation = parse_generation(reply.content)
                     candidate = await self._make_candidate(conn, current, generation)
@@ -591,13 +636,19 @@ class ExtensionService:
             await conn.execute("UPDATE model_calls SET cost_status='unknown',outcome='unknown',finished_at=? WHERE extension_request_id IS NOT NULL AND outcome='started'", (timestamp(utc_now()),))
             await conn.execute("UPDATE extension_requests SET status='failed',error_code='MODEL_OUTCOME_UNKNOWN' WHERE status='generating'")
 
-    async def test_version(self, principal: Principal, version_id: UUID) -> dict:
+    async def test_version(self, principal: Principal, version_id: UUID, *, work_step_id=None) -> dict:
         self.require_enabled()
         async with self.database.transaction() as conn:
             await self.owner(conn, principal)
             row = await one(conn, "SELECT * FROM extension_versions WHERE version_id=? AND owner_id=?", (str(version_id), str(principal.identity_id)))
             if row is None:
                 raise LookupError("extension version not found")
+            if work_step_id is not None:
+                from nexus.core.security.work import creation_step
+                request = await one(conn, "SELECT node_id FROM extension_requests WHERE request_id=?", (row["request_id"],))
+                _, grant = await creation_step(conn, work_step_id, utc_now(), scope=self.harness.scope(UUID(request["node_id"])))
+                if grant["owner_id"] != row["owner_id"] or grant["node_id"] != request["node_id"] or row["kind"] != "skill":
+                    raise AccessDenied("POLICY_DENIED")
             if row["test_status"] == "passed":
                 return await self.get_version(principal, version_id)
             if (await one(conn, "SELECT paused FROM system_state WHERE singleton=1"))[0]:

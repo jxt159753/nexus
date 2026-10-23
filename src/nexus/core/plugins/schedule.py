@@ -63,7 +63,8 @@ def next_time(rule,after):
         date_matches=(day_matches or week_matches) if fields[2]!='*' and fields[4]!='*' else day_matches and week_matches
         if view.minute in minutes and view.hour in hours and view.month in months and date_matches: return candidate
         candidate+=timedelta(minutes=1)
-    raise ValueError('no cron occurrence within 31 days')
+    # A valid rule can have no occurrence in the bounded schedule lifetime.
+    return None
 
 
 async def manage(conn,principal,conversation_id,name,value,now):
@@ -116,7 +117,7 @@ async def tick(service,now=None):
             status='missed' if (now-due).total_seconds()>300 else 'due'
             await conn.execute('INSERT OR IGNORE INTO plugin_schedule_events VALUES(?,?,?,?,?)',(str(uuid4()),row['schedule_id'],row['next_at'],status,timestamp(now)))
             rule=json.loads(row['rule_json'])
-            next_at=None if 'at' in rule or 'after_seconds' in rule else next_time(rule,now)
+            next_at=None if row['runs']+1>=row['max_runs'] or now>=expiry or 'at' in rule or 'after_seconds' in rule else next_time(rule,now)
             ended=next_at is None or next_at>expiry or row['runs']+1>=row['max_runs']
             await conn.execute('UPDATE plugin_schedules SET runs=runs+1,next_at=?,paused=? WHERE schedule_id=?',(timestamp(next_at) if next_at else row['next_at'],int(ended),row['schedule_id']))
 

@@ -14,7 +14,7 @@ from uuid import NAMESPACE_URL,UUID,uuid4,uuid5
 from nexus.contracts.extensions import canonical,digest_value
 from nexus.core.extensions.executions import SandboxExecutions
 from nexus.core.security.modes import effective
-from nexus.core.security.work import allowed_step
+from nexus.core.security.work import allowed_step, creation_step
 from nexus.core.security.types import AccessDenied,Principal
 from nexus.core.storage.database import one,timestamp,utc_now,audit
 from nexus.plugins.contracts import PluginRelease
@@ -64,6 +64,9 @@ class PluginTester:
             row=await one(conn,'SELECT * FROM plugin_versions WHERE owner_id=? AND version_id=? AND builtin=0',(str(principal.identity_id),str(version_id)))
             if row is None: raise LookupError('user plugin version not found')
             if step_id:
+                _, grant = await allowed_step(conn, step_id, utc_now())
+                await creation_step(conn, step_id, utc_now(), scope=self.service.chat.harness.scope(UUID(grant['node_id'])))
+                if grant['conversation_id'] != str(conversation_id): raise AccessDenied('POLICY_DENIED')
                 previous=await one(conn,'SELECT * FROM plugin_test_runs WHERE version_id=? AND work_step_id=? ORDER BY rowid DESC LIMIT 1',(str(version_id),str(step_id)))
                 if previous: return dict(previous)
             if row['test_status']=='passed': return {'status':'passed','version_id':str(version_id)}
@@ -100,7 +103,9 @@ class PluginTester:
             if row is None or row[0]!=run['decision_revision'] or cursor!=run['cancel_cursor']: return False
             if starting and (await one(conn,'SELECT paused FROM system_state WHERE singleton=1'))[0]: return False
             if run['work_step_id']:
-                try: await allowed_step(conn,run['work_step_id'],utc_now())
+                try:
+                    _, grant = await allowed_step(conn,run['work_step_id'],utc_now())
+                    await creation_step(conn,run['work_step_id'],utc_now(),scope=self.service.chat.harness.scope(UUID(grant['node_id'])))
                 except AccessDenied: return False
             return True
 

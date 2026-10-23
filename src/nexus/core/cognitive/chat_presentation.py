@@ -5,6 +5,7 @@ import json
 import aiosqlite
 
 from nexus.contracts.chat import ChatPresentation, ChatProgressText
+from nexus.core.cognitive.chat_feedback import fallback
 
 
 LABELS = {
@@ -82,6 +83,12 @@ async def presentation(conn: aiosqlite.Connection, turn: dict) -> dict:
     # result-consent flow instead of relabelling the proposal as a final report.
     legacy_result = turn["action_status"] == "submitted" and turn["phase"] == "reply"
     final = turn["response_text"] if phase == "completed" and not legacy_result else None
+    if turn["phase"] == "summary" and turn["work_grant_id"] and status == "completed":
+        final = turn["response_text"]
+    if final is None and phase in {"stopped", "incomplete", "interrupted", "failed", "expired", "unknown", "recovering"}:
+        final = fallback(turn, phase)
+    if final is None and failed and legacy_result:
+        final = fallback(turn, "failed")
     live = turn["response_text"] if phase in {
         "responding", "stopping", "stopped", "incomplete", "interrupted", "failed", "expired"
     } else ""
@@ -111,9 +118,11 @@ async def presentation(conn: aiosqlite.Connection, turn: dict) -> dict:
         label = "正在整理总结" if phase == "responding" else "等待整理总结"
     elif phase == "completed" and legacy_result:
         label = "执行已结束，结果见任务记录"
+    elif phase == "completed" and (failed or turn.get("error_code")):
+        label = "回复已完成，部分操作未完成"
     return ChatPresentation(
         phase=phase, label=label, process=process, process_truncated=truncated,
         live_text=live, final_text=final,
-        collapse_process=phase == "completed" and bool(final) and not failed
+        collapse_process=phase == "completed" and bool(final) and not failed and not turn.get("error_code")
                         and bool(process or turn["work_steps"] or turn["action_status"] == "submitted"),
     ).model_dump(mode="json")

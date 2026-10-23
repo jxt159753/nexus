@@ -1,0 +1,103 @@
+{
+  "paused": false,
+  "model_calls": 111,
+  "unknown_cost_calls": 5,
+  "autonomy_rows": {
+    "plugin_goals": 0,
+    "plugin_schedules": 0,
+    "plugin_schedule_events": 0,
+    "plugin_wakeups": 0
+  },
+  "active_authorities": 0,
+  "release": "/opt/nexus/releases/failure-feedback-20261023",
+  "wheel_sha256": "8c9cc95f74dcc567157d8a391170907dcbd98eea2c4a7a6d0eebcebc2c5d5f54",
+  "runtime_files_checked": 214,
+  "service": "active",
+  "single_core": true,
+  "pid": 607126,
+  "schema": 26,
+  "backup": "/var/backups/nexus/before-failure-feedback-20261023T073225Z",
+  "backup_sha256": "bc27b876f2cf6d76a45799c6d889eaa72c26afc11a0788277bfda63e0c0cd3f1",
+  "historical_records_preserved": true,
+  "no_new_model_calls": true,
+  "recorded_at": "2026-10-23T07:32:59.704482+00:00",
+  "counts": {
+    "tasks": 64,
+    "task_attempts": 62,
+    "conversations": 34,
+    "chat_turns": 62,
+    "model_calls": 111,
+    "identities": 3,
+    "grants": 28,
+    "memory_entries": 0,
+    "plugin_versions": 19,
+    "extension_versions": 1,
+    "chat_exchanges": 66
+  },
+  "changed_files": [
+    "nexus/core/cognitive/chat.py",
+    "nexus/core/cognitive/chat_compaction.py",
+    "nexus/core/cognitive/chat_presentation.py",
+    "nexus/core/cognitive/chat_work.py",
+    "nexus/core/cognitive/web_work.py",
+    "nexus/core/models/budget.py",
+    "nexus/core/models/chat.py",
+    "nexus/web/chat-work.js",
+    "nexus/web/chat.js",
+    "nexus/web/app/render.js",
+    "nexus/core/cognitive/chat_feedback.py"
+  ],
+  "task": "P76",
+  "node_online_before": false,
+  "node_online_after": false,
+  "config_unchanged": true,
+  "cost_limits_enabled": false,
+  "chat_max_output_tokens": 256000,
+  "production_https_feedback": {
+    "assets_checked": 3,
+    "historical_failures": [
+      {
+        "status": "stopped",
+        "error_code": "WEB_TIMEOUT",
+        "natural_feedback": true,
+        "has_sources": true
+      }
+    ]
+  },
+  "tests": {
+    "linux_fixed_package": {
+      "passed": 297,
+      "skipped": 4,
+      "seconds": 104.99
+    },
+    "windows_output_truncation": {
+      "passed": 8
+    },
+    "fixed_package_browser": {
+      "passed": true,
+      "surfaces": [
+        "web",
+        "legacy"
+      ],
+      "widths": [
+        1280,
+        390
+      ]
+    }
+  },
+  "excluded_parallel_changes": [
+    "voice",
+    "Skill/MCP",
+    "capability creation",
+    "plugin/attachment frontend",
+    "Node",
+    "dependencies",
+    "database migrations",
+    "Windows installer"
+  ],
+  "not_validated": [
+    "live paid-model explanation quality",
+    "new Windows installer/WebView2",
+    "user acceptance"
+  ]
+}

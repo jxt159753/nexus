@@ -58,7 +58,7 @@ def test_known_task_and_preview_failures_reach_model_with_original_error(world, 
 
 
 @pytest.mark.parametrize("error", [ValueError("bounded rejection"), AccessDenied("NODE_OFFLINE"), AccessDenied("POLICY_DENIED")])
-def test_pre_execution_errors_are_reported_but_policy_denials_stop(world, monkeypatch, error):
+def test_pre_execution_errors_are_reported_and_policy_denials_get_tool_free_explanation(world, monkeypatch, error):
     app = app_for(world, monkeypatch)
     chat = app.state.chat
 
@@ -72,7 +72,10 @@ def test_pre_execution_errors_are_reported_but_policy_denials_stop(world, monkey
         await chat.process_one()
         done = await chat.get(world.owner, turn["turn_id"])
         if isinstance(error, AccessDenied) and error.code == "POLICY_DENIED":
-            assert done["status"] == "stopped" and done["model_call_count"] == 1
+            assert done["status"] == "completed" and done["model_call_count"] == 2
+            assert done["error_code"] == "POLICY_DENIED"
+            assert done["work_steps"][0]["status"] == "stopped"
+            assert chat.provider.calls[-1][1]["allow_tools"] is False
         else:
             feedback = json.loads(chat.provider.calls[-1][0][-1]["content"])
             assert feedback["status"] == "failed" and feedback["execution_outcome"] == "not_started"

@@ -15,6 +15,7 @@ from nexus.core.cognitive.chat_work import WorkService
 from nexus.core.cognitive.attachments import AttachmentService
 from nexus.core.cognitive.chat_context import request_size, history_message, pressure, prune_tools
 from nexus.core.memory import context as memory_context
+from nexus.core.memory import automatic as auto_memory
 from nexus.core.memory.service import project_owned
 from nexus.core.cognitive.chat_results import RESULT_FIELDS, checked_native, preview, public_preview, queue_summary, validate_preview
 from nexus.core.models.budget import budget_error
@@ -23,6 +24,7 @@ from nexus.core.security.types import AccessDenied, Principal
 from nexus.core.security.service import scope_digest
 from nexus.core.models.chat_format import ChatTitle
 from nexus.core.models.providers import ModelReply
+from nexus.core.models.config import CHAT_MAX_TEXT_BYTES
 from nexus.core.storage.database import audit, one, timestamp, utc_now
 from nexus.core.storage.tasks import REQUEST, Conflict, canonical
 
@@ -43,6 +45,8 @@ def public_turn(row: sqlite3.Row, *, detail: bool = False) -> dict:
     value["references"] = json.loads(value.pop("references_json"))
     value["attachments"] = json.loads(value.pop("attachments_json"))
     value["memory_references"] = json.loads(value.pop("memory_refs_json"))
+    value["auto_memory_references"] = json.loads(value.pop("auto_memory_refs_json"))
+    value["auto_memory_saved_ids"] = json.loads(value.pop("auto_memory_saved_json"))
     request = json.loads(value.pop("request_json"))
     context = json.loads(value.pop("context_json"))
     surface = value.pop("context_surface_json")
@@ -213,6 +217,8 @@ class ChatService:
                 raise AccessDenied("MODEL_CONSENT_REQUIRED")
             if not self.config.enabled or not self.config.chat_enabled or self.provider is None:
                 raise AccessDenied("MODEL_DISABLED")
+            if self.config.chat_output_limit() < 32:
+                raise AccessDenied("BUDGET_EXCEEDED")
             if self.failed or self.harness.failed:
                 raise AccessDenied("BUSY")
             if value.allow_tools:
@@ -237,7 +243,7 @@ class ChatService:
             recent = await one(conn, "SELECT count(*) FROM chat_turns WHERE owner_id=? AND created_at>?", (str(principal.identity_id), timestamp(now-timedelta(minutes=1))))
             total = await one(conn, "SELECT count(*),coalesce(sum(length(CAST(context_json AS BLOB))+length(CAST(response_text AS BLOB))+length(CAST(request_json AS BLOB))+coalesce(length(CAST(result_preview_json AS BLOB)),0)+coalesce(length(CAST(initial_response_text AS BLOB)),0)+coalesce(length(CAST(auto_result_json AS BLOB)),0)+length(CAST(skill_catalog_json AS BLOB))+coalesce(length(CAST(skill_plan_json AS BLOB)),0)),0) FROM chat_turns")
             count = (await one(conn, "SELECT count(*) FROM chat_turns WHERE conversation_id=?", (str(conversation_id),)))[0]
-            if recent[0] >= 10 or total[0] >= 10000 or total[1] >= 268000000 or count >= 200:
+            if recent[0] >= 10 or total[0] >= 10000 or total[1] + 2*CHAT_MAX_TEXT_BYTES >= 268000000 or count >= 200:
                 raise Conflict("BUSY")
             messages = [{"role": "user", "content": value.text}]
             attachments = None
@@ -247,6 +253,13 @@ class ChatService:
                     raise Conflict("IDEMPOTENCY_CONFLICT")
                 messages = [self.attachments.message(attachments,value.text)]
             refs = []
+            memory_policy = await auto_memory.policy(conn, principal.identity_id)
+            auto_revision = memory_policy["revision"] if memory_policy["enabled"] else 0
+            auto_refs = await auto_memory.recall(conn, principal.identity_id, conversation["project_id"], value.text,
+                                                 exclude=value.memory_ids) if auto_revision and not value.compact_only else []
+            memory_expirations = [item["valid_until"] for item in auto_refs if item["valid_until"]]
+            if auto_refs:
+                messages.insert(0, auto_memory.message(auto_refs))
             if value.memory_ids:
                 snapshot = await memory_context.selection(conn, principal.identity_id, conversation["project_id"], value.memory_ids)
                 if snapshot["memory_digest"] != value.memory_digest:
@@ -264,6 +277,8 @@ class ChatService:
             history_summary = []
             available = 0
             options = {"generate_title": count == 0 and bool(conversation["auto_title"]), "allow_tools": value.allow_tools}
+            if auto_revision and not value.compact_only:
+                options["auto_memory"] = True
             if work_grant_id:
                 options.update(work_catalog=work_catalog, work_limit=4)
             elif skills:
@@ -277,6 +292,8 @@ class ChatService:
                     # turns approved for context reuse, participate in history.
                     if not await chat_compaction.reusable_turn(conn, row):
                         break
+                    if row["auto_memory_expires_at"]:
+                        memory_expirations.append(row["auto_memory_expires_at"])
                     if selected >= 10:
                         history_summary.append({"turn_id":row["turn_id"],"user_excerpt":row["text"][:160],"assistant_excerpt":row["response_text"][:240]})
                         continue
@@ -294,6 +311,10 @@ class ChatService:
             context_sources = []
             if value.include_context and value.allow_compaction:
                 older, context_sources, records = await chat_compaction.history(conn, conversation_id)
+                source_expiry = await one(conn, "SELECT min(auto_memory_expires_at) FROM chat_turns WHERE turn_id IN (SELECT value FROM json_each(?))",
+                                         (canonical([record["turn_id"] for record in records]),))
+                if source_expiry[0]:
+                    memory_expirations.append(source_expiry[0])
                 context_sources.extend([[] for _ in messages])
                 messages = [*older, *messages]
                 selected = available = len(records)
@@ -305,6 +326,8 @@ class ChatService:
                 turn_id, str(conversation_id), str(principal.identity_id), str(value.request_id), encoded, value.text, context,
                 hashlib.sha256(context.encode()).hexdigest(), selected, int(available > selected), timestamp(now), timestamp(now+timedelta(minutes=5))))
             await conn.execute("UPDATE chat_turns SET skill_catalog_json=? WHERE turn_id=?", (canonical(skills), turn_id))
+            await conn.execute("UPDATE chat_turns SET auto_memory_revision=?,auto_memory_refs_json=?,auto_memory_expires_at=? WHERE turn_id=?",
+                               (auto_revision, canonical(auto_refs), min(memory_expirations, default=None), turn_id))
             await conn.execute("UPDATE chat_turns SET memory_refs_json=?,queue_after_turn_id=?,history_summary_json=?,references_json=? WHERE turn_id=?", (canonical(refs),previous[0] if previous else None,canonical(history_summary),canonical(references),turn_id))
             await conn.execute("UPDATE chat_turns SET context_sources_json=? WHERE turn_id=?", (canonical(context_sources),turn_id))
             if attachments:
@@ -471,6 +494,7 @@ class ChatService:
                     await self.work.abort(conn,row[0],"MODEL_OUTCOME_UNKNOWN",now)
             await conn.execute("UPDATE chat_turns SET status=CASE WHEN status='stopping' THEN 'stopped' ELSE 'interrupted' END,revision=revision+1,error_code='MODEL_OUTCOME_UNKNOWN' WHERE status IN ('generating','stopping')")
             await conn.execute("UPDATE chat_turns SET recovery_required=1,revision=revision+1 WHERE (work_status!='' OR status='queued' AND work_grant_id IS NOT NULL AND work_round>0) AND recovery_required=0 AND status NOT IN ('stopped','stopping','interrupted','failed')")
+        self.work.feedback_pending.clear()
 
     async def delta(self, turn_id: str, text: str) -> None:
         async with self.database.transaction() as conn:
@@ -485,14 +509,16 @@ class ChatService:
         summary = row["phase"] == "summary"
         options = {"generate_title": not summary and bool(row.get("generate_title",False)),
                    "allow_tools": not summary and request.get("allow_tools",False)}
+        if row.get("auto_memory_revision") and not summary and not request.get("compact_only"):
+            options["auto_memory"] = True
         if not summary and request.get("allow_skills"):
             options["skill_catalog"] = json.loads(row["skill_catalog_json"])
         if summary:
             options["final_result"] = True
         if row["work_grant_id"]:
-            allow_tools = row["work_round"] < 4 and work_limit > 0
-            options = {"generate_title": row["work_round"] == 0 and bool(row.get("generate_title",False)),
-                       "allow_tools": allow_tools, "work_catalog": json.loads(row["work_catalog_json"]) if allow_tools else [], "work_limit": work_limit}
+            allow_tools = not summary and row["work_round"] < 4 and work_limit > 0
+            options.update({"generate_title": not summary and row["work_round"] == 0 and bool(row.get("generate_title",False)),
+                            "allow_tools": allow_tools, "work_catalog": json.loads(row["work_catalog_json"]) if allow_tools else [], "work_limit": work_limit})
         return options
 
     async def claim(self):
@@ -513,8 +539,9 @@ class ChatService:
                 row = await one(conn, chat_journal.QUEUE_SQL)
                 if row is None:
                     return None
-                summary = row["phase"] == "summary"
-                reservation = self.config.task_cost_microunits
+                summary = row["phase"] == "summary" and not row["work_grant_id"]
+                failure_summary = row["phase"] == "summary" and bool(row["work_grant_id"])
+                reservation = self.config.model_reservation()
                 row = dict(row)
                 messages = json.loads(row["context_surface_json"] or row["context_json"])
                 error = None
@@ -537,9 +564,9 @@ class ChatService:
                     if len(calls) != 1 or calls[0]["cost_status"] != "calculated" or calls[0]["outcome"] != "completed":
                         error = "BUDGET_EXCEEDED"
                     else:
-                        reservation = min(reservation, calls[0]["reserved_microunits"])-calls[0]["cost_microunits"]
-                        worst = (32768*self.config.input_price+self.config.chat_max_output_tokens*self.config.output_price+999999)//1000000
-                        if reservation < worst:
+                        if self.config.cost_limits_enabled:
+                            reservation = min(reservation, calls[0]["reserved_microunits"])-calls[0]["cost_microunits"]
+                        if self.config.chat_output_limit(reservation) < 32:
                             error = "BUDGET_EXCEEDED"
                     try:
                         snapshot = await validate_preview(self, conn, row)
@@ -550,12 +577,15 @@ class ChatService:
                         error = "APPROVAL_EXPIRED"
                 work_limit=4-(await one(conn,"SELECT count(*) FROM chat_work_steps WHERE turn_id=?",(row["turn_id"],)))[0] if row["work_grant_id"] else 0
                 options = self.model_options(row,work_limit)
+                options["output_budget_microunits"] = reservation
+                if self.config.chat_output_limit(reservation) < 32:
+                    error = error or "BUDGET_EXCEEDED"
                 pending_corrections=await chat_journal.corrections(conn,row["turn_id"])
                 plan = None
                 compact_noop = False
                 try:
                     request = json.loads(row["request_json"])
-                    if not error and request.get("allow_compaction"):
+                    if not error and request.get("allow_compaction") and not failure_summary:
                         projected = prune_tools(messages) if pressure(self.config,messages,**options)["pressured"] else messages
                         if projected != messages:
                             messages = projected
@@ -575,8 +605,6 @@ class ChatService:
                     error = error or exc.code
                 if not plan:
                     messages=[*messages,*pending_corrections]
-                if not error and not pressure(self.config,messages,**options)["fits"]:
-                    error = "MODEL_INPUT_LIMIT"
                 if not await chat_journal.capacity(conn):
                     error = "BUSY"
                 owner = await one(conn, "SELECT 1 FROM identities WHERE identity_id=? AND role='owner' AND revoked_at IS NULL", (row["owner_id"],))
@@ -584,6 +612,11 @@ class ChatService:
                     from nexus.core.plugins.lifecycle import budget as plugin_budget
                     try: reservation=await plugin_budget(conn,self,row['turn_id'],reservation)
                     except AccessDenied as exc: error=exc.code
+                options["output_budget_microunits"] = reservation
+                if self.config.chat_output_limit(reservation, compact=bool(options.get("compact"))) < 32:
+                    error = error or "BUDGET_EXCEEDED"
+                if not error and not pressure(self.config,messages,**options)["fits"]:
+                    error = "MODEL_INPUT_LIMIT"
                 error = error or ("AUTH_REQUIRED" if not owner else "MODEL_DISABLED" if not self.config.chat_enabled or self.provider is None else await budget_error(conn, self.config, now, reservation=reservation))
                 if not summary and row["expires_at"] <= timestamp(now):
                     error = "DEADLINE_EXCEEDED"
@@ -621,7 +654,7 @@ class ChatService:
             async def receive(part: str) -> None:
                 nonlocal accumulated, last_flush
                 accumulated += part
-                if len(accumulated.encode()) > 32768:
+                if len(accumulated.encode()) > CHAT_MAX_TEXT_BYTES:
                     raise ProviderFailure("MODEL_RESPONSE_LIMIT")
                 clock = asyncio.get_running_loop().time()
                 if clock-last_flush >= .1:
@@ -690,8 +723,8 @@ class ChatService:
         if reply is not None:
             input_tokens,output_tokens,reported_model=reply.input_tokens,reply.output_tokens,reply.model
             cost = (reply.input_tokens*self.config.input_price + reply.output_tokens*self.config.output_price + 999999)//1000000
-            if cost <= self.config.task_cost_microunits and len(reply.content.encode()) <= 32768:
-                if reply.complete and (reply.content.strip() or reply.proposal is not None):
+            if (not self.config.cost_limits_enabled or cost <= self.config.task_cost_microunits) and len(reply.content.encode()) <= CHAT_MAX_TEXT_BYTES:
+                if reply.complete and (reply.content.strip() or reply.proposal is not None or reply.rejected_calls):
                     status, error = "completed", None
                 elif reply.finish_reason == "length":
                     status, error = "incomplete", "MODEL_OUTPUT_LIMIT"
@@ -713,10 +746,19 @@ class ChatService:
                 await conn.execute("UPDATE model_calls SET cost_microunits=?,cost_status=?,input_tokens=?,output_tokens=?,finished_at=?,outcome=?,model=? WHERE call_id=? AND outcome='started'",(
                     cost,"calculated" if cost is not None else "unknown",input_tokens,output_tokens,timestamp(now),"completed" if cost is not None else "unknown",reported_model[:200],call_id))
                 await chat_compaction.finish(conn,row,call_id,reply,status,now)
-                await chat_journal.finish(conn,call_id,reply,partial,status,now)
+                await chat_journal.finish(conn,call_id,reply,partial,status,now,failure={"error_code":error,"diagnostic":failure.diagnostic} if failure else None)
                 return
             proposal=None
             plan=None
+            if status=="completed" and reply is not None and reply.rejected_calls:
+                try:
+                    if not row["work_grant_id"] or row["phase"] == "summary" or reply.proposal is not None or reply.work_calls:
+                        raise AccessDenied("POLICY_DENIED")
+                    fresh=await one(conn,"SELECT * FROM chat_turns WHERE turn_id=?",(row["turn_id"],))
+                    await self.work.rejected(conn,fresh,reply,now)
+                    status="queued"
+                except (ValidationError,AccessDenied,ValueError,TypeError,KeyError):
+                    status,error="failed","MODEL_RESPONSE_INVALID"
             if status=="completed" and reply is not None and reply.proposal is not None:
                 try:
                     if row["work_grant_id"]:
@@ -739,7 +781,7 @@ class ChatService:
                 except (ValidationError,AccessDenied,ValueError,TypeError,KeyError):
                     proposal=None
                     status,error="failed","POLICY_DENIED"
-            if row["work_grant_id"] and status=="completed" and reply and reply.proposal is None and await chat_journal.corrections(conn,row["turn_id"]):
+            if row["work_grant_id"] and row["phase"] != "summary" and status=="completed" and reply and reply.proposal is None and await chat_journal.corrections(conn,row["turn_id"]):
                 fresh=await one(conn,"SELECT work_messages_json,context_json FROM chat_turns WHERE turn_id=?",(row["turn_id"],))
                 messages=json.loads(fresh[0] or fresh[1])
                 messages.append({"role":"assistant","content":reply.content})
@@ -747,6 +789,8 @@ class ChatService:
                 status="queued"
             if row["work_grant_id"] and status not in {"completed","queued"}:
                 await self.work.abort(conn,row["turn_id"],error or "WORK_STOPPED",now)
+            if row["work_grant_id"] and row["phase"] == "summary" and status == "completed":
+                error = row["error_code"]
             await conn.execute("UPDATE model_calls SET cost_microunits=?,cost_status=?,input_tokens=?,output_tokens=?,finished_at=?,outcome=?,model=? WHERE call_id=? AND outcome='started'", (
                 cost, "calculated" if cost is not None else "unknown", input_tokens, output_tokens,
                 timestamp(now), "completed" if cost is not None else "unknown", reported_model[:200], call_id))
@@ -754,6 +798,7 @@ class ChatService:
                 await conn.execute("UPDATE chat_turns SET response_text=?,status=?,error_code=?,revision=revision+1 WHERE turn_id=?", (reply.content if reply else partial, status, error, row["turn_id"]))
                 await conn.execute("UPDATE conversations SET revision=revision+1 WHERE conversation_id=?", (row["conversation_id"],))
                 if status=="completed" and reply is not None:
+                    await auto_memory.capture(conn, row, reply.memory_candidates, now)
                     if row["phase"] == "reply" and row["generate_title"] and reply.title:
                         try:
                             title=ChatTitle(title=reply.title).title.strip()
@@ -765,7 +810,7 @@ class ChatService:
                         await conn.execute("UPDATE chat_turns SET proposal_json=?,proposal_digest=?,proposal_policy_version=?,action_status='proposed',native_tool_call_json=? WHERE turn_id=?",(canonical(proposal),digest,version,canonical(reply.native_tool_call) if reply.native_tool_call else None,row["turn_id"]))
                         if plan is not None:
                             await conn.execute("UPDATE chat_turns SET skill_plan_json=? WHERE turn_id=?", (canonical(plan), row["turn_id"]))
-            await chat_journal.finish(conn,call_id,reply,partial,status,now)
+            await chat_journal.finish(conn,call_id,reply,partial,status,now,failure={"error_code":error,"diagnostic":failure.diagnostic} if failure else None)
             await audit(conn, row["owner_id"], None, "model.settled" if cost is not None else "model.unknown", now)
 
     async def process_one(self) -> bool:

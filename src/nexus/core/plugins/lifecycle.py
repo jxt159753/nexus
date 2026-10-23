@@ -1,6 +1,7 @@
 """Finite goal and scheduled-work continuation through the existing chat Harness."""
 
 import json
+from datetime import timedelta
 from uuid import UUID,uuid5,NAMESPACE_URL
 
 from nexus.contracts.chat import ChatSubmission
@@ -31,7 +32,32 @@ async def allowed(conn,authority,chat,*,require_active=True):
         raise AccessDenied('PLUGIN_AUTONOMY_AUTHORITY_CHANGED')
     if scope_digest(chat.harness.scope(UUID(authority['node_id'])))!=authority['scope_digest']:
         raise AccessDenied('PLUGIN_AUTONOMY_SCOPE_CHANGED')
-    if require_active and authority['state']!='active': raise AccessDenied('PLUGIN_AUTONOMY_PAUSED')
+    if require_active:
+        current=await one(conn,'SELECT state,last_turn_id FROM plugin_authorities WHERE authority_id=?',(authority['authority_id'],))
+        if current is None or current['state']!='active': raise AccessDenied('PLUGIN_AUTONOMY_PAUSED')
+        if current['last_turn_id']!=authority['last_turn_id']: raise Conflict('PLUGIN_AUTHORITY_CHANGED')
+
+
+async def previous_round(conn,authority):
+    """A user-paused round may precede new work only after its effects are settled."""
+    last=await one(conn,'SELECT * FROM chat_turns WHERE turn_id=?',(authority['last_turn_id'],))
+    if last['status']=='completed' and not last['error_code']: return last
+    if last['status']!='stopped' or last['error_code']!='PLUGIN_AUTONOMY_PAUSED':
+        raise AccessDenied('PLUGIN_PREVIOUS_ROUND_FAILED')
+    if last['recovery_required'] or last['work_status'] or last['auto_result_status']=='waiting': raise Conflict('BUSY')
+    tasks=await conn.execute_fetchall("""SELECT t.* FROM tasks t WHERE t.task_id IN (
+        SELECT k.task_id FROM chat_work_tasks k JOIN chat_work_steps s USING(step_id) WHERE s.turn_id=?
+        UNION SELECT k.task_id FROM skill_run_steps k JOIN chat_work_steps s ON s.skill_run_id=k.run_id WHERE s.turn_id=?
+    )""",(last['turn_id'],last['turn_id']))
+    for task in tasks:
+        if task['execution_outcome']=='unknown': raise AccessDenied('EXECUTION_UNKNOWN')
+        if task['status'] not in {'succeeded','failed','cancelled','timed_out'} or await one(conn,'SELECT 1 FROM task_attempts WHERE task_id=? AND execution_stopped=0',(task['task_id'],)):
+            raise Conflict('BUSY')
+    if await one(conn,"SELECT 1 FROM skill_runs r JOIN chat_work_steps s ON s.skill_run_id=r.run_id WHERE s.turn_id=? AND (r.status IN ('running','cancelling') OR EXISTS(SELECT 1 FROM skill_run_steps k WHERE k.run_id=r.run_id AND k.status='unknown'))",(last['turn_id'],)):
+        raise AccessDenied('EXECUTION_UNKNOWN')
+    if await one(conn,"SELECT 1 FROM extension_tool_runs r JOIN chat_work_steps s ON r.work_step_id=s.step_id OR r.skill_run_id=s.skill_run_id LEFT JOIN sandbox_executions e ON e.execution_id=r.tool_run_id WHERE s.turn_id=? AND (r.status IN ('dispatching','unknown') OR e.status IN ('prepared','sent','unknown'))",(last['turn_id'],)):
+        raise AccessDenied('EXECUTION_UNKNOWN')
+    return last
 
 
 async def budget(conn,chat,turn_id,reservation):
@@ -68,14 +94,13 @@ async def tick(service):
 
 async def advance(service,authority):
     chat=service.chat;now=utc_now()
-    async with service.database.transaction(write=False) as conn:
+    async with service.database.transaction() as conn:
         if authority['archived']: raise AccessDenied('CONVERSATION_ARCHIVED')
         await allowed(conn,authority,chat)
         identity=await one(conn,"SELECT token_hash FROM identities WHERE identity_id=? AND role='owner' AND revoked_at IS NULL",(authority['owner_id'],))
         if identity is None: raise AccessDenied('AUTH_REQUIRED')
         if await one(conn,f'SELECT 1 FROM chat_turns WHERE conversation_id=? AND {ACTIVE} LIMIT 1',(authority['conversation_id'],)): return
-        last=await one(conn,'SELECT * FROM chat_turns WHERE turn_id=?',(authority['last_turn_id'],))
-        if last['status']!='completed' or last['error_code']: raise AccessDenied('PLUGIN_PREVIOUS_ROUND_FAILED')
+        last=await previous_round(conn,authority)
         if authority['kind']=='goal':
             goal=await one(conn,'SELECT * FROM plugin_goals WHERE goal_id=?',(authority['authority_id'],))
             if goal['status']!='active': return
@@ -87,18 +112,24 @@ async def advance(service,authority):
         else:
             schedule=await one(conn,'SELECT * FROM plugin_schedules WHERE schedule_id=?',(authority['authority_id'],))
             if schedule['deleted']: return
+            await conn.execute("UPDATE plugin_schedule_events SET status='missed' WHERE schedule_id=? AND status='due' AND due_at<? AND NOT EXISTS(SELECT 1 FROM plugin_wakeups w WHERE w.wakeup_id=plugin_schedule_events.event_id)",
+                (schedule['schedule_id'],timestamp(now-timedelta(seconds=300))))
             event=await one(conn,"SELECT * FROM plugin_schedule_events e WHERE e.schedule_id=? AND e.status='due' AND NOT EXISTS(SELECT 1 FROM plugin_wakeups w WHERE w.wakeup_id=e.event_id) ORDER BY e.rowid LIMIT 1",(schedule['schedule_id'],))
             if event is None: return
-            if (now-__import__('datetime').datetime.fromisoformat(event['due_at'])).total_seconds()>300: return
             wakeup=event['event_id'];text='执行已授权定时任务：'+schedule['prompt']
+        if last['status']=='stopped':
+            text='上轮 '+last['turn_id']+' 已被用户暂停，现已明确恢复。先用 session_task_trace 核对已有执行证据，避免重复操作。'+text
         if await one(conn,'SELECT 1 FROM plugin_wakeups WHERE wakeup_id=?',(wakeup,)): return
         principal=Principal(UUID(authority['owner_id']),'owner',identity[0])
         directory=await work_catalog.catalog(chat,conn,principal,UUID(authority['node_id']))
         if digest_value(directory['catalog'])!=authority['catalog_digest']: raise AccessDenied('PLUGIN_CATALOG_CHANGED')
-        await budget(conn,chat,authority['last_turn_id'],chat.config.task_cost_microunits)
+        await budget(conn,chat,authority['last_turn_id'],chat.config.model_reservation())
     grant=await chat.work.grant(principal,authority['conversation_id'],WorkGrantCreate(request_id=uuid5(NAMESPACE_URL,wakeup+':grant'),node_id=UUID(authority['node_id']),consent=True,profile=authority['profile']))
     async with service.database.transaction() as conn:
         await allowed(conn,authority,chat)
+        if authority['kind']=='schedule' and event['due_at']<timestamp(utc_now()-timedelta(seconds=300)):
+            await conn.execute("UPDATE plugin_schedule_events SET status='missed' WHERE event_id=? AND NOT EXISTS(SELECT 1 FROM plugin_wakeups WHERE wakeup_id=?)",(wakeup,wakeup))
+            return
         conversation=await chat.conversation(conn,principal,authority['conversation_id'])
         request=ChatSubmission(request_id=uuid5(NAMESPACE_URL,wakeup),expected_revision=conversation['revision'],text=text[:2000],allow_model=True,
             allow_tools=True,node_id=UUID(authority['node_id']),work_grant_id=UUID(grant['grant_id']),work_digest=directory['work_digest'],allow_work_results=True)

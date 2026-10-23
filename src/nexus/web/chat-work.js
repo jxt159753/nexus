@@ -248,7 +248,7 @@ function chatWorkCards(turn) {
     if (result?.execution_outcome==="unknown") card.append(el("p","执行结果未知；Core 保留证据并核对，不能当作成功或直接重跑。","hint"));
     if (result?.status && result.status!=="succeeded" && !result.error_code) card.append(el("p",`实际结果状态：${result.status}`,"hint"));
     if (step.request_text) card.append(el("p",step.request_text,"chat-prose"));
-    if (result?.error_code) card.append(el("p",`本次工具未完成：${result.error_code}`,"hint"));
+    if (result?.error_code) card.append(el("p",result.message || "这一步未能完成，具体原因保留在执行详情中。","hint"));
     if (result?.error?.message) card.append(el("p",result.error.message,"hint"));
     if (step.permission_text) card.append(el("p",`你的答复：${step.permission_text}`));
     const details=el("details");details.append(el("summary","查看执行详情"),el("pre",chatWorkJson({action:step.proposal,result:step.result})));

@@ -1,0 +1,13 @@
+{
+  "schema": "nexus.voice.standby-audio.v1",
+  "real_microphone": true,
+  "live_human": false,
+  "duration_s": 60.0,
+  "frames": 600,
+  "wake_hits": 0,
+  "cpu_percent": 2.14,
+  "rss_mib": 97.3,
+  "input": "麦克风 (iKF-V11 Max)",
+  "output": "",
+  "note": "Ambient real-microphone standby, input-only, no playback and no human prompt. Zero hits here does not establish a false-wake rate; it only records this 60 s window."
+}

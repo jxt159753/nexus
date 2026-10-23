@@ -78,13 +78,22 @@ class PluginService:
         if row is None or digest is not None and digest!=row['digest']: raise AccessDenied('PLUGIN_VERSION_UNAVAILABLE')
         return row,PluginRelease.model_validate_json(row['release_json'])
 
-    async def install(self,principal,conversation_id,request_id,release,origin='owner-upload'):
+    async def install(self,principal,conversation_id,request_id,release,origin='owner-upload',*,work_step_id=None):
         self.require_enabled()
         if not release.manifest.plugin_id.startswith('user.') or release.manifest.runtime!='python':
             raise AccessDenied('PLUGIN_NAMESPACE_RESERVED')
         encoded=canonical(release.model_dump(mode='json'))
         async with self.chat.harness.operation,self.database.transaction() as conn:
             await self.chat.conversation(conn,principal,conversation_id)
+            if work_step_id is not None:
+                grant_node = await one(conn, 'SELECT g.node_id FROM chat_work_steps s JOIN chat_turns t USING(turn_id) JOIN chat_work_grants g ON g.grant_id=t.work_grant_id WHERE s.step_id=?', (str(work_step_id),))
+                if grant_node is None:
+                    raise AccessDenied('WORK_STOPPED')
+                fresh, grant = await permissions.creation_step(conn, work_step_id, utc_now(), scope=self.chat.harness.scope(UUID(grant_node[0])))
+                if (grant['owner_id']!=str(principal.identity_id) or grant['conversation_id']!=str(conversation_id)
+                        or json.loads(fresh['proposal_json'])!={'intent':'plugin_install','arguments':{'release':release.model_dump(mode='json')}}):
+                    raise AccessDenied('POLICY_DENIED')
+                await permissions.operation(conn, work_step_id, 'plugin-install:'+str(work_step_id), utc_now())
             old=await one(conn,'SELECT * FROM plugin_install_requests WHERE request_id=?',(str(request_id),))
             if old:
                 if old['owner_id']!=str(principal.identity_id) or old['conversation_id']!=str(conversation_id) or old['request_json']!=encoded:
@@ -235,12 +244,7 @@ class PluginService:
             fresh,grant=await permissions.allowed_step(conn,step['step_id'],utc_now())
             turn=await one(conn,'SELECT conversation_id FROM chat_turns WHERE turn_id=?',(step['turn_id'],))
             conversation_id=turn[0]
-            if grant['permission_mode']!='full' and fresh['permission_decision']!='approve':
-                await conn.execute("UPDATE chat_work_steps SET status='permission',request_text=? WHERE step_id=?",
-                    (f"需要创建并隔离测试插件 {release.manifest.plugin_id}@{release.manifest.version}，摘要 {release.digest()}。通过后普通模式仍须批准该版本才能启用。回复“同意”或“不同意”。",step['step_id']))
-                await conn.execute("UPDATE chat_turns SET work_status='permission',revision=revision+1 WHERE turn_id=?",(step['turn_id'],))
-                return
-        version=await self.install(principal,conversation_id,uuid5(NAMESPACE_URL,'plugin-install:'+step['step_id']),release,'nexus-generated')
+        version=await self.install(principal,conversation_id,uuid5(NAMESPACE_URL,'plugin-install:'+step['step_id']),release,'nexus-generated',work_step_id=step['step_id'])
         if version['test_status'] in {'pending','running'}:
             if self.tester is None: raise AccessDenied('PLUGIN_TEST_UNAVAILABLE')
             test=await self.tester.start(principal,conversation_id,version['version_id'],step['step_id'])

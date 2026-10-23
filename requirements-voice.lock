@@ -1,0 +1,11 @@
+# Windows voice runtime (optional; Core does not import sounddevice/sherpa).
+# Install with: pip install -e ".[voice]"  (AEC on Windows)
+numpy==2.5.4
+sounddevice==0.5.6
+cffi==2.1.1
+pycparser==3.12
+samplerate==0.2.4
+pywebrtc-audio==0.2.0; sys_platform == "win32"
+# Wake-word runtime (install with -e ".[voice-wake]"):
+sherpa-onnx==1.13.8; sys_platform == "win32"
+sherpa-onnx-core==1.13.8; sys_platform == "win32"

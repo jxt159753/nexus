@@ -168,13 +168,13 @@ class LanguageService:
                 elif not self.config.enabled or self.provider is None:
                     error = "MODEL_DISABLED"
                 else:
-                    error = await budget_error(conn, self.config, now)
+                    error = await budget_error(conn, self.config, now, reservation=self.config.model_reservation(input_tokens=16384, output_tokens=self.config.max_output_tokens))
                 if error:
                     await conn.execute("UPDATE language_requests SET status='failed',error_code=? WHERE language_id=?", (error, row["language_id"]))
                     return None
                 call_id = str(uuid4())
                 await conn.execute("INSERT INTO model_calls(call_id,provider,model,cost_status,created_at,language_id,owner_id,reserved_microunits,pricing_json,outcome) VALUES(?,'deepseek',?,'reserved',?,?,?,?,?,'started')", (
-                    call_id, MODEL, timestamp(now), row["language_id"], row["owner_id"], self.config.task_cost_microunits,
+                    call_id, MODEL, timestamp(now), row["language_id"], row["owner_id"], self.config.model_reservation(input_tokens=16384, output_tokens=self.config.max_output_tokens),
                     canonical({"input": self.config.input_price, "output": self.config.output_price, "currency": "USD", "valid_until": self.config.price_valid_until.isoformat()})))
                 await conn.execute("UPDATE language_requests SET status='interpreting',mode='llm' WHERE language_id=?", (row["language_id"],))
                 await audit(conn, row["owner_id"], None, "model.reserved", now)
@@ -191,7 +191,7 @@ class LanguageService:
             error = "MODEL_RESPONSE_INVALID"
             try:
                 parsed = PROPOSAL.validate_json(reply.content)
-                if reply.complete and cost <= self.config.task_cost_microunits:
+                if reply.complete and (not self.config.cost_limits_enabled or cost <= self.config.task_cost_microunits):
                     if isinstance(parsed, UnsupportedProposal):
                         error = "UNSUPPORTED_TASK"
                     else:
