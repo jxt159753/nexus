@@ -528,6 +528,16 @@ P55（2026-10-21）前端本地交付：用户直接指令 DSH 在现有 `/app`�
 
 首版未包含 Android、系统通知、自动更新、代码签名和后台常驻。Core 需在 `origins` 中加入 `https://tauri.localhost`；本地开发策略已允许 HTTPS App Origin 与 loopback HTTP 并存，安全测试 29 项通过。当前状态为“开发自检完成，待用户验收”，不记为 M8 整体完成。
 
+<a id="windows-tray-w5"></a>
+
+#### W5：关闭到托盘与可关闭启动动画（2026-10-23）
+
+用户明确授权 Codex 完成本次 Windows 原生窗口和托盘修改。0.1.2 关闭主窗口或启动动画时收起到托盘，左键点击或右键“打开 NEXUS”恢复，右键“退出”才清理 App 管理的语音/Node 并退出；保留原主 WebView 与已启动进程。动画使用系统标题栏，可最小化/关闭，不置顶或主动抢焦点；关闭/提前恢复后计时器不再弹出，启动最小化后仍保持最小化，避免将其屏幕外坐标复制到主窗口。只启用已锁定 Tauri 的 tray-icon 特性，没有升级第三方依赖或改动业务页面、Core、Node/语音资源与配置。
+
+本地验证：Rust 原有 7 项桥/配置测试通过；最终 release EXE 在独立离线 WebView 配置下，真实 Windows API 验证正常启动、启动关闭、启动最小化、启动中从托盘提前恢复后再次关闭四种路径，均通过。读取真实窗口样式/可见性/最小化/位置/前台 PID；托盘原生回调及菜单命令验证恢复、重复关闭再打开和退出，4 个测试 App 进程均退出。测试只操作自身 PID 的窗口，不读取生产凭据、连接 Core、启动真实 Node 或开麦；未以原生消息测试冒充人工鼠标点击、后台音频长稳或生产 Node 保活验收。脱敏摘要见 [证据](assets/windows-tray-evidence.json)。
+
+NSIS 0.1.2 已构建，89.20 MiB，SHA-256 `c8bff03b541a3bf739dddb904b8e551fafa81b82478eef5b97fd2030ab5dea28`；路径 `apps/windows/src-tauri/target/release/bundle/nsis/NEXUS_0.1.2_x64-setup.exe`。随包 Node `6fcddb72…b7bf`、语音 `65c95be3…f5ef` 与 P63 完全一致。沙箱构建最初因工具缓存/网络解析失败、随后 NSIS 系统 DLL 重定位失败；获工具批准使用正常构建环境和既有缓存后成功，没有修改系统设置。当前是本地实现、可安装包和技术自检交付；未执行覆盖安装、提交/推送或生产发布，待用户验收，不扩大其他阶段授权。
+
 ### 聊天过程展示（presentation v1）
 
 2026-10-21 前端已适配 [聊天过程展示说明](CHAT-PROGRESS-FRONTEND.md)：`/app`、Windows 随包 UI 和旧控制台都按 `presentation.version=1` 分离处理过程与最终回答。过程面板按快照替换摘要及 `live_text`，最终回答使用 `final_text`；完成转换/首次历史加载按 `collapse_process` 设置默认折叠，用户手动展开后轮询不覆盖。审批时过程保持可见，普通回复不造空面板；无 `presentation` 的旧 Core 回退原展示。子执行变化已纳入轮次签名，不依赖 revision 变化才重绘。

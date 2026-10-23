@@ -55,12 +55,12 @@ npm run tauri build -- --bundles nsis
 产物：
 
 ```text
-apps/windows/src-tauri/target/release/bundle/nsis/NEXUS_0.1.2_x64-setup.exe
+apps/windows/src-tauri/target/release/bundle/nsis/NEXUS_0.1.3_x64-setup.exe
 ```
 
 ### 语音更新（0.1.1起）
 
-语音从 0.1.1 起包含独立 `binaries/nexus-voice.exe` 及校验过的KWS模型，0.1.2 沿用这些资源。先在项目虚拟环境运行 `python -m pip install -r requirements-voice.lock pyinstaller==6.22.3`。从 [模型锁](../../config/voice-models.lock.json) 的KWS来源下载、按文件SHA-256核验并解压到本地模型目录，再运行：
+语音从 0.1.1 起包含独立 `binaries/nexus-voice.exe` 及校验过的KWS模型；0.1.3更新唤醒运行时并保留0.1.2托盘行为。先在项目虚拟环境运行 `python -m pip install -r requirements-voice.lock pyinstaller==6.22.3`。从 [模型锁](../../config/voice-models.lock.json) 的KWS来源下载、按文件SHA-256核验并解压到本地模型目录，再运行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File apps/windows/scripts/build-voice.ps1 -WakeModelDir var/voice-research/models/kws
