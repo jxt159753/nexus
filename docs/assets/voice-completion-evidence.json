@@ -95,5 +95,13 @@
     "credentials": false,
     "raw_recordings": false,
     "chat_transcripts": false
+  },
+  "github": {
+    "pull_request": "https://github.com/jxt159753/nexus/pull/2",
+    "branch": "codex/windows-voice-loop",
+    "initial_commit": "03d0f44f3ead6ef17deaa21833b5454f4a8610a5",
+    "draft": true,
+    "merged": false,
+    "remote_commit_verified": true
   }
 }

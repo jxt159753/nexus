@@ -205,7 +205,9 @@ P62（2026-10-22，用户直接指令 DSH）插件/权限前端与 Windows 桥�
 
 生产交付：首次voice包于16:10上线；后续性格与自动记忆发布保留语音。最终修正于 **2026-10-23 17:15（北京时间）** 以P79 live包为基线部署至唯一Core，实际目录 `persona-memory-final-20261023-ac0a8186`（沿用部署器目录前缀），wheel SHA-256 `ac0a8186a3a4aa073c60b1bf961269b3618a12157ea4d1d3fe7ba23bea85460c`，237资源一致、schema029、17类历史逐行摘要保留，配置及原音色/自动记忆授权不变。备份 `/var/backups/nexus/before-voice-final-20261023T091506Z`，SHA-256 `321919fff36b16afc6ba53d8cfae4fa13b4f69430d3b53112ce2b0bdcec10c6c`。TLS、数据库完整性/外键、认证语音接口和3个页面资源通过；157条历史模型调用逐行保留，部署新增调用0，已恢复未暂停、Node在线、无活动语音会话。
 
-Windows **0.1.1** 最终NSIS已安装至既有快捷方式目录，原Node配置保留；安装包SHA-256 `1fc7a214c47a1385697a7007988300bb232f8338f4b4bf21a5b6d9549715f39d`，语音EXE `65c95be34c6d1532534ee8f992417a91238c11824250bd5aefd3743ab17af5ef`，冻结Node `6fcddb72e83253aaf6668bac98db828e7001d886d57275b0d4ffa18e02b7b7bf` 不变；KWS资源逐文件校验。安装EXE与构建EXE仅Tauri安装器bundle标记不同，归一后相同。详细脱敏证据见[本轮记录](assets/voice-completion-evidence.json)。代码上传状态在下方GitHub交付记录补充。
+Windows **0.1.1** 最终NSIS已安装至既有快捷方式目录，原Node配置保留；安装包SHA-256 `1fc7a214c47a1385697a7007988300bb232f8338f4b4bf21a5b6d9549715f39d`，语音EXE `65c95be34c6d1532534ee8f992417a91238c11824250bd5aefd3743ab17af5ef`，冻结Node `6fcddb72e83253aaf6668bac98db828e7001d886d57275b0d4ffa18e02b7b7bf` 不变；KWS资源逐文件校验。安装EXE与构建EXE仅Tauri安装器bundle标记不同，归一后相同。详细脱敏证据见[本轮记录](assets/voice-completion-evidence.json)。
+
+GitHub交付：代码已推送至 `codex/windows-voice-loop`，建立[语音交付PR #2](https://github.com/jxt159753/nexus/pull/2)，叠加既有插件分支、保持草稿，未合并main。上传树使用固定生产Core及最终Windows源码，排除未上线MCP/Android运行时代码、凭证、数据库、录音和安装包二进制；共享工作区分支与暂存区不变。
 
 本轮已完成Windows语音技术交付、部署和安装包更新，用户已确认声音/续聊及基本打断体验；完整P63验收矩阵尚未完成。长时间本地唤醒/误触发、10分钟扬声器AEC、声学延迟p95、更多设备竞争/切换组合与Android未验证，不用替身或耳机测试代替。以下首轮快照保留作历史，不覆盖本轮状态。
 
