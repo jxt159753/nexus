@@ -1,12 +1,13 @@
 param(
   [string]$Python = ".venv\Scripts\python.exe",
-  [string]$WakeModelDir = "models\kws"
+  [string]$WakeModelDir = "models\kws",
+  [string]$OutputDir = "apps\windows\src-tauri\binaries"
 )
 
 $ErrorActionPreference = "Stop"
 $voiceRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
 $pythonPath = (Resolve-Path (Join-Path $voiceRoot $Python)).Path
-$outPath = Join-Path $voiceRoot "apps\windows\src-tauri\binaries"
+$outPath = Join-Path $voiceRoot $OutputDir
 $modelSource = (Resolve-Path (Join-Path $voiceRoot $WakeModelDir)).Path
 $modelTarget = Join-Path $outPath "voice-models"
 New-Item -ItemType Directory -Force -Path (Join-Path $modelTarget "kws") | Out-Null

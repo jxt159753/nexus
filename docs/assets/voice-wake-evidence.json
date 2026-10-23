@@ -1,0 +1,77 @@
+{
+  "date": "2026-10-23",
+  "scope": "P63 manual local wake activation",
+  "activation_policy": {
+    "manual_arm": true,
+    "background_and_tray": true,
+    "max_session_minutes": 30,
+    "automatic_rearm_after_app_restart": false,
+    "stop_on_explicit_app_exit": true
+  },
+  "core": {
+    "release": "/opt/nexus/releases/voice-wake-20261023-34f806a7",
+    "wheel_sha256": "34f806a7c3b4ba00c9b7b04f7d1a3ff26091fbcb4b54ebceca48260a5bbde0ee",
+    "backup": "/var/backups/nexus/before-voice-wake-20261023T095723Z",
+    "backup_sha256": "294508b54a6f050ac216e78aca1c7486cf048fd5f872d45ed9db691068a1fba2",
+    "schema": 29,
+    "resources_checked": 237,
+    "history_categories_preserved": 17,
+    "model_calls_at_deployment": 157,
+    "deployment_model_calls": 0,
+    "tls_verified": true,
+    "node_online": true,
+    "paused": false
+  },
+  "windows": {
+    "version": "0.1.3",
+    "installer_sha256": "466338faefb27a7965a170628b943783e938813e01607c1d2db320d0d72a92d3",
+    "voice_sha256": "5c13916a66bd1dafbc02c5ce6aec4996cdd93436511b8a44d38906919dbb6879",
+    "app_sha256": "c08923e3b86ee17c16fdeeb154f073fb309ae308b0e73519d0980779c302eb04",
+    "node_preserved": true,
+    "node_configuration_preserved": true,
+    "installed_resources_match": true
+  },
+  "validation": {
+    "windows_voice_and_real_frozen_exe": {
+      "passed": 30,
+      "seconds": 42.13,
+      "opens_microphone": false
+    },
+    "linux_fixed_wheel": {
+      "passed": 27,
+      "skipped": 1,
+      "seconds": 20.14
+    },
+    "real_edge_with_native_audio_fake": {
+      "passed": 1,
+      "seconds": 4.06,
+      "viewport_width": 390
+    },
+    "tray_baseline": "Preserved independently validated W5 0.1.2 shell, 7 Rust tests and 4 native window scenarios; no claim of new manual tray acceptance"
+  },
+  "wake_synthetic": {
+    "chinese_hit": true,
+    "english_sample_hit": false,
+    "two_short_tts_calls": true,
+    "synthetic_characters": 14,
+    "not_human_acceptance": true
+  },
+  "human_validation": {
+    "microphone_standby_opened_after_readiness_confirmation": true,
+    "wake_activations_observed": 0,
+    "nonempty_finals_observed": 0,
+    "result": "User deferred live wake testing to tomorrow; no success or recognition-failure claim",
+    "microphone_closed": true,
+    "runtime_process_closed": true,
+    "debug_port_closed": true,
+    "raw_recordings_saved": false,
+    "transcripts_in_evidence": false
+  },
+  "remaining": [
+    "live Chinese and English wake success",
+    "second wake after idle",
+    "background/tray wake with real microphone",
+    "long-duration false wake rate",
+    "speaker echo and acoustic latency p95"
+  ]
+}

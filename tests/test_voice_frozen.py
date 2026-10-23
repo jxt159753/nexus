@@ -10,7 +10,10 @@ from websockets.asyncio.server import serve
 
 
 @pytest.mark.skipif(not os.environ.get("NEXUS_TEST_VOICE_EXE"), reason="opt-in Windows frozen binary")
-def test_frozen_device_failure_exits_while_parent_keeps_stdin_open():
+@pytest.mark.parametrize("wake", [False, True])
+def test_frozen_device_failure_exits_while_parent_keeps_stdin_open(wake):
+    if wake and not os.environ.get("NEXUS_TEST_WAKE_MODEL_DIR"):
+        pytest.skip("opt-in installed wake resources")
     async def scenario():
         async def handler(ws):
             await ws.recv()
@@ -34,6 +37,11 @@ def test_frozen_device_failure_exits_while_parent_keeps_stdin_open():
             try:
                 config = {"core_url": f"ws://127.0.0.1:{port}", "node_id": str(uuid4()),
                           "output_device": "不存在的语音测试设备 / deliberately absent", "aec_enabled": True}
+                if wake:
+                    from pathlib import Path
+                    models = Path(os.environ["NEXUS_TEST_WAKE_MODEL_DIR"])
+                    config.update(wake_enabled=True, request_id=str(uuid4()), conversation_id=str(uuid4()),
+                                  wake_model_dir=str(models / "kws"), wake_keywords=str(models / "keywords.txt"))
                 process.stdin.write((json.dumps(config, ensure_ascii=False) + "\n").encode("utf-8"))
                 await process.stdin.drain()
                 await asyncio.wait_for(process.wait(), 12)

@@ -19,7 +19,7 @@ process.stdin.on("end", async () => {
         voiceStart: async (config) => {
           window.__voiceCalls.push(config);
           window.__voiceRunning = true;
-          window.__voiceEvent({ event: "state", state: "listening" });
+          window.__voiceEvent({ event: "state", state: config.wake ? "standby" : "listening" });
         },
         voiceStop: async () => { window.__voiceRunning = false; },
         voiceInterrupt: async () => window.__voiceEvent({ event: "state", state: "interrupted" }),
@@ -47,6 +47,21 @@ process.stdin.on("end", async () => {
     assert.equal(await page.evaluate(() => window.__voiceCalls[0].wake), false);
     await page.locator("#voice-status").getByRole("button", { name: "打断", exact: true }).click();
     await page.getByText("已打断", { exact: true }).waitFor();
+    await page.locator("#voice-status").getByRole("button", { name: "结束语音", exact: true }).click();
+    await page.locator("#voice-status").waitFor({ state: "hidden" });
+    await page.locator("#chat-wake").click();
+    await page.getByRole("heading", { name: "开启语音唤醒", exact: true }).waitFor();
+    assert.equal(await page.getByLabel(/本地语音唤醒：/).isChecked(), true);
+    assert.equal(await proactive.isDisabled(), false);
+    assert.equal(await listen.isDisabled(), true);
+    await page.getByRole("button", { name: "取消", exact: true }).click();
+    assert.equal(await page.evaluate(() => window.__voiceCalls.length), 1);
+    await page.locator("#chat-wake").click();
+    await page.getByRole("button", { name: "同意外发并开始语音", exact: true }).click();
+    await page.getByText("本地唤醒待机", { exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => window.__voiceCalls[1].wake), true);
+    assert.match(await page.locator(".voice-detail").innerText(), /你好奈克斯/);
+    assert.match(await page.locator(".voice-expiry").innerText(), /到期自动关闭/);
     await page.locator("#voice-status").getByRole("button", { name: "结束语音", exact: true }).click();
     await page.locator("#voice-status").waitFor({ state: "hidden" });
     await page.setViewportSize({ width: 390, height: 844 });

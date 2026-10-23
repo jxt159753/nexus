@@ -1,0 +1,104 @@
+{
+  "date": "2026-10-23",
+  "task": "M8W/W5",
+  "version": "0.1.2",
+  "environment": "Windows native release App, fresh offline WebView profile for each scenario",
+  "rust_tests": {
+    "command": "cargo test --locked --offline --manifest-path apps/windows/src-tauri/Cargo.toml --lib",
+    "passed": 7
+  },
+  "scenarios": [
+    {
+      "name": "normal",
+      "passed": true,
+      "splash_not_topmost": true,
+      "splash_caption_and_close_menu": true,
+      "did_not_take_foreground_on_startup": true,
+      "native_tray_checks": {
+        "native_tray_restore": true,
+        "minimized_main_restore": true,
+        "three_close_menu_restore_cycles": true,
+        "native_menu_quit": true
+      }
+    },
+    {
+      "name": "close",
+      "passed": true,
+      "splash_not_topmost": true,
+      "splash_caption_and_close_menu": true,
+      "did_not_take_foreground_on_startup": true,
+      "native_tray_checks": {
+        "native_tray_restore": true,
+        "three_close_menu_restore_cycles": true,
+        "native_menu_quit": true
+      }
+    },
+    {
+      "name": "minimize",
+      "passed": true,
+      "splash_not_topmost": true,
+      "splash_caption_and_close_menu": true,
+      "did_not_take_foreground_on_startup": true,
+      "native_tray_checks": {
+        "native_tray_restore": true,
+        "minimized_main_restore": true,
+        "three_close_menu_restore_cycles": true,
+        "native_menu_quit": true
+      }
+    },
+    {
+      "name": "early_tray",
+      "passed": true,
+      "splash_not_topmost": true,
+      "splash_caption_and_close_menu": true,
+      "did_not_take_foreground_on_startup": true,
+      "native_tray_checks": {
+        "native_tray_restore": true,
+        "minimized_main_restore": true,
+        "three_close_menu_restore_cycles": true,
+        "native_menu_quit": true
+      }
+    }
+  ],
+  "interaction_method": "Win32 window inspection and native close/tray callback/menu messages scoped to each test child PID; no manual tray click claimed",
+  "artifacts": {
+    "installer": {
+      "path": "apps/windows/src-tauri/target/release/bundle/nsis/NEXUS_0.1.2_x64-setup.exe",
+      "bytes": 93535698,
+      "sha256": "c8bff03b541a3bf739dddb904b8e551fafa81b82478eef5b97fd2030ab5dea28"
+    },
+    "app": {
+      "path": "apps/windows/src-tauri/target/release/nexus-windows.exe",
+      "bytes": 13076992,
+      "sha256": "fc74837bc4a75aa1375f6d88d3c579b437913870267131300c8c5612cd27332b"
+    },
+    "node": {
+      "path": "apps/windows/src-tauri/binaries/nexus-node.exe",
+      "bytes": 29452919,
+      "sha256": "6fcddb72e83253aaf6668bac98db828e7001d886d57275b0d4ffa18e02b7b7bf"
+    },
+    "voice": {
+      "path": "apps/windows/src-tauri/binaries/nexus-voice.exe",
+      "bytes": 55038137,
+      "sha256": "65c95be34c6d1532534ee8f992417a91238c11824250bd5aefd3743ab17af5ef"
+    }
+  },
+  "test_apps_exited": true,
+  "production_connected": false,
+  "microphone_opened": false,
+  "installed_over_existing_app": false,
+  "limitations": [
+    "Manual pointer interaction with tray menu not exercised",
+    "No live Node/voice background endurance check",
+    "No installer upgrade or production verification"
+  ],
+  "build_notes": [
+    "Sandbox cache/network lookup failed",
+    "Project cache allowed tool discovery but sandbox NSIS launch failed with OS error 623",
+    "Normal build environment with existing tool cache produced NSIS successfully"
+  ],
+  "local_native_check_scripts": [
+    "var/windows-tray-check/smoke.py",
+    "var/windows-tray-check/finish.py"
+  ]
+}

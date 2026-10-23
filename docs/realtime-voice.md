@@ -6,7 +6,7 @@
 
 使用更新后的 Windows App，登录原 Core，保存本机 Node 配置。在聊天输入区点“语音”，核对输入/输出设备、音频外发提示、上下文及工具选项，再开始。设备枚举不会打开麦克风。
 
-普通模式立即进入收听；勾选本地唤醒则麦克风持续开启，待机只在本机识别“Hey NEXUS”或“你好奈克斯”，命中后才向 Core 上传音频。回答结束会继续收听，按钮会话静音30秒结束，唤醒会话静音后回本地待机。最长30分钟、30轮，单次收听最多60秒。
+点“语音”可直接进入收听；点“语音唤醒”并确认后，麦克风持续开启，在本机识别“你好奈克斯”或“Hey NEXUS”。命中前不上传音频、不启动云端ASR或聊天模型；命中后听到短提示音再说话，提示音表示Core已经准备好收听。待机缓存与唤醒词不作为预卷发送，只保留命中后的音频。回答结束会继续收听，按钮会话静音30秒结束，唤醒会话静音后回本地待机。最长30分钟、30轮，界面显示自动关闭时间，单次收听最多60秒。App最小化或收起到托盘后，独立音频进程继续待机；托盘“退出”会关麦。每次启动App仍需手动开启，不自动恢复。
 
 “打断”立即清空当前播报并取消原回答；AEC可用时也可直接插话。AEC初始化失败明确显示半双工，使用打断按钮再说话。点“结束语音”、退出登录、切换会话或关闭 App 会停止真实采集/播放。断线和默认音频设备变化会结束本次会话，需重新开始，不自动开麦。
 
@@ -61,7 +61,7 @@ Core启动将旧活动会话标记interrupted、未决音频预留保留unknown�
 
 ## 7. 依赖与模型
 
-Core复用已有websockets和原模型/存储依赖，无音频DSP依赖。Windows可选依赖固定在 [requirements-voice.lock](../requirements-voice.lock)：sounddevice、samplerate、numpy、pywebrtc-audio、sherpa-onnx及传递依赖。KWS固定模型文件与许可证见 [模型锁](../config/voice-models.lock.json)，安装资源逐文件核对SHA-256，失败拒绝加载。
+Core复用已有websockets和原模型/存储依赖，无音频DSP依赖。Windows可选依赖固定在 [requirements-voice.lock](../requirements-voice.lock)：sounddevice、samplerate、numpy、pywebrtc-audio、sherpa-onnx及传递依赖。KWS使用带前缀的完整短语，移除容易误触的裸“NEXUS”。每次回到待机创建新识别流，避免拼接旧对话音频。KWS固定模型文件与许可证见 [模型锁](../config/voice-models.lock.json)，安装资源逐文件核对SHA-256，失败拒绝加载。
 
 模型锁中的本地MeloTTS/ASR资源只供历史离线研究，不随当前Windows包分发。早期调研参考sherpa-onnx与Pipecat的来源记录保留在 [ADR 0029](decisions/0029-realtime-voice.md)，当前实现未引入Pipecat框架。
 

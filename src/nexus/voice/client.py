@@ -20,7 +20,7 @@ from nexus.contracts.voice import (
 )
 from nexus.voice.audio import AudioEngine, AudioUnavailable
 from nexus.voice.config import RuntimeConfig
-from nexus.voice.wake import WakeDetector
+from nexus.voice.wake import WakeDetector, WakeUnavailable
 
 
 class VoiceRuntime:
@@ -42,6 +42,7 @@ class VoiceRuntime:
         self.state = "activating"
         self.preroll = deque(maxlen=50)
         self.barge_pending = False
+        self.wake_pending = False
         self.started = time.monotonic()
         self.core_time = None
         self.core_time_monotonic = None
@@ -136,8 +137,7 @@ class VoiceRuntime:
                                       open_timeout=8, close_timeout=1)
         await self._open_audio()
         if self.wake:
-            self.state = "standby"
-            self._emit("state", state="standby", detail="本地监听唤醒词，音频尚未上传")
+            self._standby()
         elif self.config.request_id is not None:
             await self._activate()
         audio_tasks = [asyncio.create_task(self._audio_loop()), asyncio.create_task(self._uplink_loop())]
@@ -152,6 +152,15 @@ class VoiceRuntime:
             trigger="wake" if self.wake else "button", confidence=None,
             conversation_id=self.config.conversation_id))
 
+    def _standby(self):
+        self.wake.reset()
+        self.state = "standby"
+        self.listening.clear()
+        self.speaking = self.wake_pending = self.barge_pending = False
+        self.preroll.clear()
+        self._emit("state", state="standby",
+                   detail="麦克风已开启，仅本地处理。说“你好奈克斯”或“Hey NEXUS”，听到提示音后说话。")
+
     async def _control_loop(self):
         async for raw in self.control:
             message = parse_voice_message(raw)
@@ -161,6 +170,10 @@ class VoiceRuntime:
                 self._emit("session", voice_session_id=str(message.voice_session_id),
                            conversation_id=str(message.conversation_id), expires_at=message.expires_at.isoformat())
             elif isinstance(message, VoiceListenStart):
+                if self.wake_pending:
+                    # Acknowledge only after Core has actually opened ASR.
+                    await asyncio.to_thread(self.audio.ready_cue)
+                    self.wake_pending = False
                 self.speaking = False
                 self.state = "listening"
                 self.listening.set()
@@ -171,6 +184,9 @@ class VoiceRuntime:
             elif isinstance(message, VoiceFinal):
                 self._emit("final", text=message.text)
             elif isinstance(message, VoiceState):
+                if message.state == "activating" and self.wake:
+                    self._standby()
+                    continue
                 self.state = "standby" if message.state == "activating" and self.wake else message.state
                 self.current_generation = max(self.current_generation, message.generation)
                 if message.utterance_id:
@@ -274,13 +290,18 @@ class VoiceRuntime:
     async def _uplink_loop(self):
         while not self.stop_event.is_set():
             pcm = await asyncio.to_thread(self.audio.read_uplink)
-            if self.audio.aec_active or self.listening.is_set() or self.state == "standby":
+            if self.audio.aec_active or self.listening.is_set() or self.state == "standby" or self.wake_pending:
                 self.preroll.append(pcm)
             if self.wake and self.state == "standby":
                 hit = self.wake.push(pcm)
                 if hit:
                     self.metrics["wake_hit"] = hit
+                    # Upload only audio captured after the local hit. Standby
+                    # ambience and the wake phrase never enter the pre-roll.
+                    self.preroll.clear()
+                    self.wake_pending = True
                     self.state = "activating"
+                    self._emit("state", state="activating", detail="已听到唤醒词，正在准备收听")
                     self.listening.clear()
                     self.barge_pending = True
                     await self._activate()
@@ -423,8 +444,10 @@ def main():
     except Exception as exc:
         # Error diagnostics contain only a class/code, never provider contents,
         # credentials, URLs or transcripts.
+        message = ("本地唤醒模型不可用，请重新安装 Windows 更新包。" if isinstance(exc, WakeUnavailable)
+                   else "语音连接或设备不可用，请检查设置后重新开始。")
         print(json.dumps({"event": "error", "code": type(exc).__name__,
-                          "message": "语音连接或设备不可用，请检查设置后重新开始。"}, ensure_ascii=False), flush=True)
+                          "message": message}, ensure_ascii=False), flush=True)
         raise SystemExit(1) from None
 
 

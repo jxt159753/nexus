@@ -190,6 +190,16 @@ class AudioEngine:
         del self._uplink[:target]
         return result
 
+    def ready_cue(self):
+        """Short local acknowledgement; no TTS request or model call."""
+        rate = self.config.downlink_rate
+        count = int(rate * 0.075)
+        positions = self._np.arange(count) / rate
+        envelope = self._np.sin(self._np.pi * self._np.arange(count) / count) ** 2
+        tones = [0.08 * envelope * self._np.sin(2 * self._np.pi * hz * positions) for hz in (660, 880)]
+        samples = self._np.concatenate((tones[0], self._np.zeros(int(rate * 0.025)), tones[1]))
+        self.play((samples * 32767).astype(self._np.int16).tobytes())
+
     def play(self, pcm):
         if self._closed or not pcm:
             return

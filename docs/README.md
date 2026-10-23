@@ -90,6 +90,7 @@ Core、Node、Tool、Skill 等词的解释见 [架构文档的名词说明](ARCH
 | 性格与自动记忆 P78/P79 | [实际模型调用、记忆隔离/纠正/撤销、部署与费用证据](assets/automatic-memory-evidence.json) |
 | Skill Shell 与受控 MCP P65 | [真实 Shell、stdio/HTTP/SSE、权限、独立 Core/Node 与重启证据](SKILL-MCP-VERIFICATION.md) |
 | 原生插件前端/权限/Windows 桥（本地） | [界面、会话覆盖、插件生命周期、工具卡、390px/键盘与安装版验证](PLUGINS-FRONTEND-VERIFICATION.md) |
+| P63 本地语音唤醒 | [手动开启、待机隐私、安装更新及延期真人验证](assets/voice-wake-evidence.json) |
 | P63 Windows语音补齐 | [部署、安装包、真人确认、测试层级与未验矩阵](assets/voice-completion-evidence.json) |
 | P63 实时语音合成音冒烟（非验收） | [百炼 TTS/ASR/Core 媒体代理时延与限制](assets/voice-bailian-smoke.json) |
 | P63 真实麦克风 ASR 冒烟（录音回放，非真人实时） | [Realtek 麦克风阵列采集 + Fun-ASR 时延](assets/voice-mic-human-smoke.json) |

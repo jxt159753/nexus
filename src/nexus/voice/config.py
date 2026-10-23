@@ -63,6 +63,8 @@ class RuntimeConfig:
             raise ValueError("heartbeat_grace_ms out of range")
         if self.wake_enabled and not self.wake_model_dir:
             raise ValueError("wake_model_dir is required when wake is enabled")
+        if self.wake_enabled and (self.request_id is None or self.conversation_id is None):
+            raise ValueError("wake standby requires an owner-prepared request and conversation")
 
 
 def load_runtime_config(path: Path) -> RuntimeConfig:

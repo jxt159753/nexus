@@ -39,6 +39,9 @@ function renderStatus(event = {}) {
   if (event.event === "partial" || event.event === "final") detail.textContent = event.text || "";
   else if (event.event === "devices") detail.textContent = `${event.input || "默认麦克风"} · ${event.aec_active ? "回声消除已启用，可插话" : "半双工；请用打断按钮"}`;
   else if (event.event === "state" && event.detail) detail.textContent = event.detail;
+  const expiry = bar.querySelector(".voice-expiry");
+  expiry.textContent = active?.expires_at ? `麦克风已开启 · ${new Date(active.expires_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} 到期自动关闭` : "";
+  if (event.event === "state" && event.state === "standby") detail.textContent = event.detail || "说“你好奈克斯”或“Hey NEXUS”，听到提示音后说话。待机音频仅在本机处理。";
   for (const id of ["chat-voice", "dock-voice"]) {
     const control = document.getElementById(id);
     if (control) control.textContent = active ? "语音设置" : "语音";
@@ -107,7 +110,7 @@ function deviceSelect(title, devices, direction) {
   return { label, select };
 }
 
-async function openVoice() {
+async function openVoice(wakeByDefault = false) {
   if (starting) return;
   if (!state.ready) { notify("请先登录 Core", true); return; }
   if (!native?.voiceStart) { notify("Windows 实时语音请在更新后的 NEXUS Windows App 中使用", true); return; }
@@ -140,10 +143,11 @@ async function openVoice() {
     const output = deviceSelect("播放设备", devices, "output");
     const context = checkbox("附带当前会话近期对话", !!state.prefs.context);
     const tools = checkbox("使用与文字聊天相同的工具，并外发本轮工具目录及结果", !!state.prefs.tools);
-    const wake = checkbox("先进入本地唤醒待机：麦克风持续开启，命中唤醒词后才上传音频");
+    const wake = checkbox("本地语音唤醒：说“你好奈克斯”或“Hey NEXUS”；麦克风持续开启，命中后才上传音频", wakeByDefault);
     const proactive = checkbox(`允许 Core 在唤醒待机时播报本会话的新提醒（北京时间 ${server.dnd_start_hour}:00–${server.dnd_end_hour}:00 免打扰，最多每日 ${server.proactive_daily_limit} 次）`);
     const listen = checkbox("另行允许主动播报后收听回答；8 秒无语音即回待机");
-    proactive.input.disabled = listen.input.disabled = true;
+    proactive.input.disabled = !wake.input.checked;
+    listen.input.disabled = true;
     wake.input.addEventListener("change", () => {
       proactive.input.disabled = !wake.input.checked;
       if (!wake.input.checked) proactive.input.checked = listen.input.checked = false;
@@ -154,8 +158,8 @@ async function openVoice() {
       if (!proactive.input.checked) listen.input.checked = false;
     });
     body.append(input.label, output.label, context.label, tools.label, wake.label, proactive.label, listen.label,
-      el("p", "hint", "普通/完全模式沿用当前会话设置；需要审批时请在聊天界面核对。停止、断线或切换会话后不会自动开麦。"));
-    openSheet({ title: "开始语音", body, actions: [
+      el("p", "hint", "开启后可把 App 最小化或切到后台。听到提示音后说话；静音30秒回到本地待机。普通/完全模式沿用当前会话设置；停止、断线、切换会话或退出 App 会关麦，不自动恢复。"));
+    openSheet({ title: wakeByDefault ? "开启语音唤醒" : "开始语音", body, actions: [
       { label: "取消", className: "quiet", onClick: closeSheet },
       { label: "同意外发并开始语音", className: "primary", onClick: async () => {
         if (starting) return;
@@ -195,10 +199,13 @@ export function initVoice(value) {
   for (const id of ["chat", "dock"]) {
     const actions = document.querySelector(`#${id}-form .composer-actions`);
     if (actions) {
-      const control = button("语音", "quiet", openVoice);
+      const control = button("语音", "quiet", () => openVoice(false));
       control.id = `${id}-voice`;
       control.type = "button";
-      actions.prepend(control);
+      const wakeControl = button("语音唤醒", "quiet", () => openVoice(true));
+      wakeControl.id = `${id}-wake`;
+      wakeControl.type = "button";
+      actions.prepend(control, wakeControl);
     }
   }
   const bar = el("section", "voice-status");
@@ -208,7 +215,7 @@ export function initVoice(value) {
   const text = el("div");
   const status = el("strong");
   status.setAttribute("role", "status");
-  text.append(status, el("p", "voice-detail hint"));
+  text.append(status, el("p", "voice-detail hint"), el("p", "voice-expiry hint"));
   bar.append(text,
     button("打断", "quiet", () => native?.voiceInterrupt?.().catch((e) => notify(failure(e), true))),
     button("结束语音", "quiet danger", () => stopVoice()));
@@ -222,6 +229,7 @@ export function initVoice(value) {
           else {
             const local = await native.voiceStatus();
             if (!local.running && !starting) await stopVoice();
+            else if (local.event) renderStatus(local.event);
           }
         }
       } finally { timer = setTimeout(poll, 1000); }

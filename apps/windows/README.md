@@ -12,7 +12,7 @@ apps/windows/
 └─ src-tauri/
    ├─ src/bridge.rs       Core 原生 HTTP 桥（Cookie/CSRF/Origin）
    ├─ src/node.rs         Node 进程与配置
-   ├─ src/lib.rs          Splash + 主窗口
+   ├─ src/lib.rs          Splash、主窗口及系统托盘生命周期
    ├─ binaries/           nexus-node.exe（构建产物，不入库）
    ├─ icons/
    └─ tauri.conf.json
@@ -55,17 +55,19 @@ npm run tauri build -- --bundles nsis
 产物：
 
 ```text
-apps/windows/src-tauri/target/release/bundle/nsis/NEXUS_0.1.0_x64-setup.exe
+apps/windows/src-tauri/target/release/bundle/nsis/NEXUS_0.1.2_x64-setup.exe
 ```
 
-### 本轮语音更新（0.1.1）
+### 语音更新（0.1.1起）
 
-当前安装包为 `NEXUS_0.1.1_x64-setup.exe`，包含独立 `binaries/nexus-voice.exe` 及校验过的KWS模型。先在项目虚拟环境运行 `python -m pip install -r requirements-voice.lock pyinstaller==6.22.3`。从 [模型锁](../../config/voice-models.lock.json) 的KWS来源下载、按文件SHA-256核验并解压到本地模型目录，再运行：
+语音从 0.1.1 起包含独立 `binaries/nexus-voice.exe` 及校验过的KWS模型，0.1.2 沿用这些资源。先在项目虚拟环境运行 `python -m pip install -r requirements-voice.lock pyinstaller==6.22.3`。从 [模型锁](../../config/voice-models.lock.json) 的KWS来源下载、按文件SHA-256核验并解压到本地模型目录，再运行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File apps/windows/scripts/build-voice.ps1 -WakeModelDir var/voice-research/models/kws
 # 然后按上节构建 NSIS
 ```
+
+聊天输入区的“语音唤醒”可手动进入本地待机，说“你好奈克斯”并听到提示音后提问；最小化/收起到托盘后继续待机，托盘退出关麦。单次最长30分钟，重启不自动恢复。真人唤醒验证按用户要求延期。
 
 聊天输入区的“语音”提供设备选择、音频外发同意、上下文/工具选项和独立主动权限。原生桥复用已保存的Node身份，令牌不进入网页；退出先关闭音频进程。断线、停止和设备切换后需重新开始。实际部署、安装摘要及验收限制统一见 [P63](../../docs/ROADMAP.md#p63实时语音扩展选型确认待配置实施)，使用方法见[实时语音](../../docs/realtime-voice.md)。下文P62数字保留为旧版时点证据。
 
@@ -85,7 +87,7 @@ origins = ['http://127.0.0.1:8000', 'https://tauri.localhost']
 
 ## 使用
 
-1. 启动 App，等待启动动画结束。
+1. 启动 App，动画约 5.6 秒后进入主窗口。启动窗口使用系统标题栏，可以最小化或关闭，不置顶、不主动抢焦点。
 2. 登录页填写 Core 根地址与 Owner 凭证。App 只接受 HTTPS，开发时允许 `http://127.0.0.1`/`localhost`。
 3. 设置 → 本机 Node，填写：
    - Core WebSocket 地址，例如 `wss://core.example.com/ws/v1/node`
@@ -94,6 +96,7 @@ origins = ['http://127.0.0.1:8000', 'https://tauri.localhost']
    - Workspace 绝对路径
 4. 点“启动本机 Node”完成首次配置。Node 作为独立进程启动，Core 的设备列表应变为在线；保存成功后，以后 App 启动会自动启动 Node。
 5. “停止”只停止本机 Node；不取消 Core 中的任务、审批或模型回复。
+6. 关闭主窗口或启动窗口（包括 Alt+F4）会收起到系统托盘，App 和已启动的 Node、语音继续按原状态运行；启动时关闭后不会被计时器重新弹出。左键点击托盘图标，或右键选择“打开 NEXUS”，可恢复主窗口。右键“退出”才退出 App 并停止其管理的语音和 Node 进程。最小化按钮保留普通任务栏最小化行为；不新增开机自启。
 
 Node 可执行文件内含 certifi CA，WSS 不再依赖外部 CA 文件。PyInstaller 单文件不实现 `python -m`，因此 Node 通过 `nexus-node.exe --worker` 重入 worker；该入口必须保留。Node 令牌通过环境变量传给子进程，不写入 TOML 或前端 localStorage。首次在设置中启动成功后，配置会存入 Windows 凭据管理器；以后 App 启动会自动启动 Node，无需手动。登录时勾选“记住此设备”会把 Owner 令牌和当前会话 Cookie 存入 Windows 凭据管理器；下次启动先复用未过期会话，失效后才用 Owner 令牌重新登录。退出登录会清除 Owner/会话；Node 配置需在设置中单独停止或更换。启动动画与主窗口使用同一位置。
 
@@ -102,7 +105,7 @@ Node 可执行文件内含 certifi CA，WSS 不再依赖外部 CA 文件。PyIns
 - 前端 `/api/v1/*` 由 Rust 原生桥发送，Core 仍检查 Origin、Cookie、CSRF、任务、权限和费用。
 - App 不执行任何 Node 工具，不把模型回答当成执行成功。
 - Node 配置由 App 写入 `%APPDATA%\ai.nexus.windows\node.toml`，不含秘密；Workspace 和 Node 数据目录由 App 创建。App 只更新连接、数据目录、workspace、允许工具列表和 owner 显式勾选的 `plugin.call@1`；现有 `[plugins]`、LSP/MCP、commands、interaction 配置按 TOML 语义保留，旧配置损坏时拒绝启动而不是覆盖。App 不会自动信任 Node 自报的 `plugin_digest`；需要 owner 在 Core 中同步静态信任。若独立 Node 已使用同一数据目录/身份，App 启动会因锁或在线检查失败，不能把旧 App Node 显示成新插件执行端。
-- 首版没有自动更新、系统通知、代码签名、后台常驻或 Android。
+- 自动更新、系统通知、代码签名不属于本外壳；0.1.2 支持用户启动后的托盘常驻。Android 独立任务见路线图。
 
 ## 已验证
 

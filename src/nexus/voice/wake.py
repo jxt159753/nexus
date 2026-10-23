@@ -52,8 +52,13 @@ class WakeDetector:
             keywords_threshold=config.wake_threshold,
             num_trailing_blanks=config.wake_trailing_blanks,
         )
+        self.hit_count = 0
+        self.reset()
+
+    def reset(self) -> None:
+        # Listening pauses during a conversation. A new stream prevents old
+        # acoustic context from being joined to a later standby interval.
         self._stream = self._kws.create_stream()
-        self.hits: list[str] = []
         self._pushes = 0
 
     def push(self, pcm16: bytes) -> str | None:
@@ -69,7 +74,7 @@ class WakeDetector:
             result = self._kws.get_result(self._stream)
             if result:
                 self._kws.reset_stream(self._stream)
-                self.hits.append(result)
+                self.hit_count += 1
                 return str(result)
         return None
 
