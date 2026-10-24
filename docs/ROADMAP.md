@@ -12,7 +12,7 @@
 - 最终 wheel SHA-256 **`461eef1aaad48edd34817e83100bf8391edca7753a9bc6be1267322c31bf473c`**，270运行资源核对；从实际 P87 固定包只提取本项17项后端／迁移差异，P86网页与 Windows 0.1.10／Android 0.1.5 下载保持。数据库副本迁移和兼容回退读取schema036通过，37类历史摘要保持；生产单活切换后唯一 Core PID1496364，原未暂停状态恢复。备份 `/var/backups/nexus/before-usage-unlimited-20261024T090815Z`，SHA-256 `f9dc83b1a74355d7e0b9f68a54a7d9a6b5af335c654263e8c855146e5dc830a2`；未实演生产回滚。
 - 使用正常 owner API、手机入口参数、`all_nodes=true` 和原问题“你能否调用Windows mcp”复验，保持normal。模型完成电脑 `plugin_inspect` 和 `mcp_list`，完整回答“可以。你的电脑上 Windows-MCP 是通的”，**3次真实模型调用、USD0.009148**，不再触发旧日额度；无设备任务、无新授权，测试会话已归档。旧6笔未知账单保持。此证据验证手机入口的 Core 路由与完整答复，不冒充手机真机操作或实际桌面控制。
 
-当前状态：修复与额度取消已上线，服务器、真实模型完整答复及权限检查通过；GitHub 发布快照在隔离工作区整理，沿现有 PR #1／#2 合并至 main，原工作区未上线的 P88 实现保留。手机真机和实际桌面动作未复验，待用户验收。设计见 [ADR0044](decisions/0044-optional-usage-quotas.md)，脱敏记录见[发布证据](assets/unlimited-usage-evidence.json)。
+当前状态：修复与额度取消已上线，服务器、真实模型完整答复及权限检查通过；GitHub 发布提交 `fe9a1f3` 已推送，[PR #1](https://github.com/jxt159753/nexus/pull/1) 与 [PR #2](https://github.com/jxt159753/nexus/pull/2) 已保留历史合并至 main（功能合并 `3a97ff0`）；确认全部提交属于 main 后，带精确远端 SHA 租约清理3条已合并开发分支，远程仅保留 main。原工作区未上线的 P88 实现保留。手机真机和实际桌面动作未复验，待用户验收。设计见 [ADR0044](decisions/0044-optional-usage-quotas.md)，脱敏记录见[发布证据](assets/unlimited-usage-evidence.json)。
 
 <a id="p88-context-efficiency"></a>
 ## P88：短引用回取、记忆优化与确定性停滞检测（2026-10-24）

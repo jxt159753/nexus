@@ -337,13 +337,35 @@
   "publication": {
     "target_branch": "main",
     "pull_request": 2,
-    "unpublished_p88_runtime_excluded": true
+    "unpublished_p88_runtime_excluded": true,
+    "status": "merged",
+    "source_commit": "fe9a1f344c6b867dc5adeb1dc7b4cb45c49d5a03",
+    "merge_commit": "3a97ff0198c662c972410c6dc12df8d1972e7ce2",
+    "merged_pull_requests": [
+      1,
+      2
+    ],
+    "remote_branches": [
+      "main"
+    ],
+    "removed_merged_branches": [
+      "codex/m4-self-extension",
+      "codex/m6-chat-work",
+      "codex/windows-voice-loop"
+    ]
   },
   "recovery": {
     "initial_linux_disk_full": true,
     "old_pytest_fixtures_archived_before_cleanup": true,
     "production_database_integrity": "ok",
     "old_service_recovered_before_switch": true,
-    "identical_downloads_shared": 13
+    "identical_downloads_shared": 13,
+    "final_free_bytes": 1307176960
+  },
+  "final_usage": {
+    "calls": 257,
+    "unknown_cost_calls": 6,
+    "enabled": true,
+    "paused": false
   }
 }
