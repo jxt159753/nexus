@@ -54,7 +54,7 @@ def send(process,value,framed):
     process.stdin.flush()
 
 
-def receive(process,identifier,framed):
+def receive(process,identifier,framed,max_bytes=32768):
     for _ in range(100):
         if framed:
             length=None; headers=0
@@ -65,15 +65,15 @@ def receive(process,identifier,framed):
                 if line==b'\r\n': break
                 key,_,item=line.decode('ascii').partition(':')
                 if key.lower()=='content-length': length=int(item.strip())
-            if length is None or not 0<length<=32768: raise ValueError('protocol message limit exceeded')
+            if length is None or not 0<length<=max_bytes: raise ValueError('protocol message limit exceeded')
             raw=bytearray()
             while len(raw)<length:
                 data=process.stdout.read(length-len(raw))
                 if not data: raise ValueError('protocol closed mid-message')
                 raw.extend(data)
         else:
-            raw=process.stdout.readline(32769)
-            if not raw or len(raw)>32768: raise ValueError('protocol message limit exceeded')
+            raw=process.stdout.readline(max_bytes+1)
+            if not raw or len(raw)>max_bytes: raise ValueError('protocol message limit exceeded')
         value=json.loads(raw)
         if value.get('id')==identifier:
             if 'error' in value: raise ValueError('server returned protocol error: '+str(value['error'])[:300])
@@ -109,7 +109,8 @@ def stdio(server,params,method,cwd,framed=False,document=None,expected_catalog=N
             nonlocal counter
             counter+=1
             send(process,{'jsonrpc':'2.0','id':counter,'method':name,'params':value},framed)
-            return receive(process,counter,framed)
+            from nexus.plugins.mcp_images import MAX_MESSAGE_BYTES
+            return receive(process,counter,framed,MAX_MESSAGE_BYTES if not framed and name=='tools/call' else 32768)
         if framed: return {'result':request(method,params),'verification':'configured_server_response'}
         return mcp_operation(request,result,method,params,expected_catalog)
     finally:
@@ -125,6 +126,8 @@ def http(server,params,method,expected_catalog=None):
     headers={'Content-Type':'application/json','Accept':'application/json, text/event-stream'}
     opener=build_opener(ProxyHandler({}),NoRedirect())
     def request(value):
+        from nexus.plugins.mcp_images import MAX_MESSAGE_BYTES
+        max_bytes=MAX_MESSAGE_BYTES if value.get('method')=='tools/call' else 32768
         with opener.open(Request(url,data=json.dumps(value).encode(),headers=headers,method='POST'),timeout=2) as response:
             session=response.headers.get('Mcp-Session-Id')
             if session:
@@ -135,13 +138,13 @@ def http(server,params,method,expected_catalog=None):
                 total=0
                 for line in response:
                     total+=len(line)
-                    if total>32768: raise ValueError('MCP event byte limit')
+                    if total>max_bytes: raise ValueError('MCP event byte limit')
                     if line.startswith(b'data:'):
                         message=json.loads(line[5:].strip())
                         if message.get('id')==value.get('id'): return message
                 raise ValueError('MCP response missing')
-            raw=response.read(32769)
-            if len(raw)>32768: raise ValueError('MCP response byte limit')
+            raw=response.read(max_bytes+1)
+            if len(raw)>max_bytes: raise ValueError('MCP response byte limit')
             return json.loads(raw)
     first=request({'jsonrpc':'2.0','id':1,'method':'initialize','params':{'protocolVersion':'2025-11-25','capabilities':{},'clientInfo':{'name':'nexus','version':'1.0.0'}}})
     version=first.get('result',{}).get('protocolVersion') if isinstance(first,dict) else None
@@ -160,7 +163,13 @@ def http(server,params,method,expected_catalog=None):
 
 def launch(runtime,payload,context,deadline,cancel):
     argv=([sys.executable,'--plugin-protocol'] if getattr(sys,'frozen',False) else [sys.executable,'-B','-m','nexus.plugins.protocols'])
-    return runtime.json_process(argv,payload,context,deadline,cancel)
+    if payload['kind']!='mcp':
+        return runtime.json_process(argv,payload,context,deadline,cancel)
+    from tempfile import TemporaryDirectory
+    from nexus.plugins.mcp_images import upload
+    with TemporaryDirectory(prefix='mcp-images-',dir=runtime.config.data_dir) as directory:
+        data=runtime.json_process(argv,{**payload,'image_directory':directory},context,deadline,cancel)
+        return upload(runtime,data,directory,deadline,cancel)
 
 
 def mcp(runtime,value,name,context,deadline,cancel):
@@ -204,6 +213,9 @@ def main():
         if value['kind']=='lsp': result=stdio(value['server'],value['params'],value['method'],value['cwd'],True,value.get('document'))
         elif value['server'].get('url'): result=http(value['server'],value['params'],value['method'],value.get('expected_catalog'))
         else: result=stdio(value['server']['process'],value['params'],value['method'],value['cwd'],expected_catalog=value.get('expected_catalog'))
+        if value['kind']=='mcp':
+            from nexus.plugins.mcp_images import extract
+            result=extract(result,value['image_directory'])
     except (OSError,ValueError,KeyError) as exc: result={'worker_error':str(exc)[:500]}
     sys.stdout.write(json.dumps(result,ensure_ascii=False,separators=(',',':')))
     return 0

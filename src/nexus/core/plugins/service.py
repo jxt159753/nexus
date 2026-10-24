@@ -303,6 +303,9 @@ class PluginService:
                 if args['plugin_id']=='builtin.present':
                     from nexus.core.plugins.deliverables import store
                     output=await store(conn,principal,conversation,task,output)
+                elif args['plugin_id']=='builtin.mcp' and output.get('files'):
+                    from nexus.core.plugins.deliverables import store
+                    output={**output,'files':(await store(conn,principal,conversation,task,output))['files']}
                 data['data']=output
             await self.chat.work.result(conn,step,data,utc_now())
 

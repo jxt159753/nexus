@@ -12,6 +12,10 @@ Core 信任的是完整 `NodeConfig.plugin_digest()`，包括 Node 侧相关资�
 
 用户问“能否调用 Windows-MCP”时，先只读检查电脑端插件及执行状态；若需了解具体工具，再用 `mcp_list(server)` 读取契约。不能因入口在手机、此会话没有安装记录或旧助手说过“不支持”而否定电脑能力；能力询问本身也不授权重新安装、登记或试运行桌面动作。实际发布与验证范围见 [P87](ROADMAP.md#p87-mobile-mcp)。
 
+`mcp_call_tool` 的 MCP `image` 内容通过 Node 临时文件及既有认证 artifact 上传返回 `files`，执行消息只携带文字和已存储字节的摘要／链接。图片单文件 4 MiB、单次批量 8 MiB，沿用既有文件传输容量；MCP 图片响应允许 base64 展开后最多 12 MiB，普通控制结果仍保持 24 KiB。Core 上传入口只接受对应设备的有效运行任务；结果核验成功后生成现有聊天文件卡片，认证下载和预览权限不变。图片元数据不是视觉观察证据。
+
+Windows-MCP `Snapshot(use_ui_tree=false)` 会跳过窗口枚举，空窗口字段不代表桌面没有窗口；列窗口需要 `use_ui_tree=true`，截图需要 `use_vision=true`。图片传输失败不能推断为锁屏、显示器断开或额度不足，未知执行仍先对账。版本与实测见 [P90](ROADMAP.md#p90-mcp-images-storage)。
+
 Shell 以 Node 当前用户权限运行，工作目录不构成文件隔离。原生 Skill 保留现有生成、测试、具体版本批准与启用流程；full 免运行步骤的执行确认，不代替旧 M4 Skill 的版本批准。普通模式每个原生步骤创建具体审批任务，审批绑定固定版本、参数、设备与策略。
 
 ## Skill 步骤

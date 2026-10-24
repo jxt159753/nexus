@@ -6,6 +6,7 @@ import uvicorn
 from nexus.core.app import create_app
 from nexus.core.config import CoreConfig
 from nexus.service_config import load_config
+from nexus.core.asyncio_compat import configure_transport
 
 
 def main() -> None:
@@ -17,6 +18,7 @@ def main() -> None:
             "NEXUS_DATA_DIR": "data_dir", "NEXUS_HOST": "host", "NEXUS_PORT": "port",
         })
         app = create_app(config)
+        configure_transport()
         server = uvicorn.Config(app, host=config.host, port=config.port, workers=1,
             ws="websockets-sansio", ws_max_size=config.max_message_bytes,
             ws_max_queue=16, ws_per_message_deflate=False,

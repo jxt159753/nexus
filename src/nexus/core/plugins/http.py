@@ -242,10 +242,18 @@ class PluginHTTP:
             step,grant=await allowed_step(conn,str(invocation_id),utc_now())
             if grant['node_id']!=str(principal.identity_id): raise AccessDenied()
             args=json.loads(step['proposal_json'])['arguments']
-            if (args.get('plugin_id'),args.get('tool'))!=('builtin.present','present'): raise AccessDenied()
+            kind=(args.get('plugin_id'),args.get('tool'))
+            if kind not in {('builtin.present','present'),('builtin.mcp','mcp_call_tool')}: raise AccessDenied()
             task=await one(conn,'SELECT t.* FROM tasks t JOIN task_attempts a ON a.attempt_id=t.current_attempt_id WHERE t.task_id=? AND a.node_id=? AND a.phase IN (\'dispatching\',\'running\')',(step['task_id'],str(principal.identity_id)))
             if task is None: raise AccessDenied('ARTIFACT_TASK_NOT_RUNNING')
-            item=args['input']['files'][index]
+            if kind==('builtin.mcp','mcp_call_tool'):
+                from nexus.core.cognitive.attachment_media import image_media_type
+                from nexus.plugins.mcp_images import IMAGE_TYPES
+                media=image_media_type(content)
+                if media not in IMAGE_TYPES: raise ValueError('invalid MCP image bytes')
+                item={'path':f'mcp-image-{index+1}.{IMAGE_TYPES[media]}','description':'MCP 返回的图片'}
+            else:
+                item=args['input']['files'][index]
             identifier=str(uuid5(NAMESPACE_URL,f'{invocation_id}:{index}'))
             existing=await one(conn,'SELECT sha256 FROM plugin_deliverables WHERE deliverable_id=?',(identifier,))
             if existing and existing[0]!=digest: raise ValueError('artifact identity conflict')

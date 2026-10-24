@@ -1,7 +1,7 @@
 {
   "name": "nexus-windows",
   "private": true,
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "NEXUS Windows desktop shell",
   "scripts": {
     "tauri": "tauri",

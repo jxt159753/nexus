@@ -307,6 +307,7 @@ class PluginRuntime:
 
     def json_process(self,argv,payload,context,deadline,cancel):
         with self.lock: process=self.start(context,'worker',argv,self.cwd(context))
+        diagnostic={}
         try:
             process.send(canonical(payload)+'\n')
             process.process.stdin.close()
@@ -320,11 +321,14 @@ class PluginRuntime:
             if not isinstance(data,dict): raise ValueError('plugin worker must return an object')
             if data.get('worker_error'): raise ValueError(data['worker_error'])
             return bounded(data,24576)
+        except (OSError,ValueError) as exc:
+            diagnostic={'status':'unknown','error':str(exc)[:500]}
+            raise
         finally:
             with self.lock:
                 process.stop();self.processes.pop(process.identifier,None)
                 with self.db() as conn:
-                    conn.execute("UPDATE processes SET state='completed',result='{}' WHERE id=?",(process.identifier,))
+                    conn.execute("UPDATE processes SET state='completed',result=? WHERE id=?",(canonical(diagnostic),process.identifier))
 
     def control(self,name,value,context,deadline,cancel):
         with self.lock:

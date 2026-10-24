@@ -189,8 +189,9 @@ class ExecutionRepository:
             else:
                 await task_event(conn, task, "attempt.retry_ready", task.owner_id, now)
         else:
-            code = ErrorCode.BUDGET_EXCEEDED if retry else ErrorCode.EXECUTION_UNKNOWN
-            await conn.execute("UPDATE tasks SET error_json=? WHERE task_id=?", (create_error(code, "Execution attempt budget exhausted" if retry else "Execution ended without a result").model_dump_json(), str(task.task_id)))
+            exhausted = retry and task.action.tool not in MUTATING_TOOLS
+            code = ErrorCode.BUDGET_EXCEEDED if exhausted else ErrorCode.EXECUTION_UNKNOWN
+            await conn.execute("UPDATE tasks SET error_json=? WHERE task_id=?", (create_error(code, "Execution recovery attempts exhausted" if exhausted else "Execution stopped without a verified result; it was not repeated").model_dump_json(), str(task.task_id)))
             await transition(conn, task, "failed", task.owner_id, now, execution=True)
 
     async def active(self, node_id: UUID) -> list[dict]:
