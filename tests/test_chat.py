@@ -292,21 +292,21 @@ def test_actual_sse_parser_splits_utf8_validates_usage_and_minimizes_request():
     assert [m["role"] for m in captured[0]["messages"]] == ["system","user"]
 
 
-@pytest.mark.parametrize("chunks", [
-    [sse("partial"), b"data: [DONE]\n\n"],
-    [sse(delta={"tool_calls":[{"name":"shell"}]})],
-    [sse("x"*17000)],
-    [sse(finish="stop",usage={"prompt_tokens":True,"completion_tokens":1}),b"data: [DONE]\n\n"],
-    [b"data: not-json\n\n"],
+@pytest.mark.parametrize("chunks,code", [
+    ([sse("partial"), b"data: [DONE]\n\n"],"MODEL_OUTCOME_UNKNOWN"),
+    ([sse(delta={"tool_calls":[{"name":"shell"}]})],"MODEL_RESPONSE_INVALID"),
+    ([sse("x"*17000)],"MODEL_RESPONSE_LIMIT"),
+    ([sse(finish="stop",usage={"prompt_tokens":True,"completion_tokens":1}),b"data: [DONE]\n\n"],"MODEL_USAGE_INVALID"),
+    ([b"data: not-json\n\n"],"MODEL_REQUEST_FAILED"),
 ])
-def test_bad_streams_fail_closed_without_leaking_remote_body(chunks):
+def test_bad_streams_fail_closed_without_leaking_remote_body(chunks,code):
     async def handle(request):
         return httpx2.Response(200,headers={"content-type":"text/event-stream"},stream=Stream(chunks))
     async def scenario():
         provider = DeepSeekChatProvider(SecretStr("synthetic-key"),ModelConfig(),transport=httpx2.MockTransport(handle))
         async def receive(value):
             pass
-        with pytest.raises(ProviderFailure, match="MODEL_REQUEST_FAILED"):
+        with pytest.raises(ProviderFailure, match=code):
             await provider.invoke([{"role":"user","content":"hello"}],receive)
     asyncio.run(scenario())
 
@@ -385,7 +385,7 @@ def test_v6_upgrade_keeps_nonempty_ledger_and_consistent_backup(tmp_path):
         conn.commit()
     asyncio.run(Database(path).initialize())
     with closing(sqlite3.connect(path)) as conn:
-        assert conn.execute("SELECT * FROM model_calls").fetchone() == (*expected,None,0)
+        assert conn.execute("SELECT * FROM model_calls").fetchone() == (*expected,None,0,None,None,None,None,None)
         assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
     backups = list(tmp_path.glob("core.sqlite3.before-v7-*.sqlite3"))
     assert len(backups) == 1

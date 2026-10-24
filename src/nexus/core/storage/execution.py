@@ -1,5 +1,7 @@
 """Durable single-step dispatch and evidence settlement. No network I/O."""
 
+from nexus.contracts.basic import MUTATING_TOOLS
+
 from datetime import timedelta
 from uuid import UUID, uuid4
 
@@ -14,6 +16,7 @@ from nexus.core.security.types import AccessDenied, NodeScope, Principal
 from nexus.core.storage.database import Database, audit, one, timestamp, utc_now
 from nexus.core.storage.control import expire_task, task_event
 from nexus.core.storage.tasks import TERMINAL, canonical, load_task, transition
+from nexus.core.extensions.authorization import skill_task_allowed
 
 COMMAND = TypeAdapter(CommandExecute)
 RESULT = TypeAdapter(CommandResult)
@@ -41,11 +44,13 @@ class ExecutionRepository:
         now = utc_now()
         async with self.database.transaction() as conn:
             task = await load_task(conn, task_id)
+            if not await skill_task_allowed(conn, task_id, now):
+                return None
             authorization = await self.security.authorize_dispatch(conn, task, node, scope, now)
             if task.cancel_requested or (await one(conn, "SELECT paused FROM system_state WHERE singleton=1"))[0]:
                 return None
             count = (await one(conn, "SELECT count(*) FROM task_attempts WHERE task_id=?", (str(task_id),)))[0]
-            if count >= 2:
+            if count >= (1 if task.action.tool in MUTATING_TOOLS else 2):
                 return None
             if task.current_attempt_id is not None:
                 previous = await one(conn, "SELECT * FROM task_attempts WHERE attempt_id=?", (str(task.current_attempt_id),))
@@ -109,7 +114,14 @@ class ExecutionRepository:
                 return "already_settled" if task.status in TERMINAL or row["phase"] == "completed" else "stored"
             now = utc_now()
             if not (task.created_at - timedelta(seconds=5) <= result.observed_at <= min(now, command.expires_at) + timedelta(seconds=5)):
-                raise invalid()
+                if row["phase"] == "completed":
+                    return "already_settled"
+                # An authenticated, identity-bound completion proves the worker
+                # ended even when device clock skew invalidates its output time.
+                # Reject the business result without permanently holding the slot.
+                await audit(conn, str(node.identity_id), str(task.task_id), "attempt.result_time_rejected", now)
+                await self._ended(conn, task, row, now, outcome="unknown", retry=False)
+                return "already_settled"
             task = await expire_task(conn, task, now)
             if task.status in TERMINAL or task.current_attempt_id != result.attempt_id or row["phase"] == "completed":
                 await conn.execute("UPDATE task_attempts SET result_json=?, phase='completed', execution_stopped=1 WHERE attempt_id=?", (result.model_dump_json(), str(result.attempt_id)))
@@ -171,7 +183,7 @@ class ExecutionRepository:
             return
         if task.cancel_requested:
             await transition(conn, task, "cancelled", task.owner_id, now, execution=True)
-        elif retry and row["attempt_no"] < 2:
+        elif retry and row["attempt_no"] < 2 and task.action.tool not in MUTATING_TOOLS:
             if task.status != "recovering":
                 await transition(conn, task, "recovering", task.owner_id, now, execution=True)
             else:
@@ -205,16 +217,16 @@ class ExecutionRepository:
             if status.phase != "not_found" and status.command_digest != row["command_digest"]:
                 raise invalid()
             if row["phase"] in {"completed", "verifying"}:
-                return "none"
+                return "already_settled" if row["phase"] == "completed" and (status.phase == "cancelled" or status.phase == "unknown" and status.execution_stopped) else "none"
             now = utc_now()
             task = await expire_task(conn, task, now)
             if status.phase == "cancelled":
                 await self._ended(conn, task, row, now, outcome="known", retry=not task.cancel_requested)
-                return "none"
+                return "already_settled"
             if status.phase == "unknown":
                 if status.execution_stopped:
                     await self._ended(conn, task, row, now, outcome="unknown", retry=True)
-                    return "none"
+                    return "already_settled"
                 await conn.execute("UPDATE task_attempts SET phase='unknown' WHERE attempt_id=?", (str(status.attempt_id),))
             if task.status in TERMINAL or task.cancel_requested or row["stop_reason"]:
                 return "none"  # Periodic stop requests avoid a status/cancel feedback loop.
@@ -239,6 +251,8 @@ class ExecutionRepository:
 
     async def may_send(self, node: Principal, scope: NodeScope, command: CommandExecute) -> bool:
         async with self.database.transaction(write=False) as conn:
+            if not await skill_task_allowed(conn, command.task_id, utc_now()):
+                return False
             task, row = await self._active(conn, node, command.attempt_id)
             if (task.status not in {"dispatching", "running", "recovering"} or task.cancel_requested or row["phase"] in {"completed", "verifying"}
                     or row["stop_reason"] or utc_now() >= command.expires_at
@@ -255,6 +269,8 @@ class ExecutionRepository:
         async with self.database.transaction() as conn:
             task, row = await self._active(conn, node, attempt_id)
             now = utc_now()
+            if not await skill_task_allowed(conn, task.task_id, now):
+                return None
             if task.status not in {"dispatching", "running", "recovering"} or task.cancel_requested or row["phase"] in {"completed", "verifying"} or row["stop_reason"]:
                 return None
             if (await one(conn, "SELECT paused FROM system_state WHERE singleton=1"))[0]:

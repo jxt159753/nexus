@@ -1,3 +1,4 @@
+from nexus.plugins.contracts import PluginNodeCall, PluginNodeResult,PluginId,ToolId
 """JARVIS Link v1 payloads. These types do not authorize or execute actions."""
 
 from typing import Annotated, Literal, Self
@@ -16,6 +17,10 @@ from nexus.contracts.base import (
     Version1,
 )
 from nexus.contracts.errors import ErrorPayload
+from nexus.contracts.basic import ToolName, CommandId
+from nexus.contracts.interaction import InteractionResult
+from nexus.contracts.tools import ImageReadCall, ImageReadResult
+from nexus.contracts.tools import ObserveCall, InteractCall, FileLinesCall, FileLinesResult, FileGlobCall, FileGlobResult, FileGrepCall, FileGrepResult, FileEditPreviewCall, FileEditPreviewResult, FileEditCall, FileEditResult, FileReadCall, FileSearchCall, FilePreviewCall, FileWriteCall, CommandRunCall, FileReadResult, FileSearchResult, FilePreviewResult, FileWriteResult, CommandRunResult
 from nexus.contracts.task import ExecutionOutcome, TaskStatus
 from nexus.contracts.tools import (
     ListDirectoryCall,
@@ -92,14 +97,18 @@ class ControlUpdated(StrictContract):
 
 
 class ToolCapability(StrictContract):
-    tool: Literal["system.info", "filesystem.list"]
+    tool: ToolName
     tool_version: Version1
 
 
 class NodeHello(StrictContract):
+    plugin_digest: CommandDigest | None=None
+    plugin_tools: dict[PluginId,list[ToolId]]=Field(default_factory=dict,max_length=32)
     node_id: UUID
     node_version: StrictStr = Field(min_length=1, max_length=50)
-    tools: list[ToolCapability] = Field(max_length=2)
+    tools: list[ToolCapability] = Field(max_length=14)
+    interaction_digests: dict[CommandId, CommandDigest] = Field(default_factory=dict, max_length=16)
+    command_digests: dict[CommandId, CommandDigest] = Field(default_factory=dict, max_length=16)
     roots: list[Literal["workspace"]] = Field(max_length=1)
     boot_id: UUID
 
@@ -161,8 +170,64 @@ class ListDirectoryExecute(CommandExecuteBase, ListDirectoryCall):
     pass
 
 
+class FileReadExecute(CommandExecuteBase, FileReadCall):
+    pass
+
+
+class ImageReadExecute(CommandExecuteBase, ImageReadCall):
+    pass
+
+
+class FileSearchExecute(CommandExecuteBase, FileSearchCall):
+    pass
+
+
+class FilePreviewExecute(CommandExecuteBase, FilePreviewCall):
+    pass
+
+
+class FileWriteExecute(CommandExecuteBase, FileWriteCall):
+    pass
+
+
+class CommandRunExecute(CommandExecuteBase, CommandRunCall):
+    pass
+
+
+class FileLinesExecute(CommandExecuteBase, FileLinesCall):
+    pass
+
+
+class FileGlobExecute(CommandExecuteBase, FileGlobCall):
+    pass
+
+
+class FileGrepExecute(CommandExecuteBase, FileGrepCall):
+    pass
+
+
+class FileEditPreviewExecute(CommandExecuteBase, FileEditPreviewCall):
+    pass
+
+
+class FileEditExecute(CommandExecuteBase, FileEditCall):
+    pass
+
+
+class ObserveExecute(CommandExecuteBase, ObserveCall):
+    pass
+
+
+class InteractExecute(CommandExecuteBase, InteractCall):
+    pass
+
+
+class PluginNodeExecute(CommandExecuteBase, PluginNodeCall):
+    pass
+
+
 CommandExecute = Annotated[
-    SystemInfoExecute | ListDirectoryExecute, Field(discriminator="tool")
+    SystemInfoExecute | ListDirectoryExecute | FileReadExecute | FileSearchExecute | FilePreviewExecute | FileWriteExecute | CommandRunExecute | FileLinesExecute | FileGlobExecute | FileGrepExecute | FileEditPreviewExecute | FileEditExecute | ObserveExecute | InteractExecute | ImageReadExecute | PluginNodeExecute, Field(discriminator="tool")
 ]
 
 
@@ -207,8 +272,78 @@ class ListDirectoryCommandResult(CommandResultBase):
     result: ListDirectoryResult | None = None
 
 
+class FileReadCommandResult(CommandResultBase):
+    tool: Literal["filesystem.read"]
+    result: FileReadResult | None = None
+
+
+class ImageReadCommandResult(CommandResultBase):
+    tool: Literal["filesystem.read_image"]
+    result: ImageReadResult | None = None
+
+
+class FileSearchCommandResult(CommandResultBase):
+    tool: Literal["filesystem.search"]
+    result: FileSearchResult | None = None
+
+
+class FilePreviewCommandResult(CommandResultBase):
+    tool: Literal["filesystem.write_preview"]
+    result: FilePreviewResult | None = None
+
+
+class FileWriteCommandResult(CommandResultBase):
+    tool: Literal["filesystem.write"]
+    result: FileWriteResult | None = None
+
+
+class CommandRunCommandResult(CommandResultBase):
+    tool: Literal["command.run"]
+    result: CommandRunResult | None = None
+
+
+class FileLinesCommandResult(CommandResultBase):
+    tool: Literal["filesystem.read_lines"]
+    result: FileLinesResult | None = None
+
+
+class FileGlobCommandResult(CommandResultBase):
+    tool: Literal["filesystem.glob"]
+    result: FileGlobResult | None = None
+
+
+class FileGrepCommandResult(CommandResultBase):
+    tool: Literal["filesystem.grep"]
+    result: FileGrepResult | None = None
+
+
+class FileEditPreviewCommandResult(CommandResultBase):
+    tool: Literal["filesystem.edit_preview"]
+    result: FileEditPreviewResult | None = None
+
+
+class FileEditCommandResult(CommandResultBase):
+    tool: Literal["filesystem.edit"]
+    result: FileEditResult | None = None
+
+
+class ObserveCommandResult(CommandResultBase):
+    tool: Literal["interaction.observe"]
+    result: InteractionResult | None = None
+
+
+class InteractCommandResult(CommandResultBase):
+    tool: Literal["interaction.act"]
+    result: InteractionResult | None = None
+
+
+class PluginNodeCommandResult(CommandResultBase):
+    tool: Literal["plugin.call"]
+    result: PluginNodeResult | None = None
+
+
 CommandResult = Annotated[
-    SystemInfoCommandResult | ListDirectoryCommandResult, Field(discriminator="tool")
+    SystemInfoCommandResult | ListDirectoryCommandResult | FileReadCommandResult | FileSearchCommandResult | FilePreviewCommandResult | FileWriteCommandResult | CommandRunCommandResult | FileLinesCommandResult | FileGlobCommandResult | FileGrepCommandResult | FileEditPreviewCommandResult | FileEditCommandResult | ObserveCommandResult | InteractCommandResult | ImageReadCommandResult | PluginNodeCommandResult, Field(discriminator="tool")
 ]
 
 

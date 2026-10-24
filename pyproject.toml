@@ -19,6 +19,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+images = [
+    "Pillow==13.0.0",
+]
+plugins = [
+    "pywinpty==3.1.0; sys_platform == 'win32'",
+]
 dev = [
     "pytest>=8,<10",
 ]
@@ -29,8 +35,8 @@ include = ["nexus*"]
 
 [tool.setuptools.package-data]
 "nexus.core.storage" = ["migrations/*.sql"]
-"nexus.node" = ["migrations/*.sql"]
-"nexus.web" = ["*.html", "*.css", "*.js"]
+"nexus.node" = ["migrations/*.sql", "tools/*.ps1"]
+"nexus.web" = ["*.html", "*.css", "*.js", "app/*", "app/vendor/*", "app/vendor/addons/postprocessing/*", "app/vendor/addons/shaders/*", "app/vendor/markdown/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

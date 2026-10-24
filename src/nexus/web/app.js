@@ -38,6 +38,8 @@ function loggedOut() {
   memoryRetry = null;
   languageRetry = null; languageBefore = null;
   chatReset();
+  projectReset(); basicReset();
+  if (typeof extensionReset === "function") extensionReset();
   $("language-form").reset(); $("language-requests").replaceChildren();
   state.controlRevision = -1;
   ["tasks", "memories", "routes", "projects", "capabilities"].forEach(id => $(id).replaceChildren());
@@ -93,6 +95,7 @@ async function nodes() {
   $("node-status").textContent = node ? (node.online ? "在线 · 已认证" : "离线 · 任务会等待节点") : "请先在 Core 配置节点";
   $("capabilities").replaceChildren(...(node ? node.tools : []).map(t => el("span", t)));
   chatNodes(value.nodes);
+  basicNodes(value.nodes);
 }
 function putTask(task, detail) {
   const previous = state.tasks.get(task.task_id);
@@ -104,18 +107,41 @@ function putTask(task, detail) {
   }
   renderTasks();
   chatRender();
+  basicUpdatePreview();
 }
-function taskCard({task, detail}) {
+function displayJson(value, limit=12000) {
+  if (window.NexusImages?.safeJson) return window.NexusImages.safeJson(value, limit);
+  let raw = "";
+  try { raw = JSON.stringify(value, (key, item) => key === "data_base64" ? "[base64 已省略]" : item, 2) || ""; } catch { raw = "[无法序列化的记录]"; }
+  return raw.length > limit ? raw.slice(0, limit) + "…" : raw;
+}
+function renderTaskResult(container, result) {
+  if (!result) return;
+  if (result.image && window.NexusImages) {
+    const evidence = window.NexusImages.createImageEvidence(result);
+    if (evidence) { container.append(evidence); return; }
+    const metadata = window.NexusImages.createImageMetadata(result);
+    if (metadata) { container.append(metadata); return; }
+    container.append(el("p", "图片结果未通过严格白名单校验，不显示预览或内联数据；执行状态以任务记录为准。", "hint"));
+    return;
+  }
+  if (result.image) { container.append(el("p", "图片读取组件尚未加载；不显示内联图片数据。", "hint")); return; }
+  container.append(el("pre", displayJson(result)));
+}
+function taskCard({task, detail}, options={}) {
     const card = el("article", undefined, "task"); card.dataset.taskId = task.task_id;
     const heading = el("div", undefined, "section-heading");
-    heading.append(el("h3", task.request.intent === "get_system_info" ? "读取系统信息" : "列出 workspace 目录"));
+    heading.append(el("h3", toolLabels[task.request.intent] || task.request.intent));
     heading.append(el("span", statuses[task.status] || task.status, "badge " + (task.status === "succeeded" ? "success" : task.status === "awaiting_approval" ? "pending" : ["failed", "timed_out"].includes(task.status) ? "failed" : "")));
     card.append(heading, el("p", `${new Date(task.created_at).toLocaleString()} · ${task.task_id}`, "meta"));
     const project = state.projects.find(p => p.project_id === task.project_id);
     if (task.project_id) card.append(el("small", `项目：${project ? project.name : task.project_id}`));
     if (task.cancel_requested) card.append(el("p", terminal.has(task.status) ? "已记录取消请求；以最终执行证据为准。" : "已请求取消，等待节点确认实际停止。", "hint"));
     if (task.execution_outcome === "unknown") card.append(el("p", "执行结果未知 · Core 正在保留证据并对账", "hint"));
-    if (task.result) card.append(el("pre", JSON.stringify(task.result, null, 2)));
+    if (task.result && !(options && options.omitResult)) {
+      if (task.result.image && (task.status !== "succeeded" || task.execution_outcome === "unknown")) card.append(el("p", "任务未成功或结果未知；不显示图片预览，仅保留真实执行状态。", "hint"));
+      else renderTaskResult(card, task.result);
+    }
     if (task.error) card.append(el("p", `${task.error.code} · ${task.error.message}`, "hint"));
     if (task.verification) card.append(el("p", `验证级别：${task.verification}`, "hint"));
     if (task.result && task.result.truncated) card.append(el("p", "结果已截断，以上不是完整目录。", "hint"));
@@ -141,7 +167,7 @@ function taskCard({task, detail}) {
       const value = await api("/api/v1/tasks/" + task.task_id);
       let block = card.querySelector(".evidence");
       if (block) {block.remove(); return;}
-      block = el("pre", JSON.stringify({attempts:value.attempts, approvals:value.approvals, events:value.events}, null, 2), "evidence");
+      block = el("pre", displayJson({attempts:value.attempts, approvals:value.approvals, events:value.events}), "evidence");
       card.append(block);
     });
     buttons.append(more); card.append(buttons); return card;
@@ -234,7 +260,7 @@ async function loadProjects() {
   }
   if (!state.logged) return;
   state.projects = projects;
-  for (const id of ["task-project", "memory-project"]) {
+  for (const id of ["task-project", "memory-project", "chat-project", "project-workspace"]) {
     const selected = $(id).value; $(id).replaceChildren(new Option("不关联项目", ""));
     for (const project of projects) $(id).add(new Option(project.name, project.project_id));
     if (projects.some(p => p.project_id === selected)) $(id).value = selected;
@@ -269,10 +295,10 @@ async function records(kind, reset = true) {
 async function usage() {
   const value = await api("/api/v1/models/usage");
   if (!state.logged) return;
-  $("model-calls").replaceChildren(document.createTextNode(value.calls + " "), el("small", "次调用"));
+  $("model-calls").replaceChildren(document.createTextNode(value.calls + " "), el("small", "次 API 调用（含网页）"));
   $("model-cost").textContent = `费用 ${value.cost_microunits === null ? "未知（保留预留额度）" : "$" + value.cost_microunits / 1000000 + "（公开峰值单价上界）"} · 模型成功不等于任务成功`;
   document.querySelector(".model-badge").textContent = value.enabled ? "规则优先 · DeepSeek 按次同意" : "规则路由 · 模型已禁用";
-  chatAvailability(value.chat_enabled);
+  chatAvailability(value.chat_enabled,value.web_enabled);
 }
 async function languagePage(older = false) {
   const value = await api("/api/v1/language" + (older && languageBefore ? "?before=" + languageBefore : ""));
@@ -310,7 +336,7 @@ async function languagePage(older = false) {
 async function enter(session) {
   state.csrf = session.csrf_token; state.logged = true;
   $("login-panel").hidden = true; $("console").hidden = false; $("logout").hidden = false;
-  try {await Promise.all([nodes(), loadProjects(), usage(), languagePage(), chatList()]);}
+  try {await Promise.all([nodes(), loadProjects(), usage(), languagePage(), chatList(), typeof extensionStatus === "function" ? extensionStatus() : Promise.resolve()]);}
   catch (error) {loggedOut(); throw error;}
   connect();
 }
@@ -354,10 +380,11 @@ $("more-memories").onclick = action(async () => records("memories", false));
 $("more-routes").onclick = action(async () => records("routes", false));
 $("refresh-routes").onclick = action(async () => {await Promise.all([records("routes"), usage()]);});
 document.querySelectorAll("[data-tab]").forEach(button => {button.onclick = action(async () => {
-  for (const tab of ["chat", "tasks", "memories", "routes"]) $(tab + "-view").hidden = tab !== button.dataset.tab;
+  for (const tab of ["chat", "tasks", "extensions", "memories", "routes"]) $(tab + "-view").hidden = tab !== button.dataset.tab;
   document.querySelector(".workspace").classList.toggle("chat-mode",button.dataset.tab==="chat");
   document.querySelectorAll("[data-tab]").forEach(b => {b.classList.toggle("active", b === button); b.setAttribute("aria-pressed", String(b === button));});
   if (button.dataset.tab === "chat") await Promise.all([chatList(),usage()]);
+  else if (button.dataset.tab === "extensions") { if (typeof extensionPage === "function") await extensionPage(); }
   else if (button.dataset.tab !== "tasks") await records(button.dataset.tab);
 });});
 setInterval(() => {if (state.logged) nodes().catch(error => notify(error.message, true));}, 5000);
@@ -365,4 +392,6 @@ setInterval(() => {if (state.logged && languagePolling && !$("tasks-view").hidde
 window.addEventListener("pagehide", () => {state.generation++; clearTimeout(state.timer); if (state.socket) state.socket.close();});
 window.addEventListener("pageshow", event => {if (event.persisted && state.logged) connect();});
 initChat();
+initProjects();
+initBasicTools();
 api("/api/v1/session").then(enter).catch(error => {loggedOut(); if (error.message !== "AUTH_REQUIRED") notify(error.message, true);});

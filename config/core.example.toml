@@ -5,11 +5,21 @@ host = '127.0.0.1'
 port = 8000
 # Explicit loopback development. Remote access requires local_http=false and TLS.
 local_http = true
-origins = ['http://127.0.0.1:8000']
+# The Windows app loads its bundled UI from this secure Tauri origin.
+origins = ['http://127.0.0.1:8000', 'https://tauri.localhost']
 
 # Optional M2. Keep disabled until DEEPSEEK_API_KEY is safely set on Core.
 [models]
 chat_enabled = false # M3: explicitly enable after configuring Core's existing DeepSeek key
+chat_images_enabled = false # Enable only after the UI discloses image result transmission
+chat_input_bytes = 32768 # complete serialized request
+chat_context_window_tokens = 1000000
+chat_input_tokens = 32768
+chat_compaction_threshold_percent = 80
+chat_compaction_retain_percent = 16
+chat_compaction_headroom_tokens = 512
+web_enabled = false # DeepSeek Search/Fetch; reuse Core key and the shared daily/request budget
+web_request_cost_microunits = 750 # USD 0.00075 per billable request; review with price_valid_until
 enabled = false
 daily_cost_microunits = 1000000 # USD 1/day, UTC; outstanding unknowns remain charged
 task_cost_microunits = 50000   # USD 0.05/request; reserved before sending
@@ -20,6 +30,23 @@ timeout_seconds = 30
 input_price = 300000
 output_price = 1200000
 price_valid_until = '2026-10-25'
+
+# M4 is off by default. fixture_generation is a development-only substitute and
+# never proves sandbox isolation. Tool approval always requires a qualified
+# Sandbox Node whose runsc image digest matches the version environment.
+[extensions]
+enabled = false
+generation_enabled = false
+fixture_generation = false
+max_output_tokens = 4096
+approval_ttl_hours = 168
+
+# Register a dedicated Linux Sandbox Node only after runsc and the image digest
+# have been verified on that host. The Core never executes candidate code.
+# [sandbox_nodes.'<sandbox-node-uuid>']
+# runtime = 'runsc'
+# image_digest = '<64-hex image tree digest>'
+# verification_profiles = ['directory_entry_stats_v1']
 
 [nodes.'6909ccbe-2f7c-42ec-ab97-9fe1b03c425d']
 tools = ['system.info@1', 'filesystem.list@1']

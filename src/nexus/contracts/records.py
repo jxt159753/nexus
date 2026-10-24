@@ -3,7 +3,7 @@
 from typing import Literal, Self
 from uuid import UUID
 
-from pydantic import Field, StrictBool, StrictStr, model_validator
+from pydantic import Field, StrictBool, StrictInt, StrictStr, model_validator
 
 from nexus.contracts.base import StrictContract, UTCDateTime
 
@@ -43,4 +43,37 @@ class MemoryCreate(StrictContract):
             raise ValueError("unverified cannot have verification time")
         if not self.content.strip() or not self.source.strip():
             raise ValueError("nonempty content and source required")
+        return self
+
+
+class MemorySelection(StrictContract):
+    memory_ids: list[UUID] = Field(default_factory=list, max_length=8)
+
+    @model_validator(mode="after")
+    def unique(self) -> Self:
+        if len(set(self.memory_ids)) != len(self.memory_ids):
+            raise ValueError("duplicate memories")
+        return self
+
+
+class TodoCreate(StrictContract):
+    request_id: UUID
+    text: StrictStr = Field(min_length=1, max_length=1000)
+
+    @model_validator(mode="after")
+    def nonempty(self) -> Self:
+        if not self.text.strip():
+            raise ValueError("nonempty todo required")
+        return self
+
+
+class TodoUpdate(TodoCreate):
+    expected_revision: StrictInt = Field(ge=1)
+    status: Literal["planned", "done", "cancelled"]
+    evidence_task_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def evidence(self) -> Self:
+        if (self.status == "done") != (self.evidence_task_id is not None):
+            raise ValueError("only completed items require task evidence")
         return self

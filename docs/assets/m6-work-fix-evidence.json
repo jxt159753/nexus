@@ -1,0 +1,183 @@
+{
+  "observed_date": "2026-10-20",
+  "package": {
+    "sha256": "0952d92d9ee53c3bbbbee4a967c92a215f9c1bd912086ea621876eb99f96bfa8",
+    "app_files": 128,
+    "bytes": 256178
+  },
+  "deployment": {
+    "release": "/opt/nexus/releases/m6-work-fix-20261020",
+    "wheel_sha256": "0952d92d9ee53c3bbbbee4a967c92a215f9c1bd912086ea621876eb99f96bfa8",
+    "backup": "/var/backups/nexus/before-m6-work-fix-20261020T083923Z",
+    "backup_sha256": "3dcce31aea476eb1b63b6e91bd4becb2f60758069f9b2fa707fa61b8e13735b2",
+    "schema": 17,
+    "before_counts": {
+      "tasks": 25,
+      "conversations": 15,
+      "chat_turns": 26,
+      "model_calls": 34,
+      "identities": 3,
+      "grants": 14,
+      "skill_runs": 0
+    },
+    "all_old_rows_preserved": true,
+    "configuration_only_web_enabled": true,
+    "model_secret_unchanged": true,
+    "paused": true,
+    "service": "active",
+    "before_pid": 3730415,
+    "pid": 3945627,
+    "deployed": true,
+    "observed_at": "2026-10-20T08:39:29.936653+00:00"
+  },
+  "linux_preflight": {
+    "release": "/opt/nexus/releases/m6-work-fix-20261020",
+    "wheel_sha256": "0952d92d9ee53c3bbbbee4a967c92a215f9c1bd912086ea621876eb99f96bfa8",
+    "tests_exit_code": 0,
+    "locked_pins": 25,
+    "installed_files": 128,
+    "service_untouched": true,
+    "deployed": false
+  },
+  "api_after": {
+    "tasks": 25,
+    "conversations": 15,
+    "turns": 26,
+    "ledger_unchanged": true,
+    "node_scopes_unchanged": true,
+    "online_nodes": 1,
+    "online_sandbox_nodes": 1,
+    "catalogs": [
+      {
+        "node_id": "6cb88e0a-e645-498d-8dcd-81cc6a2cda94",
+        "skills": 0,
+        "digest_present": true
+      }
+    ],
+    "fixed_static_asset": true,
+    "tls_verified": true,
+    "web_enabled": true
+  },
+  "restored": {
+    "paused": false,
+    "prior_pause_restored": true,
+    "ledger_unchanged": true,
+    "history_unchanged": true,
+    "online_nodes": 1
+  },
+  "production_smoke": {
+    "passed": true,
+    "tls_verified": true,
+    "node_online": true,
+    "sandbox_online": true,
+    "workspace_unchanged": true,
+    "web_enabled": true,
+    "catalog": [
+      "find_files",
+      "get_node_status",
+      "get_system_info",
+      "list_directory",
+      "read_file",
+      "run_command",
+      "run_tool",
+      "web_fetch",
+      "web_search",
+      "write_file"
+    ],
+    "real_model_calls": 0,
+    "real_web_api_calls": 0,
+    "ledger_unchanged": true,
+    "unknown_cost_calls_preserved": 2,
+    "old_tasks_preserved": 25,
+    "smoke_tasks": [
+      {
+        "intent": "get_system_info",
+        "task_id": "1b36911f-27f9-4f28-bcf7-08b8d55ac01c",
+        "attempts": 1,
+        "verification": "node_report_schema_checked",
+        "no_extra_approval": true
+      },
+      {
+        "intent": "preview_file_write",
+        "task_id": "b47a1f3c-16f6-4656-9f0b-6b2f827b366b",
+        "attempts": 1,
+        "verification": "node_report_schema_checked",
+        "no_extra_approval": true
+      },
+      {
+        "intent": "write_file",
+        "task_id": "dd72d463-8e24-4eca-bb4f-05de33ffa134",
+        "attempts": 1,
+        "verification": "node_report_schema_checked",
+        "no_extra_approval": true
+      },
+      {
+        "intent": "read_file",
+        "task_id": "5eda9b2b-39a2-4958-8645-78506a49eedd",
+        "attempts": 1,
+        "verification": "node_report_schema_checked",
+        "no_extra_approval": true
+      },
+      {
+        "intent": "find_files",
+        "task_id": "5342d663-1fc6-4c1e-b404-073ce590654b",
+        "attempts": 1,
+        "verification": "node_report_schema_checked",
+        "no_extra_approval": true
+      }
+    ],
+    "smoke_file": "nexus-fix-check-334ff79c-fd9b-4ce3-8fd8-652e3d8c3293.txt",
+    "smoke_file_sha256": "94b316c0f40ebec6cf5dabc763460ad406efa3937b161dbff2b5be5c9b45b9ae",
+    "paused": false,
+    "smoke_file_cleaned": true
+  },
+  "windows_fixed": {
+    "passed": 204,
+    "seconds": 131.35,
+    "log": "var/web-work-fixed-2.log"
+  },
+  "source_full": {
+    "passed": 792,
+    "failed": 1,
+    "seconds": 496.18,
+    "failure": "S7 test discarded an approval event received before task.accepted; waiting for approval timed out. Test changed to collect both events without assuming ordering."
+  },
+  "tls_backup_checks": [
+    {
+      "passed": 2,
+      "failed": 0,
+      "seconds": 12.84,
+      "log": "var/web-work-acceptance-fixed-1.log",
+      "before_test_order_fix": true
+    },
+    {
+      "passed": 1,
+      "failed": 1,
+      "seconds": 10.08,
+      "log": "var/web-work-acceptance-fixed-2.log",
+      "passed_case": "HTTPS/WSS after test order fix",
+      "failed_case": "Offline backup temporary SQLite disk I/O error"
+    }
+  ],
+  "pending": "Last isolated TLS/backup rerun was NOT executed: automatic approval review failed because its usage limit was reached. No bypass or additional real model/web calls.",
+  "browser": {
+    "passed": true,
+    "real_node": true,
+    "synthetic_native_sse": true,
+    "batch_reads_then_write": true,
+    "no_extra_file_approval": true,
+    "web_search_fetch_links": true,
+    "refresh_recovery": true,
+    "viewports": [
+      "1440x1000",
+      "390x844"
+    ],
+    "errors": [],
+    "real_model_calls": 0,
+    "real_web_api_calls": 0
+  },
+  "real_model_calls": 0,
+  "real_web_api_calls": 0,
+  "android_device_verified": false,
+  "final_user_acceptance": false
+}

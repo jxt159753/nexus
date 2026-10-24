@@ -1,0 +1,7 @@
+{
+  "name": "nexus-plugin-runtime",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pinned local language-server dependency; no global PATH changes",
+  "dependencies": {"pyright": "1.1.414"}
+}

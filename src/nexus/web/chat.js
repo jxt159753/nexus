@@ -1,24 +1,32 @@
 "use strict";
 const chatState = {conversation:null, conversations:new Map(), turns:new Map(), previews:new Map(), actionConsents:new Set(), confirming:null, active:null, retry:null, createRequest:null, before:null, listBefore:null, latest:true, loading:false, enabled:false, epoch:0};
+const chatPresentationState = new Map();
 const chatLabels = {queued:"等待回复",generating:"正在回复",completed:"已完成",incomplete:"达到输出上限，回复未完整结束",stopping:"正在停止",stopped:"已停止",interrupted:"服务中断，未自动重发",failed:"回复失败",expired:"请求已过期"};
 function chatNodes(nodes) {
+  chatWorkState.nodes=new Map(nodes.map(node=>[node.node_id,node]));
   const selected=$("chat-node").value;
   $("chat-node").replaceChildren(...nodes.map(n=>new Option(`${n.node_id} · ${n.online ? "在线" : "离线"}`,n.node_id)));
   if (!nodes.length) $("chat-node").add(new Option("暂无配置节点；可继续普通聊天",""));
   if (nodes.some(n=>n.node_id===selected)) $("chat-node").value=selected;
+  if (chatSkillState.node && chatSkillState.node!==$("chat-node").value) chatSkillsInvalidate();
 }
 function chatReset() {
+  chatWorkReset();
+  chatMemoryReset(); chatReferenceReset();
   chatState.epoch++; chatState.conversation=null; chatState.conversations.clear(); chatState.turns.clear(); chatState.previews.clear(); chatState.actionConsents.clear(); chatState.confirming=null; chatState.active=null; chatState.retry=null; chatState.createRequest=null; chatState.before=null; chatState.listBefore=null; chatState.latest=true;
   $("chat-messages").replaceChildren(); $("chat-conversation").replaceChildren(new Option("新建一个会话开始", "")); $("chat-form").reset(); $("chat-title-form").reset(); $("chat-send").disabled=true; $("chat-stop").disabled=true;
+  chatSkillsReset();
 }
-function chatAvailability(enabled) {
+function chatAvailability(enabled,webEnabled=false) {
   chatState.enabled=enabled;
+  chatWorkState.webEnabled=webEnabled;
   $("chat-availability").textContent=enabled ? "DeepSeek · 可连续追问，聊天记录保存在 Core" : "聊天模型尚未启用；已有会话仍可查看。请在 Core 显式启用聊天配置。";
   $("chat-send").disabled=!enabled || !chatState.conversation || !!chatState.conversation.archived || !!chatState.active || !!chatState.confirming;
 }
 async function chatList(older=false) {
   const epoch=chatState.epoch, archived=$("chat-archived").checked;
-  const value=await api(`/api/v1/chat/conversations?archived=${archived}`+(older && chatState.listBefore ? `&before=${chatState.listBefore}` : ""));
+  const project=$("chat-project").value;
+  const value=await api(`/api/v1/chat/conversations?archived=${archived}&project_only=true`+(project ? `&project_id=${project}` : "")+(older && chatState.listBefore ? `&before=${chatState.listBefore}` : ""));
   if (!state.logged || epoch!==chatState.epoch || archived!==$("chat-archived").checked) return;
   if (!older) chatState.conversations.clear();
   value.conversations.forEach(c=>chatState.conversations.set(c.conversation_id,c));
@@ -31,7 +39,10 @@ async function chatList(older=false) {
 }
 async function chatSelect(id) {
   if (chatState.conversation?.conversation_id!==id) {
+    chatWorkReset();
+    chatMemoryReset(); chatReferenceReset();
     chatState.epoch++; chatState.turns.clear(); chatState.previews.clear(); chatState.actionConsents.clear(); chatState.retry=null; chatState.before=null; chatState.latest=true; $("chat-context").checked=true; $("chat-text").value="";
+    chatSkillsReset();
   }
   chatState.conversation=chatState.conversations.get(id);
   await chatHistory();
@@ -45,6 +56,7 @@ async function chatHistory(older=false) {
   if (value.conversation.revision>=chatState.conversation.revision) chatState.conversation=value.conversation;
   const wasActive=chatState.active;
   chatState.active=value.active_turn_id;
+  chatWorkState.grant=value.work_grant;
   chatState.conversations.set(conversation.conversation_id,chatState.conversation);
   const option=[...$("chat-conversation").options].find(o=>o.value===conversation.conversation_id);
   if (option) option.textContent=chatState.conversation.title;
@@ -53,9 +65,18 @@ async function chatHistory(older=false) {
     const previous=chatState.turns.get(turn.turn_id);
     if (!previous || turn.revision>=previous.revision) chatState.turns.set(turn.turn_id,turn);
     if (turn.task_id && (!state.tasks.has(turn.task_id) || (!terminal.has(state.tasks.get(turn.task_id).task.status) && state.socket?.readyState!==WebSocket.OPEN))) await updateTask(turn.task_id);
+    for (const step of turn.skill_run?.steps || []) {
+      if (step.task_id && (!state.tasks.has(step.task_id) || !terminal.has(state.tasks.get(step.task_id).task.status))) await updateTask(step.task_id);
+    }
+    for (const step of turn.work_steps || []) {
+      for (const id of [step.preview_task_id,step.task_id]) {
+        if (id && (!state.tasks.has(id) || !terminal.has(state.tasks.get(id).task.status))) await updateTask(id);
+      }
+    }
     if (chatState.retry?.payload.request_id===turn.request_id) {
       if ($("chat-text").value===chatState.retry.payload.text) $("chat-text").value="";
       chatState.retry=null;
+      chatMemoryReset(); chatReferenceReset();
     }
   }
   const ordered=[...chatState.turns.values()].sort((a,b)=>a.cursor-b.cursor);
@@ -84,13 +105,13 @@ function chatResultPreview(turn, card, canContinue) {
   const send=el("button","同意发送这些结果给 DeepSeek 并生成最终回答","primary");
   send.disabled=!canContinue || !value || value.expected_revision!==chatState.conversation?.revision || new Date(value.expires_at)<=new Date();
   load.disabled=!canContinue;
-  if (!canContinue) box.append(el("p","本次工具结果尚未发送给模型。已有后续消息，本轮不能再追加回答；新请求可在工具确认卡勾选自动回传。","hint"));
+  if (!canContinue) box.append(el("p","本次结果尚未发送给模型。已有后续消息或活动轮次，本轮不能再追加回答。","hint"));
   if (value) {
     const labels={os_name:"操作系统",os_version:"系统版本",architecture:"处理器架构",python_version:"Python 版本",root_id:"工作区别名",entries:"目录条目名称和类型",truncated:"是否截断"};
     box.append(el("p","选择本次外发字段；改选后请更新预览。原输入及当时所选上下文也将再次发送。","hint"));
     for (const field of value.available_fields) {
       const label=el("label",undefined,"checkbox"), input=document.createElement("input"); input.type="checkbox"; input.checked=value.fields.includes(field); input.value=field;
-      input.onchange=()=>{send.disabled=true;}; choices.push(input); label.append(input,document.createTextNode(labels[field])); box.append(label);
+      input.onchange=()=>{send.disabled=true;}; choices.push(input); label.append(input,document.createTextNode(labels[field] || `步骤 ${field} 的白名单结果`)); box.append(label);
     }
     box.append(el("pre",JSON.stringify(value.data,null,2)),el("p",`以上为实际外发结果；有效至 ${new Date(value.expires_at).toLocaleTimeString()}。最多再调用一次，与本轮已用费用共用 $0.05 上限。`,"hint"));
   }
@@ -111,6 +132,32 @@ function chatResultPreview(turn, card, canContinue) {
   });
   box.append(load); if (value) box.append(send); card.append(box);
 }
+function chatPresentationPanel(turn,p) {
+  let ui=chatPresentationState.get(turn.turn_id);
+  if (!ui) {
+    ui={open:!(p.phase==="completed" && p.collapse_process && p.final_text!==null),manual:false,phase:p.phase};
+    chatPresentationState.set(turn.turn_id,ui);
+  } else if (ui.phase!==p.phase) {
+    if (p.phase==="completed" && !ui.manual) ui.open=!(p.collapse_process && p.final_text!==null);
+    ui.phase=p.phase;
+  }
+  if (p.phase==="awaiting_input") ui.open=true;
+  const details=el("details","chat-process");
+  details.open=ui.open;
+  const summary=el("summary",ui.open?"收起处理过程":"查看处理过程");
+  details.append(summary);
+  details.addEventListener("toggle",()=>{ui.open=details.open;ui.manual=true;summary.textContent=details.open?"收起处理过程":"查看处理过程";});
+  for (const item of p.process || []) {
+    const box=el("div",undefined,"chat-process-text"); box.append(chatContent(item.text || "")); details.append(box);
+    if (item.truncated) details.append(el("p","这条摘要已裁剪，完整内容保留在 Core 记录中。","hint"));
+  }
+  if (p.process_truncated) details.append(el("p","较早的公开摘要已裁剪；完整记录仍在 Core 的执行日志中。","hint"));
+  if (p.live_text) {
+    details.append(el("p","正在生成","hint"));
+    const live=el("div",undefined,"chat-process-text"); live.append(chatContent(p.live_text)); details.append(live);
+  }
+  return details;
+}
 function chatRender() {
   const log=$("chat-messages"), nearBottom=log.scrollHeight-log.scrollTop-log.clientHeight<90;
   const existing=new Map([...log.querySelectorAll("[data-turn-id]")].map(n=>[n.dataset.turnId,n]));
@@ -120,18 +167,34 @@ function chatRender() {
     keep.add(turn.turn_id); let article=existing.get(turn.turn_id);
     if (!article) {article=el("article",undefined,"chat-turn"); article.dataset.turnId=turn.turn_id;}
     const task=turn.task_id ? state.tasks.get(turn.task_id) : null;
-    const revision=`${turn.revision}:${task?.task.revision ?? ""}:${chatState.conversation?.revision}:${chatState.previews.get(turn.turn_id)?.result_digest ?? ""}`;
+    const skillRevision=JSON.stringify([turn.skill_run?.revision,turn.skill_run?.steps.map(s=>[s.status,state.tasks.get(s.task_id)?.task.revision,s.tool_execution])]);
+    const revision=`${turn.revision}:${JSON.stringify(turn.presentation || null)}:${task?.task.revision ?? ""}:${chatState.conversation?.revision}:${chatState.previews.get(turn.turn_id)?.result_digest ?? ""}:${skillRevision}:${chatSkillState.busy.has(turn.turn_id)}`;
     if (article.dataset.revision!==revision) {
       article.dataset.revision=revision;
       const question=el("div",undefined,"chat-user"), answer=el("div",undefined,"chat-assistant");
+      const presentation=turn.presentation?.version===1 ? turn.presentation : null;
       question.append(el("strong","你"),el("div",turn.text,"chat-prose"));
-      answer.append(el("strong","NEXUS"),chatContent(turn.phase==="summary" ? (turn.initial_response_text || "已确认只读动作。") : turn.response_text || (turn.proposal ? "已提出只读动作，等待你的决定。" : turn.status==="queued" ? "等待模型…" : turn.status==="generating" ? "正在生成…" : "尚无回复内容")));
+      answer.append(el("strong","NEXUS"));
+      if (presentation) {
+        answer.append(chatPresentationPanel(turn,presentation));
+        if (presentation.final_text!==null) answer.append(el("strong","最终回答"),chatContent(presentation.final_text));
+      } else {
+        answer.append(chatContent(turn.phase==="summary" ? (turn.initial_response_text || "已确认只读动作。") : turn.response_text || (turn.work_status==="waiting" ? "正在执行本轮工作，请查看下方实际进度。" : turn.work_status==="permission" ? "需要你的答复，请查看下方具体请求。" : turn.proposal ? "已提出只读动作，等待你的决定。" : turn.status==="queued" ? "等待模型…" : turn.status==="generating" ? "正在生成…" : "尚无回复内容")));
+      }
       const cost=turn.cost_status==="unknown" ? " · 费用未知，保留预留" : turn.cost_microunits!=null ? ` · 费用上界 $${turn.cost_microunits/1000000}` : "";
-      answer.append(el("p",`${chatLabels[turn.status]}${turn.error_code ? " · "+turn.error_code : ""}${cost}${turn.context_truncated ? " · 本轮较早上下文已裁剪" : ""}`,"hint"));
+      const replyStatus=presentation ? presentation.label : (turn.work_status==="waiting" ? "工作进行中" : turn.work_status==="permission" ? "等待你的答复" : turn.skill_plan && turn.phase==="reply" ? "流程建议已生成" : chatLabels[turn.status]);
+      answer.append(el("p",`${replyStatus}${turn.error_code ? " · "+turn.error_code : ""}${cost}${turn.web_call_count ? ` · 网页请求 ${turn.web_call_count} 次（计入费用）` : ""}${turn.context_truncated ? " · 部分历史或工具上下文已裁剪，完整执行结果见工作记录" : ""}`,"hint"));
       const inspect=el("button","查看本轮发送内容","quiet");
-      inspect.onclick=action(async()=>{const value=await api(`/api/v1/chat/turns/${turn.turn_id}`); const details=el("pre",JSON.stringify(value.turn.context_messages,null,2)); inspect.replaceWith(details);});
+      inspect.onclick=action(async()=>{const value=await api(`/api/v1/chat/turns/${turn.turn_id}`); const details=el("pre",JSON.stringify({messages:value.turn.context_messages,skill_catalog:value.turn.skill_catalog,work_catalog:value.turn.work_catalog,work_messages:value.turn.work_messages,result_messages:value.turn.result_context_messages},null,2)); inspect.replaceWith(details);});
       answer.append(inspect);
-      if (turn.proposal) {
+      chatJournalButton(turn,answer);
+      const failureHints={MODEL_RESPONSE_INVALID:"模型返回的格式无法校验，本轮已停止。",MODEL_TOOL_CALL_LIMIT:"模型提出的动作超过本轮剩余额度，未执行这批动作。",MODEL_REQUEST_FAILED:"模型连接或响应解析失败，本轮已停止。",MODEL_TIMEOUT:"等待模型响应超时，本轮已停止。",MODEL_OUTCOME_UNKNOWN:"未收到完整模型响应或用量，实际费用无法确认；这不表示设备已经执行。"};
+      if (failureHints[turn.error_code]) answer.append(el("p",failureHints[turn.error_code],"hint"));
+      if (turn.error_code?.startsWith("WEB_")) answer.append(el("p","网页请求未完成，未自动重试；不能确定计费时保留该次预留。","hint"));
+      if (turn.work_grant_id) answer.append(chatWorkCards(turn));
+      if (turn.allow_skills && turn.status==="completed" && !turn.proposal) answer.append(el("p","本轮没有选出可执行流程，未创建设备执行。可核对可用能力或补充目标。","hint"));
+      if (turn.skill_plan) answer.append(chatSkillCard(turn,!chatState.active && turn===turns.at(-1)));
+      else if (turn.proposal) {
         const card=el("section",undefined,"chat-action");
         card.append(el("h3",turn.proposal.intent==="get_system_info" ? "读取系统信息" : "列出 workspace 目录"),el("pre",JSON.stringify({node_id:turn.node_id,action:turn.proposal,tool_version:1,expires_at:turn.expires_at},null,2)));
         if (task) {
@@ -159,7 +222,11 @@ function chatRender() {
         if (turn.result_supported && turn.phase==="reply" && turn.status==="completed" && task?.task.status==="succeeded" && turn.auto_result_status!=="waiting" && !chatState.conversation?.archived) chatResultPreview(turn,card,!chatState.active && turn===turns.at(-1));
         answer.append(card);
       }
-      if (turn.phase==="summary") answer.append(el("strong","最终回答"),chatContent(turn.response_text || (turn.status==="queued" ? "等待模型解读结果…" : turn.status==="generating" ? "正在根据结果生成回答…" : "本次解读未完成；工具执行结果已保留。")));
+      if (!presentation && turn.phase==="summary") answer.append(el("strong","最终回答"),chatContent(turn.response_text || (turn.status==="queued" ? "等待模型解读结果…" : turn.status==="generating" ? "正在根据结果生成回答…" : "本次解读未完成；工具执行结果已保留。")));
+      if (turn.memory_references?.length) {
+        const refs=el("details"); refs.append(el("summary","本轮引用的记忆与来源"),el("pre",JSON.stringify(turn.memory_references,null,2))); answer.append(refs);
+      }
+      const saveMemory=el("button","从本条输入明确保存记忆","quiet"); saveMemory.onclick=()=>chatMemoryEditor(turn); answer.append(saveMemory);
       article.replaceChildren(question,answer);
     }
     log.append(article);
@@ -170,19 +237,37 @@ function chatRender() {
   const conversation=chatState.conversation;
   if (document.activeElement!==$("chat-title")) $("chat-title").value=conversation?.title || "";
   $("chat-archive").disabled=!conversation; $("chat-archive").textContent=conversation?.archived ? "取消归档" : "归档";
-  $("chat-stop").disabled=!chatState.active;
+  const flowRunning=!!chatState.turns.get(chatState.active)?.skill_run && chatState.turns.get(chatState.active)?.phase!=="summary";
+  $("chat-stop").disabled=!chatState.active || flowRunning;
   const waiting=chatState.turns.get(chatState.active)?.auto_result_status==="waiting";
   $("chat-stop").textContent=waiting ? "停止自动回传" : "停止回复";
   $("chat-send").disabled=!chatState.enabled || !conversation || !!conversation.archived || !!chatState.active || !!chatState.confirming;
-  $("chat-context-info").textContent=waiting ? "等待工具结果并自动回答，完成后即可追问。停止自动回传不会取消工具；取消执行请使用任务卡。" : chatState.active ? "本轮上下文已固定；停止或完成后可发送下一条。" : "每次发送最多附带本会话最近 10 轮完整对话，超限按整轮裁剪。";
+  chatWorkRender();
+  chatControlFields();
+  if (chatState.active && conversation && !conversation.archived && !chatState.confirming) $("chat-send").disabled=false;
+  const permission=chatState.turns.get(chatState.active)?.work_status==="permission";
+  if (permission && !conversation?.archived) $("chat-send").disabled=false;
+  $("chat-send").textContent=chatState.active && !permission ? ($("chat-input-mode").value==="steer" ? "发送纠正，下一步生效" : "排队发送后续任务") : permission ? "发送本次权限答复" : chatWorkActive() ? "发送并允许本轮工具结果回传 DeepSeek" : "发送给 DeepSeek";
+  $("chat-stop").textContent=chatState.turns.get(chatState.active)?.work_grant_id ? "停止本轮工作" : $("chat-stop").textContent;
+  $("chat-text").placeholder=permission ? "回复：同意 / 不同意（不调用模型）" : "说出你的问题或工作目标";
+  const working=chatWorkActive();
+  $("chat-tools").parentElement.lastChild.textContent=working ? "本轮使用已配置的工具与工作区" : "允许建议系统信息与目录工具（执行前需确认）";
+  for (const id of ["chat-skill-load","chat-skills-catalog"]) $(id).hidden=working;
+  $("chat-skills").parentElement.hidden=working;
+  const imageNote=working && chatWorkImageAvailable() ? " 图片工具已由服务器返回：配置工作区内的图片可能生成最多 1024px / 8 KiB 的有界快照并随本轮结果发送给 DeepSeek；可能继续缩小或使用有损 JPEG，GIF/WebP 只取首帧，透明区域显示白底。点击发送即本轮明确同意，历史选择不代替本轮同意。" : "";
+  $("chat-outbound-notice").textContent=working ? "发送即同意外发本轮输入、所选上下文、可用能力目录及实际工具结果；网页搜索词和公开页面网址会发送给 DeepSeek。每轮最多 4 个动作、5 次工作模型交换；勾选压缩时最多额外一次摘要调用，共用原费用上限；网页每次有结果收费 $0.00075，合计共用 $0.05 和每日 $1。"+imageNote : "点击“发送给 DeepSeek”即同意外发本次输入及所选上下文和流程目录。勾选压缩时最多额外一次摘要调用，共用原费用上限。单步工具可在确认卡允许自动回传；多步流程成功后先预览结果，再同意解读。每天 $1、每轮共用 $0.05，普通聊天 1 次、含结果解读最多 2 次调用。"+imageNote;
+  $("chat-context-info").textContent=flowRunning ? "流程正在执行，请在上方查看步骤、审批或取消整个流程。完成后可预览结果并追问。" : waiting ? "等待工具结果并自动回答，完成后即可追问。停止自动回传不会取消工具；取消执行请使用任务卡。" : chatState.active ? "可选择纠正当前工作或排队后续任务；纠正在已派发操作结束后生效，不会扩大权限。" : "上下文保留近期原文和所选资料；同意压缩时按 token 估算与请求容量生成旧历史摘要，原始记录保留。可用 /compact 手动压缩。";
 }
 function initChat() {
+  initChatControls();
+  initChatWork();
+  initChatSkills();
   $("chat-new").onclick=action(async()=>{
     $("chat-new").disabled=true; $("chat-text").disabled=true; $("chat-text").value="";
     chatState.epoch++; chatState.conversation=null; chatState.active=null; chatState.turns.clear(); chatRender();
     try {
       chatState.createRequest ||= crypto.randomUUID();
-      const value=await api("/api/v1/chat/conversations",{method:"POST",body:JSON.stringify({request_id:chatState.createRequest})});
+      const value=await api("/api/v1/chat/conversations",{method:"POST",body:JSON.stringify({request_id:chatState.createRequest,project_id:$("chat-project").value || null})});
       chatState.createRequest=null; $("chat-archived").checked=false; await chatList();
       if (!chatState.conversations.has(value.conversation.conversation_id)) chatState.conversations.set(value.conversation.conversation_id,value.conversation);
       await chatSelect(value.conversation.conversation_id);
@@ -199,12 +284,28 @@ function initChat() {
     $("chat-send").disabled=true;
     try {
     const conversation=chatState.conversation;
-    if (!conversation || chatState.active) throw new Error("请先新建会话或等待当前回复结束");
-    const allowTools=$("chat-tools").checked && !!$("chat-node").value, nodeId=allowTools ? $("chat-node").value : null;
-    const signature=JSON.stringify([conversation.conversation_id,$("chat-text").value,$("chat-context").checked,allowTools,nodeId]);
-    if (chatState.retry?.signature!==signature) chatState.retry={signature,payload:{request_id:crypto.randomUUID(),expected_revision:conversation.revision,text:$("chat-text").value,include_context:$("chat-context").checked,allow_model:true,allow_tools:allowTools,node_id:nodeId}};
+    if (chatState.turns.get(chatState.active)?.work_status==="permission") {await chatWorkAnswer(chatState.turns.get(chatState.active));return;}
+    if (!conversation) throw new Error("请先新建会话");
+    if (chatState.active && $("chat-input-mode").value==="steer") {
+      const signature=JSON.stringify([chatState.active,$("chat-text").value]);
+      if (chatControlState.retry?.signature!==signature) chatControlState.retry={signature,payload:{request_id:crypto.randomUUID(),text:$("chat-text").value,allow_model:true}};
+      await api(`/api/v1/chat/turns/${chatState.active}/steer`,{method:"POST",body:JSON.stringify(chatControlState.retry.payload)});
+      chatControlState.retry=null;$("chat-text").value="";notify("纠正已记录，将在当前执行结束后的下一步生效");return;
+    }
+    const compactOnly=$("chat-text").value.trim()==="/compact";
+    const allowCompaction=$("chat-compaction").checked;
+    if (compactOnly && (!allowCompaction || !$("chat-context").checked)) throw new Error("请勾选会话上下文和压缩同意");
+    const allowTools=!compactOnly && $("chat-tools").checked && !!$("chat-node").value, nodeId=allowTools ? $("chat-node").value : null;
+    const allowSkills=!compactOnly && !chatWorkActive() && $("chat-skills").checked;
+    if (allowSkills && (!allowTools || !chatSkillState.catalog || chatSkillState.node!==nodeId)) throw new Error("请重新查看流程目录后再允许发送");
+    const skillsDigest=allowSkills ? chatSkillState.catalog.skills_digest : null;
+    const memories=compactOnly ? {} : {...memorySubmission(),...chatReferenceSubmission()};
+    const work=compactOnly ? {} : await chatWorkSubmission();
+    const signature=JSON.stringify([conversation.conversation_id,$("chat-text").value,$("chat-context").checked,allowTools,nodeId,allowSkills,skillsDigest,memories,work,allowCompaction,compactOnly]);
+    if (chatState.retry?.signature!==signature) chatState.retry={signature,payload:{request_id:crypto.randomUUID(),expected_revision:conversation.revision,text:$("chat-text").value,include_context:$("chat-context").checked,allow_compaction:allowCompaction,compact_only:compactOnly,allow_model:true,enqueue:!!chatState.active,allow_tools:allowTools,node_id:nodeId,allow_skills:allowSkills,skills_digest:skillsDigest,...memories,...work}};
     await api(`/api/v1/chat/conversations/${conversation.conversation_id}/turns`,{method:"POST",body:JSON.stringify(chatState.retry.payload)});
     chatState.latest=true; await chatHistory();
+    $("chat-skills").checked=false;
     } catch(error) {
       if (error.message==="IDEMPOTENCY_CONFLICT") {chatState.retry=null; await chatHistory(); notify("会话已变化，请核对上下文后重新发送",true);}
       else notify(error.message,true);

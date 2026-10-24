@@ -27,6 +27,10 @@ Do not infer missing resources or claim execution. If ambiguous, return unsuppor
 class ProviderFailure(ValueError):
     """No remote body, credential or transport exception is exposed to clients."""
 
+    def __init__(self, code: str, *, usage: tuple[int,int] | None = None, model: str | None = None):
+        super().__init__(code)
+        self.usage, self.model = usage, model
+
 
 class DeepSeekProvider:
     def __init__(self, key: SecretStr, config: ModelConfig, *, transport=None):

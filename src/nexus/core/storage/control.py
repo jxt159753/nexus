@@ -88,6 +88,8 @@ class ControlRepository:
             event = await conn.execute("INSERT INTO control_events(owner_id,kind,paused,revision,created_at) VALUES(?,?,?,?,?)", (str(principal.identity_id), kind, int(paused), revision, timestamp(now)))
             affected = 0
             if kind == "cancel_all":
+                await conn.execute("UPDATE chat_work_grants SET revoked_at=? WHERE owner_id=? AND revoked_at IS NULL",(timestamp(now),str(principal.identity_id)))
+                await conn.execute("UPDATE chat_turns SET work_status='stopping',revision=revision+1 WHERE owner_id=? AND work_status!=''",(str(principal.identity_id),))
                 await conn.execute("UPDATE conversations SET revision=revision+1 WHERE owner_id=? AND conversation_id IN (SELECT conversation_id FROM chat_turns WHERE auto_result_status='waiting')", (str(principal.identity_id),))
                 automatic = await conn.execute("UPDATE chat_turns SET auto_result_status='stopped',revision=revision+1 WHERE owner_id=? AND auto_result_status='waiting'", (str(principal.identity_id),))
                 affected += automatic.rowcount
@@ -97,6 +99,10 @@ class ControlRepository:
                 affected += chats.rowcount
                 language = await conn.execute("UPDATE language_requests SET status='cancelled' WHERE owner_id=? AND status IN ('queued','interpreting','proposed')", (str(principal.identity_id),))
                 affected += language.rowcount
+                extensions = await conn.execute("UPDATE extension_requests SET status='cancelled',updated_at=?,revision=revision+1 WHERE owner_id=? AND status IN ('draft','queued','generating')", (timestamp(now), str(principal.identity_id)))
+                affected += extensions.rowcount
+                skills = await conn.execute("UPDATE skill_runs SET status='cancelling',cancel_requested=1,revision=revision+1,updated_at=? WHERE owner_id=? AND status IN ('running','cancelling')", (timestamp(now), str(principal.identity_id)))
+                affected += skills.rowcount
                 rows = await conn.execute_fetchall("SELECT task_id FROM tasks WHERE owner_id=? AND status NOT IN ('succeeded','failed','cancelled','timed_out') LIMIT 100", (str(principal.identity_id),))
                 for row in rows:
                     task = await expire_task(conn, await load_task(conn, UUID(row[0])), now)

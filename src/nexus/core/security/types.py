@@ -37,6 +37,9 @@ class NodeScope:
     local_tools: frozenset[str]
     local_roots: frozenset[str]
     resource_version: int = 1
+    command_digests: dict[str, str] = field(default_factory=dict)
+    interaction_digests: dict[str, str] = field(default_factory=dict)
+    plugin_digest: str | None=None
 
     def __post_init__(self) -> None:
         if type(self.resource_version) is not int or self.resource_version < 1:

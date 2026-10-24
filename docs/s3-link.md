@@ -67,6 +67,6 @@ Invoke-RestMethod -Uri "$origin/api/v1/nodes" -WebSession $session
 
 Core 收到的 status_result / error 进入当前连接的有界 incoming 队列，仅是尚未信任、未结算的传输证据。P06 不自动 ACK 结果、不推进任务状态、不建立持久派发队列；未来 P07 消费者须先校验归属及有效 attempt、落盘，再发送 result.ack。断线可能丢失内存消息，本地回执保留以便后续对账。
 
-当前 Node 对网络 command.execute 明确返回 POLICY_DENIED，Core 内部发送入口也拒绝执行派发，避免绕过尚未实现的 P07 权威事务。P05 本地执行接口保持可用，其真实工具与进程验证仍见 [Node Runtime](node-runtime.md)。全局控制、有限重试和网络故障结算属于 P08；S3 交付不表示后端任务闭环或 MVP 完成。
+S3 交付时 Node 对网络 command.execute 返回 POLICY_DENIED，Core 内部发送入口也拒绝执行派发，以免绕过当时尚未接入的 P07 权威事务；这是历史阶段限制。S4 已通过 Harness 启用执行，S5 已接入全局控制、有限重试和故障结算，M6 基础工具与[聊天工作](chat-work.md)继续复用该链路；不能将 S3 的禁派发快照作为当前运行规则。P05 工具与进程证据仍见 [Node Runtime](node-runtime.md)。
 
 WebSocket 客户端选用锁定的 websockets 17.1，同时供 Uvicorn 的 Sans-I/O 后端使用；已有框架及其他 24 个依赖版本不变。API 边界参考 [websockets asyncio client 官方文档](https://websockets.readthedocs.io/en/stable/reference/asyncio/client.html)；本项目关闭重定向、代理和压缩的行为由本地源码与测试验证。

@@ -1,0 +1,240 @@
+{
+  "date": "2026-10-20",
+  "kind": "supplement",
+  "wheel_sha256": "0952d92d9ee53c3bbbbee4a967c92a215f9c1bd912086ea621876eb99f96bfa8",
+  "installed_files_verified": 128,
+  "rounds": [
+    {
+      "round": 1,
+      "passed": 2,
+      "seconds": 9.49,
+      "evidence": [
+        {
+          "transport": "HTTPS/WSS with explicit isolated CA and hostname verification",
+          "core_pid": 6588,
+          "node_pid": 58464,
+          "system_task": "4c7d1c5e-3123-486e-8cdc-5da6b6d07da8",
+          "directory_task": "9f8c4081-a61a-4cfb-ad9f-7c4ca62ea3e7",
+          "verification": "node_report_schema_checked",
+          "certificate_rejections": [
+            "untrusted CA",
+            "hostname mismatch"
+          ],
+          "wss_auth_rejections": [
+            "missing cookie",
+            "wrong origin"
+          ],
+          "idempotency_conflict_status": 409,
+          "model_calls": 0
+        },
+        {
+          "original_pids": [
+            53572,
+            44364
+          ],
+          "restored_core_pid": 66392,
+          "restored_node_pid": 11384,
+          "backup_sha256": {
+            "core": "921c542e4807dea45ad9500735e717ca8227f2b6825a5b7e6aecacdfc11e02ba",
+            "node": "9bfb7c93837e47486f814ed52bb13af2c2d07a7bc5fd0ecf6e1a721240dc6051"
+          },
+          "restored_into_fresh_directories": true,
+          "node_initially_offline": true,
+          "scope_preserved": true,
+          "paused_preserved": true,
+          "history_preserved": true,
+          "pending_approval_preserved": "3c900d9b-3513-4f97-aa40-df137e23d623",
+          "system_task": "4c0734ff-56e1-4225-be46-ce5c4d383567",
+          "directory_task": "adafa057-8b91-4683-85be-7e09ab8e6aab",
+          "memory_consent": "54b123dc-9f75-4176-bafd-e654c538dbaf",
+          "model_calls": 0
+        }
+      ]
+    },
+    {
+      "round": 2,
+      "passed": 2,
+      "seconds": 10.39,
+      "evidence": [
+        {
+          "transport": "HTTPS/WSS with explicit isolated CA and hostname verification",
+          "core_pid": 6720,
+          "node_pid": 30060,
+          "system_task": "7e80a69e-7df0-4247-aa54-85db033f0e6d",
+          "directory_task": "ab088a69-254c-4118-a89b-38733896d192",
+          "verification": "node_report_schema_checked",
+          "certificate_rejections": [
+            "untrusted CA",
+            "hostname mismatch"
+          ],
+          "wss_auth_rejections": [
+            "missing cookie",
+            "wrong origin"
+          ],
+          "idempotency_conflict_status": 409,
+          "model_calls": 0
+        },
+        {
+          "original_pids": [
+            50580,
+            57216
+          ],
+          "restored_core_pid": 18584,
+          "restored_node_pid": 46552,
+          "backup_sha256": {
+            "core": "2ae9a01c3bc7c206255147884596e89ff376a7585b3bb08296e609b6f76ba5f1",
+            "node": "923baf206b597feebc0b1cf94ec60496b5be1d4b37974ddf92a855a733b95b36"
+          },
+          "restored_into_fresh_directories": true,
+          "node_initially_offline": true,
+          "scope_preserved": true,
+          "paused_preserved": true,
+          "history_preserved": true,
+          "pending_approval_preserved": "94d32f06-1d05-46ed-be6b-15ecbd673ebe",
+          "system_task": "791a6964-8746-4922-be43-8d97779fb2c7",
+          "directory_task": "f46c06ef-aef0-4a0c-ab38-d6c548c4cbc2",
+          "memory_consent": "01ff028e-b4e6-4461-971d-7875936b778a",
+          "model_calls": 0
+        }
+      ]
+    },
+    {
+      "round": 3,
+      "passed": 2,
+      "seconds": 9.57,
+      "evidence": [
+        {
+          "transport": "HTTPS/WSS with explicit isolated CA and hostname verification",
+          "core_pid": 39716,
+          "node_pid": 59956,
+          "system_task": "124dc9cd-dde3-4ef6-96cb-a53026632f27",
+          "directory_task": "882790e0-f26d-44ea-889e-003f6acd919d",
+          "verification": "node_report_schema_checked",
+          "certificate_rejections": [
+            "untrusted CA",
+            "hostname mismatch"
+          ],
+          "wss_auth_rejections": [
+            "missing cookie",
+            "wrong origin"
+          ],
+          "idempotency_conflict_status": 409,
+          "model_calls": 0
+        },
+        {
+          "original_pids": [
+            38008,
+            61552
+          ],
+          "restored_core_pid": 10304,
+          "restored_node_pid": 52396,
+          "backup_sha256": {
+            "core": "df147179a579f9edf6d8d577efa222be7a7f6f9b1ed8e2d44070820b7b267d3b",
+            "node": "c46fea9d1dbeee996966a1b459ffee719559ae5bd4d99fef9e8aace92d4f614b"
+          },
+          "restored_into_fresh_directories": true,
+          "node_initially_offline": true,
+          "scope_preserved": true,
+          "paused_preserved": true,
+          "history_preserved": true,
+          "pending_approval_preserved": "d4d98dd7-0f6e-489b-929a-db6dba8721a6",
+          "system_task": "8974dea6-aca6-4823-b446-9ed4fc1effb7",
+          "directory_task": "ea1fa123-6304-4fa0-8a8f-0085af1bcefd",
+          "memory_consent": "2fc1f5cb-14c0-41e1-ae60-ffa1740d3f45",
+          "model_calls": 0
+        }
+      ]
+    }
+  ],
+  "total_passed": 6,
+  "previous_io_error_reproduced": false,
+  "previous_io_error_root_cause_confirmed": false,
+  "production_metadata": {
+    "since": "2026-10-20T08:39:29.936653+00:00",
+    "observed_calls": [
+      {
+        "provider": "deepseek",
+        "model": "deepseek-flash",
+        "cost_status": "calculated",
+        "outcome": "completed",
+        "calls": 9,
+        "cost_microunits": 7606
+      }
+    ],
+    "work_steps": [
+      {
+        "intent": "list_directory",
+        "status": "succeeded",
+        "verification": "node_report_schema_checked",
+        "execution_outcome": "known",
+        "error_code": null
+      },
+      {
+        "intent": "get_system_info",
+        "status": "succeeded",
+        "verification": "node_report_schema_checked",
+        "execution_outcome": "known",
+        "error_code": null
+      },
+      {
+        "intent": "write_file",
+        "status": "succeeded",
+        "verification": "node_report_schema_checked",
+        "execution_outcome": "known",
+        "error_code": null
+      },
+      {
+        "intent": "list_directory",
+        "status": "succeeded",
+        "verification": "node_report_schema_checked",
+        "execution_outcome": "known",
+        "error_code": null
+      },
+      {
+        "intent": "run_command",
+        "status": "succeeded",
+        "verification": "node_report_schema_checked",
+        "execution_outcome": "known",
+        "error_code": null
+      },
+      {
+        "intent": "list_directory",
+        "status": "succeeded",
+        "verification": "node_report_schema_checked",
+        "execution_outcome": "known",
+        "error_code": null
+      },
+      {
+        "intent": "run_command",
+        "status": "succeeded",
+        "verification": "node_report_schema_checked",
+        "execution_outcome": "known",
+        "error_code": null
+      },
+      {
+        "intent": "write_file",
+        "status": "succeeded",
+        "verification": "node_report_schema_checked",
+        "execution_outcome": "known",
+        "error_code": null
+      }
+    ],
+    "step_limit": 100,
+    "contents_excluded": true,
+    "unknown_cost_calls": 2
+  },
+  "production_state": {
+    "paused": false,
+    "calls": 43,
+    "unknown_cost_calls": 2,
+    "node_online": true,
+    "web_enabled": true
+  },
+  "new_real_model_calls": 0,
+  "new_real_web_api_calls": 0,
+  "real_web_api_verified": false,
+  "android_device_verified": false,
+  "application_changed": false,
+  "redeployed": false,
+  "final_user_acceptance": false
+}

@@ -5,7 +5,10 @@ from uuid import UUID
 from fastapi import APIRouter, Query, Request
 
 from nexus.contracts.base import StrictContract
-from nexus.contracts.chat import ChatActionDecision, ChatResultConsent, ChatResultPreview, ChatSubmission, ConversationCreate, ConversationUpdate
+from nexus.contracts.records import MemorySelection
+from nexus.contracts.work import WorkGrantCreate, WorkPermissionReply
+from nexus.core.cognitive import work_catalog
+from nexus.contracts.chat import ChatSteering, ChatResume, ChatReferences, ChatActionDecision, ChatPlanPreview, ChatResultConsent, ChatResultPreview, ChatSubmission, ConversationCreate, ConversationUpdate
 from nexus.core.harness.http import body
 
 
@@ -22,15 +25,67 @@ class ChatHTTP:
             ("/turns/{turn_id}/action", "POST", self.decide_action),
             ("/turns/{turn_id}/result-preview", "POST", self.preview_result),
             ("/turns/{turn_id}/result-consent", "POST", self.consent_result),
+            ("/skills", "GET", self.skills),
+            ("/turns/{turn_id}/plan-preview", "POST", self.preview_plan),
+            ("/conversations/{conversation_id}/memory-preview", "POST", self.memory_preview),
+            ("/work-catalog", "GET", self.work_catalog),
+            ("/conversations/{conversation_id}/work-grant", "POST", self.work_grant),
+            ("/conversations/{conversation_id}/work-grant", "DELETE", self.work_revoke),
+            ("/turns/{turn_id}/permission", "POST", self.work_permission),
+            ("/turns/{turn_id}/journal", "GET", self.journal),
+            ("/turns/{turn_id}/steer", "POST", self.steer),
+            ("/turns/{turn_id}/resume", "POST", self.resume),
+            ("/conversations/{conversation_id}/reference-preview", "POST", self.reference_preview),
         ]:
             self.router.add_api_route(path, handler, methods=[method])
+
+    async def journal(self,turn_id: UUID,request: Request):
+        return await self.service.journal.detail(await self.guards.owner_http(request),turn_id)
+
+    async def steer(self,turn_id: UUID,request: Request):
+        await self.service.journal.steer(await self.guards.owner_http(request),turn_id,await body(request,ChatSteering))
+        return {"queued":True}
+
+    async def resume(self,turn_id: UUID,request: Request):
+        await self.service.journal.resume(await self.guards.owner_http(request),turn_id,await body(request,ChatResume))
+        return {"resumed":True}
+
+    async def reference_preview(self,conversation_id: UUID,request: Request):
+        return await self.service.journal.preview_references(await self.guards.owner_http(request),conversation_id,await body(request,ChatReferences))
+
+    async def work_catalog(self, request: Request, node_id: UUID):
+        principal=await self.guards.owner_http(request)
+        async with self.service.database.transaction(write=False) as conn:
+            return await work_catalog.catalog(self.service,conn,principal,node_id)
+
+    async def work_grant(self,conversation_id: UUID,request: Request):
+        return {"grant":await self.service.work.grant(await self.guards.owner_http(request),conversation_id,await body(request,WorkGrantCreate))}
+
+    async def work_revoke(self,conversation_id: UUID,request: Request):
+        principal=await self.guards.owner_http(request)
+        await body(request,StrictContract)
+        await self.service.work.revoke(principal,conversation_id)
+        return {"revoked":True}
+
+    async def work_permission(self,turn_id: UUID,request: Request):
+        await self.service.work.answer(await self.guards.owner_http(request),turn_id,await body(request,WorkPermissionReply))
+        return {"turn":await self.service.get(await self.guards.owner_http(request),turn_id)}
 
     async def create(self, request: Request):
         principal = await self.guards.owner_http(request)
         return {"conversation": await self.service.create(principal, await body(request, ConversationCreate))}
 
-    async def page(self, request: Request, before: int = Query(2**63-1, ge=1, le=2**63-1), archived: bool = False):
-        return {"conversations": await self.service.page(await self.guards.owner_http(request), before, archived)}
+    async def skills(self, request: Request, node_id: UUID):
+        return await self.service.skill_catalog(await self.guards.owner_http(request), node_id)
+
+    async def preview_plan(self, turn_id: UUID, request: Request):
+        return await self.service.preview_plan(await self.guards.owner_http(request), turn_id, await body(request, ChatPlanPreview, max_bytes=16384))
+
+    async def page(self, request: Request, before: int = Query(2**63-1, ge=1, le=2**63-1), archived: bool = False, project_id: UUID | None = None, project_only: bool = False):
+        return {"conversations": await self.service.page(await self.guards.owner_http(request), before, archived, project_id, project_only)}
+
+    async def memory_preview(self, conversation_id: UUID, request: Request):
+        return await self.service.memory_preview(await self.guards.owner_http(request), conversation_id, await body(request, MemorySelection))
 
     async def update(self, conversation_id: UUID, request: Request):
         principal = await self.guards.owner_http(request)

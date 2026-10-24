@@ -68,16 +68,16 @@ class Harness:
         if connection is not None:
             return connection.scope
         policy = self.link.config.nodes[node_id]
-        return NodeScope(node_id, policy.tools, policy.roots, policy.tools, policy.roots, policy.resource_version)
+        return NodeScope(node_id, policy.tools, policy.roots, policy.tools, policy.roots, policy.resource_version, policy.command_digests, policy.interaction_digests,policy.plugin_digest)
 
-    async def submit(self, principal: Principal, node_id: UUID, request: TaskRequest, *, language_id: UUID | None = None, chat_turn_id: UUID | None = None):
+    async def submit(self, principal: Principal, node_id: UUID, request: TaskRequest, *, language_id: UUID | None = None, chat_turn_id: UUID | None = None, rate_limit: bool = True, skill_run_id: UUID | None = None, skill_step_index: int | None = None, work_step_id: UUID | None = None, work_role: str = "execute"):
         if self.failed:
             raise AccessDenied("BUSY")
         await self.security.validate_principal(principal)
         if principal.role != "owner" or principal.identity_id != self.link.config.owner_id:
             raise AccessDenied()
         scope = self.scope(node_id)
-        task = await self.tasks.create(principal.identity_id, request, node_id, rate_limit=True, language_id=language_id,chat_turn_id=chat_turn_id)
+        task = await self.tasks.create(principal.identity_id, request, node_id, rate_limit=rate_limit, language_id=language_id,chat_turn_id=chat_turn_id, skill_run_id=skill_run_id, skill_step_index=skill_step_index, work_step_id=work_step_id, work_role=work_role)
         if task.status in {"queued", "awaiting_approval", "ready"} and task.expires_at > utc_now():
             try:
                 await self.security.prepare(task.task_id, principal, scope)
@@ -107,6 +107,8 @@ class Harness:
                 ack = ResultAck(session_id=connection.session_id, attempt_id=result.attempt_id, status=status)
             elif message.type == "command.status_result":
                 followup = await self.executions.status(connection.principal, message.payload)
+                if followup == "already_settled":
+                    ack = ResultAck(session_id=connection.session_id, attempt_id=message.payload.attempt_id, status="already_settled")
             elif message.type == "command.cancelled":
                 await self.executions.cancelled(connection.principal, message.payload.attempt_id)
             # Transport errors alone never prove an execution stopped.

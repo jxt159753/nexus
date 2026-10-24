@@ -1,0 +1,4 @@
+# Optional image decoder for workspace images or the Core upload helper.
+# The Core main process does not import Pillow.
+-r requirements.lock
+Pillow==13.0.0

@@ -41,7 +41,7 @@ async def body(request: Request, model, *, max_bytes: int = 4096):
             try:
                 parsed = json.loads(value)
                 intent = parsed.get("request", {}).get("intent")
-                if isinstance(intent, str) and intent not in {"get_system_info", "list_directory"}:
+                if isinstance(intent, str) and intent not in {"get_system_info", "list_directory", "read_file", "find_files", "preview_file_write", "write_file", "run_command", "read_file_lines", "glob_files", "search_file_content", "preview_file_edit", "edit_file", "observe_target", "interact_target"}:
                     raise HTTPException(400, detail="UNSUPPORTED_TASK")
             except (ValueError, AttributeError):
                 pass
@@ -79,7 +79,7 @@ class HarnessHTTP:
 
     async def submit(self, request: Request, response: Response) -> dict:
         principal = await self.guards.owner_http(request)
-        submitted = await body(request, Submission)
+        submitted = await body(request, Submission, max_bytes=32768)
         task = await self.harness.submit(principal, submitted.node_id, submitted.request)
         response.headers["Cache-Control"] = "no-store"
         return {"task": task}

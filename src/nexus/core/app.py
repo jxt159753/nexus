@@ -1,6 +1,7 @@
 """Single Core: authenticated transport, durable Harness and owner API."""
 
 import asyncio
+import mimetypes
 import os
 import sqlite3
 from contextlib import asynccontextmanager
@@ -21,13 +22,23 @@ from nexus.core.memory.http import RecordsHTTP
 from nexus.core.models.providers import DisabledDecisionModel, DisabledProvider
 from nexus.core.models.deepseek import DeepSeekProvider
 from nexus.core.models.chat import DeepSeekChatProvider
+from nexus.core.models.web import DeepSeekWebProvider
 from nexus.core.cognitive.language import LanguageService
 from nexus.core.cognitive.http import LanguageHTTP
 from nexus.core.cognitive.chat import ChatService
 from nexus.core.cognitive.chat_http import ChatHTTP
+from nexus.core.cognitive.attachment_http import AttachmentHTTP
+from nexus.core.extensions.http import ExtensionHTTP
+from nexus.core.extensions.service import ExtensionService
+from nexus.core.extensions.skills import SkillService
+from nexus.core.extensions.tools import ToolService
+from nexus.core.link.sandbox import SandboxLink
+from nexus.core.models.extensions import DeepSeekExtensionProvider
 from nexus.core.security.http import SecurityHTTP, TransportPolicy
 from nexus.core.security.service import SecurityService
 from nexus.core.security.types import AccessDenied
+from nexus.core.security.modes import PermissionHTTP
+from nexus.core.plugins.http import PluginHTTP
 from nexus.core.storage.database import Database
 from nexus.core.storage.tasks import Conflict
 from nexus.locking import DataDirectoryLock
@@ -40,8 +51,10 @@ def create_app(config: CoreConfig) -> FastAPI:
     link = NodeLink(guards, config)
     harness = Harness(link)
     clients = ClientLink(harness, guards)
+    sandbox_link = SandboxLink(guards, config, harness.operation)
     provider = None
     chat_provider = None
+    extension_provider = None
     if config.models.enabled:
         key = os.environ.get("DEEPSEEK_API_KEY", "")
         if not key or len(key) > 256 or any(c.isspace() for c in key):
@@ -49,8 +62,19 @@ def create_app(config: CoreConfig) -> FastAPI:
         provider = DeepSeekProvider(SecretStr(key), config.models)
         if config.models.chat_enabled:
             chat_provider = DeepSeekChatProvider(SecretStr(key), config.models)
+        extension_provider = DeepSeekExtensionProvider(SecretStr(key), config.models.timeout_seconds)
     language = LanguageService(harness, provider)
     chat = ChatService(harness, chat_provider, language.owner)
+    if config.models.enabled and config.models.chat_enabled and config.models.web_enabled:
+        chat.work.web.provider = DeepSeekWebProvider(SecretStr(key))
+    extensions = ExtensionService(harness, extension_provider)
+    tools = ToolService(extensions, sandbox_link, config.extensions)
+    extensions.sandbox = tools
+    skills = SkillService(harness, extensions, tools)
+    extensions.skills = skills
+    chat.skills = skills
+    from nexus.core.plugins.testing import PluginTester
+    chat.plugins.tester = PluginTester(chat.plugins, sandbox_link, tools)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -59,27 +83,39 @@ def create_app(config: CoreConfig) -> FastAPI:
         scheduler = None
         interpreter = None
         chatter = None
+        generator = None
+        skill_runner = None
+        plugin_scheduler = None
+        plugin_tester = None
         try:
             await database.initialize()
             await harness.executions.resume_verification()
             await language.recover()
             await chat.recover()
+            from nexus.core.plugins.lifecycle import recover as recover_plugins
+            await recover_plugins(chat.plugins)
+            await extensions.recover()
+            await tools.recover()
+            await chat.plugins.seed()
+            await chat.plugins.tester.recover()
+            plugin_tester = asyncio.create_task(chat.plugins.tester.run())
+            from nexus.core.plugins.schedule import run as run_plugin_schedule
+            plugin_scheduler = asyncio.create_task(run_plugin_schedule(chat.plugins))
             scheduler = asyncio.create_task(harness.run())
             interpreter = asyncio.create_task(language.run())
             chatter = asyncio.create_task(chat.run())
+            generator = asyncio.create_task(extensions.run())
+            skill_runner = asyncio.create_task(skills.run())
             yield
         finally:
             try:
-                if chatter is not None:
-                    chatter.cancel()
-                    await asyncio.gather(chatter, return_exceptions=True)
-                if interpreter is not None:
-                    interpreter.cancel()
-                    await asyncio.gather(interpreter, return_exceptions=True)
-                if scheduler is not None:
-                    scheduler.cancel()
-                    await asyncio.gather(scheduler, return_exceptions=True)
+                for task in (plugin_tester, plugin_scheduler, skill_runner, generator, chatter, interpreter, scheduler):
+                    if task is not None:
+                        task.cancel()
+                await asyncio.gather(*(task for task in (plugin_tester, plugin_scheduler, skill_runner, generator, chatter, interpreter, scheduler) if task is not None), return_exceptions=True)
+                await chat.work.web.close()
                 await link.close()
+                await sandbox_link.close()
                 await clients.close()
             finally:
                 lock.close()
@@ -92,19 +128,35 @@ def create_app(config: CoreConfig) -> FastAPI:
     app.include_router(RecordsHTTP(guards).router)
     app.include_router(LanguageHTTP(language, guards).router)
     app.include_router(ChatHTTP(chat, guards).router)
+    app.include_router(PermissionHTTP(chat, guards).router)
+    app.include_router(PluginHTTP(chat.plugins, guards).router)
+    app.include_router(AttachmentHTTP(chat, guards).router)
+    app.include_router(ExtensionHTTP(extensions, guards).router)
+    app.include_router(sandbox_link.router)
     app.state.node_link = link
     app.state.harness = harness
     app.state.client_link = clients
     app.state.model_provider = provider or DisabledProvider()
     app.state.language = language
     app.state.chat = chat
+    app.state.plugins = chat.plugins
+    app.state.extensions = extensions
+    app.state.skills = skills
+    app.state.sandbox_link = sandbox_link
     app.state.decision_model = DisabledDecisionModel()
     web = files("nexus.web")
+    # Python's mimetypes does not know .mjs on every platform; browsers refuse
+    # module scripts served as text/plain.
+    mimetypes.add_type("text/javascript", ".mjs")
     app.mount("/static", StaticFiles(directory=str(web)), name="static")
 
     @app.get("/")
     async def index():
         return FileResponse(str(web.joinpath("index.html")))
+
+    @app.get("/app")
+    async def app_client():
+        return FileResponse(str(web.joinpath("app", "app.html")))
 
     @app.middleware("http")
     async def response_policy(request: Request, call_next):
@@ -112,7 +164,7 @@ def create_app(config: CoreConfig) -> FastAPI:
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
+        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'sha256-UaO1DKdOZTH3g72w3U/IhBu3y5cxME0JyJYosMMMerQ=' 'sha256-jH4JDM+p01kuu6ou/A4MgTq6B9+X7dUZGHEdH52L4GY='; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
         return response
 
     @app.exception_handler(AccessDenied)

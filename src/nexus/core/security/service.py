@@ -14,6 +14,7 @@ from nexus.core.security.types import (
     AccessDenied, Authorization, BrowserSession, NodeScope, Principal,
 )
 from nexus.core.storage.database import Database, audit, one, timestamp, utc_now
+from nexus.contracts.tools import TOOL_ARGUMENT_MODELS
 from nexus.core.storage.tasks import (
     TaskRecord, canonical, load_task, transition,
 )
@@ -36,6 +37,9 @@ def scope_digest(scope: NodeScope) -> str:
         "resource_version": scope.resource_version,
         "tools": sorted(scope.tools), "roots": sorted(scope.roots),
         "local_tools": sorted(scope.local_tools), "local_roots": sorted(scope.local_roots),
+        **({"command_digests": scope.command_digests} if scope.command_digests else {}),
+        **({"interaction_digests": scope.interaction_digests} if scope.interaction_digests else {}),
+        **({'plugin_digest':scope.plugin_digest} if scope.plugin_digest else {}),
     }))
 
 
@@ -124,11 +128,11 @@ class SecurityService:
             shared = granted[0] & granted[1]
             tools = frozenset(key for key in scope.tools & scope.local_tools if (
                 key == "system.info@1" and (key, "") in shared
-                or key == "filesystem.list@1" and (key, "workspace") in shared
+                or key != "system.info@1" and (key, "workspace") in shared
                 and "workspace" in scope.roots & scope.local_roots
             ))
-            roots = frozenset({"workspace"}) if "filesystem.list@1" in tools else frozenset()
-            return NodeScope(scope.node_id, tools, roots, scope.local_tools, scope.local_roots, scope.resource_version)
+            roots = frozenset({"workspace"}) if tools-{"system.info@1"} else frozenset()
+            return NodeScope(scope.node_id, tools, roots, scope.local_tools, scope.local_roots, scope.resource_version, scope.command_digests, scope.interaction_digests,scope.plugin_digest)
 
     async def login(self, token: SecretStr, *, now: datetime | None = None) -> BrowserSession:
         now = now or utc_now()
@@ -181,7 +185,7 @@ class SecurityService:
 
     async def set_grant(self, identity_id: UUID, tool: str, *, root_id: str = "", enabled: bool = True) -> None:
         """Explicit offline configuration, separate for owner and each Node."""
-        if (tool, root_id) not in {("system.info", ""), ("filesystem.list", "workspace")} or type(enabled) is not bool:
+        if (f"{tool}@1" not in TOOL_ARGUMENT_MODELS or root_id != ("" if tool == "system.info" else "workspace")) or type(enabled) is not bool:
             raise ValueError("unsupported grant")
         async with self.database.transaction() as conn:
             row = await one(conn, "SELECT revoked_at FROM identities WHERE identity_id=?", (str(identity_id),))
@@ -214,7 +218,15 @@ class SecurityService:
         if node is None or node["role"] != "node" or node["revoked_at"] is not None:
             raise AccessDenied("POLICY_DENIED")
         key = f"{task.action.tool}@{task.action.tool_version}"
-        if key not in {"system.info@1", "filesystem.list@1"} or key not in scope.tools or key not in scope.local_tools:
+        if key not in TOOL_ARGUMENT_MODELS or key not in scope.tools or key not in scope.local_tools:
+            raise AccessDenied("POLICY_DENIED")
+        if task.action.tool == 'plugin.call':
+            if not scope.plugin_digest: raise AccessDenied('PLUGIN_NODE_POLICY_CHANGED')
+            from nexus.core.plugins.service import authorize_task
+            await authorize_task(conn, task)
+        if task.action.tool == "command.run" and scope.command_digests.get(task.action.arguments.command_id) != task.action.arguments.template_digest:
+            raise AccessDenied("POLICY_DENIED")
+        if task.action.tool.startswith("interaction.") and scope.interaction_digests.get(task.action.arguments.target_id)!=task.action.arguments.template_digest:
             raise AccessDenied("POLICY_DENIED")
         root = getattr(task.action.arguments, "root_id", "")
         if root and (root not in scope.roots or root not in scope.local_roots):
@@ -254,6 +266,9 @@ class SecurityService:
             return await self._prepare(conn, task, scope, version, now)
 
     async def _prepare(self, conn: aiosqlite.Connection, task: TaskRecord, scope: NodeScope, version: int, now: datetime) -> Authorization:
+        from nexus.core.security.work import check_task
+        work_allowed = await check_task(conn, task, scope, now)
+        automatic_file = task.action.tool in {"filesystem.read","filesystem.search","filesystem.write_preview","filesystem.write","filesystem.read_lines","filesystem.glob","filesystem.grep","filesystem.edit_preview","filesystem.edit","filesystem.read_image"}
         if task.status == "recovering" and not task.cancel_requested:
             old = await one(conn, "SELECT execution_stopped,phase FROM task_attempts WHERE attempt_id=?", (str(task.current_attempt_id),))
             if old is not None and old["execution_stopped"] and old["phase"] == "completed":
@@ -278,6 +293,12 @@ class SecurityService:
             str(approval_id), str(task.task_id), str(task.owner_id), str(task.node_id), task.action.tool,
             task.action.tool_version, arguments_digest(task), version, scope_digest(scope), timestamp(expires),
         ))
+        if work_allowed or automatic_file:
+            await conn.execute("UPDATE approvals SET decision='approve',decided_by=?,decided_at=? WHERE approval_id=?",(str(task.owner_id),timestamp(now),str(approval_id)))
+            if task.status != "ready":
+                await transition(conn,task,"ready",task.owner_id,now)
+            await audit(conn,str(task.owner_id),str(task.task_id),"approval.workspace_policy" if automatic_file else "approval.work_grant",now)
+            return Authorization("allow",version,approval_id,expires)
         if task.status != "awaiting_approval":
             await transition(conn, task, "awaiting_approval", task.owner_id, now)
         else:
@@ -329,6 +350,8 @@ class SecurityService:
         return await self._authorized(conn, task, scope, version, now)
 
     async def _authorized(self, conn: aiosqlite.Connection, task: TaskRecord, scope: NodeScope, version: int, now: datetime) -> Authorization:
+        from nexus.core.security.work import check_task
+        await check_task(conn, task, scope, now)
         if task.status != "ready":
             raise AccessDenied("POLICY_DENIED")
         if task.action.tool == "system.info":

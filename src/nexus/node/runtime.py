@@ -5,7 +5,7 @@ import secrets
 import threading
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from pydantic import TypeAdapter
@@ -30,6 +30,7 @@ class NodeRuntime:
         self.boot_id = uuid4()
         self._slot = threading.Lock()
         self._state = threading.Lock()
+        self._core_clock: tuple[datetime, float] | None = None
         self._active: tuple[UUID, threading.Event] | None = None
         self._closed = False
         self._unhealthy = False
@@ -42,6 +43,14 @@ class NodeRuntime:
             self._lock.close()
             raise
         self._worker = ManagedWorker()
+        self.plugins = None
+        if self.config.plugins.enabled:
+            from nexus.plugins.node_runtime import PluginRuntime
+            try:
+                self.plugins = PluginRuntime(self.config)
+            except BaseException:
+                self._lock.close()
+                raise
 
     def _recover(self) -> None:
         for receipt in self.receipts.unresolved():
@@ -65,6 +74,8 @@ class NodeRuntime:
         if not self._slot.acquire(timeout=15):
             raise RuntimeError("worker stop not confirmed; Node lock retained")
         try:
+            if self.plugins is not None:
+                self.plugins.close()
             self._lock.close()
         finally:
             self._slot.release()
@@ -74,6 +85,18 @@ class NodeRuntime:
         if receipt is None:
             return CommandStatusResult(session_id=session_id, attempt_id=attempt_id, phase="not_found")
         return receipt.status(session_id)
+
+    def use_core_clock(self, sent_at: datetime) -> None:
+        """Called only after the configured Core's authenticated welcome."""
+        if sent_at.tzinfo is None or sent_at.utcoffset() != timedelta(0):
+            raise ValueError("UTC Core time required")
+        with self._state:
+            self._core_clock = sent_at, time.monotonic()
+
+    def _now(self) -> datetime:
+        with self._state:
+            anchor = self._core_clock
+        return datetime.now(UTC) if anchor is None else anchor[0] + timedelta(seconds=time.monotonic()-anchor[1])
 
     def cancel(self, attempt_id: UUID) -> bool:
         self.receipts.cancel_pending(attempt_id)
@@ -122,7 +145,7 @@ class NodeRuntime:
         key = f"{command.tool}@{command.tool_version}"
         if key not in REGISTRY or key not in self.config.allowed_tools:
             raise ProtocolError(ErrorCode.POLICY_DENIED, "Tool is not locally allowed")
-        if command.tool == "filesystem.list":
+        if command.tool != "system.info":
             root = self.config.roots.get(command.arguments.root_id)
             if root is None:
                 raise ProtocolError(ErrorCode.POLICY_DENIED, "Resource is not configured")
@@ -130,7 +153,7 @@ class NodeRuntime:
                 local_directory(root)
             except (OSError, ValueError):
                 raise ProtocolError(ErrorCode.POLICY_DENIED, "Resource is not a safe local directory") from None
-        remaining = (command.expires_at - datetime.now(UTC)).total_seconds()
+        remaining = (command.expires_at - self._now()).total_seconds()
         if remaining <= 0:
             raise ProtocolError(ErrorCode.TOOL_TIMEOUT, "Command has expired")
         deadline = time.monotonic() + min(remaining, command.execution_timeout_seconds, self.config.execution_timeout_seconds)
@@ -145,11 +168,19 @@ class NodeRuntime:
         if on_phase is not None:
             on_phase("command.started")
         try:
-            budget = min(deadline - time.monotonic(), (command.expires_at - datetime.now(UTC)).total_seconds())
+            budget = min(deadline - time.monotonic(), (command.expires_at - self._now()).total_seconds())
             if budget <= 0:
                 raise ExecutionStopped("timeout")
-            raw = self._worker.run(WorkerRequest(command=command, config=self.config, job_name=job_name).model_dump_json().encode("utf-8"), job_name, budget, cancel)
-            result = RESULT.validate_json(raw)
+            if command.tool == 'plugin.call':
+                if self.plugins is None:
+                    raise ValueError('plugin runtime is disabled')
+                output = self.plugins.execute(command.arguments, deadline, cancel, job_name)
+                value = command.model_dump(mode='json',include={'session_id','task_id','attempt_id','tool','tool_version','command_digest'})
+                value.update(observed_at=self._now().isoformat(),outcome='succeeded',result=output.model_dump(mode='json'))
+                result = RESULT.validate_json(json.dumps(value))
+            else:
+                raw = self._worker.run(WorkerRequest(command=command, config=self.config, job_name=job_name).model_dump_json().encode("utf-8"), job_name, budget, cancel)
+                result = RESULT.validate_json(raw)
             if (result.task_id != command.task_id or result.attempt_id != command.attempt_id
                     or result.command_digest != command.command_digest or result.tool != command.tool
                     or result.tool_version != command.tool_version or result.session_id != command.session_id):
@@ -166,6 +197,9 @@ class NodeRuntime:
             stopped = job_stopped(job_name)
             self.receipts.finish(command.attempt_id, "unknown", stopped=stopped)
             return self.status(command.attempt_id, command.session_id)
+        # Persist once in the Core time domain. Cached replay must retain this
+        # timestamp across reconnects, rather than applying a new clock offset.
+        result = result.model_copy(update={"observed_at": self._now()})
         self.receipts.finish(command.attempt_id, "completed", result)
         return self.status(command.attempt_id, command.session_id)
 

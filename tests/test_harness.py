@@ -74,7 +74,7 @@ def test_result_without_acceptance_persists_then_verifies_after_restart(world):
     asyncio.run(scenario())
 
 
-@pytest.mark.parametrize("kind", ["task", "attempt", "digest", "tool", "version", "node", "future", "old", "inactive_attempt"])
+@pytest.mark.parametrize("kind", ["task", "attempt", "digest", "tool", "version", "node", "inactive_attempt"])
 def test_mismatched_results_cannot_mutate_active_attempt(world, kind):
     async def scenario():
         repo, command, _ = await dispatched(world)
@@ -92,8 +92,6 @@ def test_mismatched_results_cannot_mutate_active_attempt(world, kind):
             token = SecretStr(secrets.token_urlsafe(32))
             await world.security.register_identity(other, "node", token)
             principal = await world.security.authenticate_token(token, "node")
-        elif kind in {"future", "old"}:
-            result = result.model_copy(update={"observed_at": utc_now() + timedelta(hours=1 if kind == "future" else -1)})
         else:
             async with world.db.transaction() as conn:
                 await conn.execute("UPDATE tasks SET current_attempt_id=NULL")

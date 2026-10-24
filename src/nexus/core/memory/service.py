@@ -42,6 +42,10 @@ class Records:
                     raise Conflict("IDEMPOTENCY_CONFLICT")
                 return dict(await one(conn, "SELECT * FROM memory_entries WHERE consent_event_id=?", (existing["consent_event_id"],)))
             await project_owned(conn, value.project_id, principal.identity_id)
+            if value.source.startswith("chat:"):
+                origin = await one(conn, "SELECT c.project_id FROM chat_turns t JOIN conversations c USING(conversation_id) WHERE t.turn_id=? AND t.owner_id=?", (value.source[5:], str(principal.identity_id)))
+                if origin is None or origin["project_id"] != (str(value.project_id) if value.project_id else None):
+                    raise ValueError("memory source must belong to this project")
             if value.verified_at is not None and value.verified_at > now:
                 raise ValueError("verification time cannot be in the future")
             if (await one(conn, "SELECT count(*) FROM memory_entries"))[0] >= 10000:
@@ -50,6 +54,8 @@ class Records:
                 old = await one(conn, "SELECT * FROM memory_entries WHERE memory_id=? AND owner_id=?", (str(value.supersedes_id), str(principal.identity_id)))
                 if old is None:
                     raise LookupError("memory not found")
+                if old["project_id"] != (str(value.project_id) if value.project_id else None):
+                    raise ValueError("replacement must stay in the same project")
                 if old["superseded_at"] or old["retracted_at"]:
                     raise Conflict("memory is inactive")
                 await conn.execute("UPDATE memory_entries SET superseded_at=? WHERE memory_id=?", (timestamp(now), str(value.supersedes_id)))

@@ -64,7 +64,10 @@ class NodeLink:
             raise AccessDenied()
         advertised = frozenset(f"{item.tool}@{item.tool_version}" for item in hello.tools)
         trusted = NodeScope(principal.identity_id, advertised, frozenset(hello.roots),
-                            policy.tools, policy.roots, policy.resource_version)
+                            policy.tools, policy.roots, policy.resource_version,
+                            {key: value for key, value in hello.command_digests.items() if policy.command_digests.get(key) == value},
+                            {key: value for key, value in hello.interaction_digests.items() if policy.interaction_digests.get(key) == value},
+                            hello.plugin_digest if hello.plugin_digest==policy.plugin_digest else None)
         connection = NodeConnection(ws, principal, hello, trusted)
         await self._scope(connection)
         # Never make the connection visible if its durable audit cannot commit.
@@ -132,18 +135,36 @@ class NodeLink:
         result = []
         for node_id in self.config.nodes:
             connection = self.connections.get(node_id)
-            value = dict(node_id=str(node_id), online=False, tools=[], roots=[], session_id=None, boot_id=None)
+            value = dict(node_id=str(node_id), online=False, tools=[], roots=[], command_digests={}, interaction_digests={}, session_id=None, boot_id=None)
             if connection is not None:
                 try:
                     scope = await self._scope(connection)
                     self._current(connection)
                     value.update(online=time.monotonic() - connection.last_heartbeat < self.config.heartbeat_timeout_seconds,
                                  tools=sorted(scope.tools), roots=sorted(scope.roots),
+                                 command_digests=scope.command_digests, interaction_digests=scope.interaction_digests,
                                  session_id=str(connection.session_id), boot_id=str(connection.hello.boot_id))
                 except (AccessDenied, ProtocolError):
                     pass
             result.append(value)
         return {"nodes": result}
+
+    async def node_status(self, node_id: UUID) -> dict:
+        """Control-plane observation; offline nodes need no execution RPC."""
+        if node_id not in self.config.nodes:
+            raise AccessDenied("POLICY_DENIED")
+        value = {"online":False,"busy":None,"heartbeat_age_seconds":None,"tools":[],"roots":[],"observed_at":utc_now().isoformat()}
+        connection = self.connections.get(node_id)
+        if connection is not None:
+            try:
+                scope = await self._scope(connection)
+                self._current(connection)
+                age = max(0,round(time.monotonic()-connection.last_heartbeat,1))
+                online = age < self.config.heartbeat_timeout_seconds
+                value.update(online=online,busy=bool(connection.active_attempt_id) if online else None,heartbeat_age_seconds=age,tools=sorted(scope.tools & scope.local_tools),roots=sorted(scope.roots & scope.local_roots))
+            except (AccessDenied,ProtocolError):
+                pass
+        return value
 
     async def _receive(self, connection: NodeConnection) -> None:
         rate = MessageRate()

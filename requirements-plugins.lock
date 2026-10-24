@@ -1,0 +1,3 @@
+# Windows native terminal support. Core does not require a Windows wheel.
+-r requirements-images.lock
+pywinpty==3.1.0; sys_platform == "win32"

@@ -112,6 +112,10 @@ class TaskRepository:
         rate_limit: bool = False,
         language_id: UUID | None = None,
         chat_turn_id: UUID | None = None,
+        skill_run_id: UUID | None = None,
+        skill_step_index: int | None = None,
+        work_step_id: UUID | None = None,
+        work_role: str = "execute",
     ) -> TaskRecord:
         now = now or utc_now()
         request = REQUEST.validate_json(REQUEST.dump_json(request))
@@ -123,6 +127,14 @@ class TaskRepository:
         }))
         encoded = canonical(request.model_dump(mode="json"))
         async with self.database.transaction() as conn:
+            if work_step_id is not None:
+                from nexus.core.cognitive.chat_work import validate_task
+                await validate_task(conn, work_step_id, work_role, owner_id, node_id, request, now)
+            if skill_run_id is not None:
+                from nexus.core.extensions.authorization import skill_run_allowed
+                run = await one(conn, "SELECT * FROM skill_runs WHERE run_id=? AND owner_id=? AND node_id=?", (str(skill_run_id), str(owner_id), str(node_id)))
+                if not await skill_run_allowed(conn, run, now) or run["current_step"] != skill_step_index:
+                    raise Conflict("Skill execution authorization changed")
             for identity, role in ((owner_id, "owner"), (node_id, "node")):
                 row = await one(conn, "SELECT role, revoked_at FROM identities WHERE identity_id=?", (str(identity),))
                 if row is None or row["role"] != role or row["revoked_at"] is not None:
@@ -131,6 +143,10 @@ class TaskRepository:
             if existing:
                 if canonical(REQUEST.validate_json(existing["request_json"]).model_dump(mode="json")) != encoded or existing["node_id"] != str(node_id):
                     raise Conflict("IDEMPOTENCY_CONFLICT")
+                if skill_run_id is not None and not await one(conn, "SELECT 1 FROM skill_run_steps WHERE run_id=? AND step_index=? AND task_id=?", (str(skill_run_id), skill_step_index, existing["task_id"])):
+                    raise Conflict("Skill task association changed")
+                if work_step_id is not None and not await one(conn,"SELECT 1 FROM chat_work_tasks WHERE task_id=? AND step_id=? AND role=?",(existing["task_id"],str(work_step_id),work_role)):
+                    raise Conflict("work task association changed")
                 return task_record(existing)
             if request.project_id is not None and not await one(conn, "SELECT 1 FROM projects WHERE project_id=? AND owner_id=?", (str(request.project_id), str(owner_id))):
                 raise LookupError("project not found")
@@ -140,8 +156,27 @@ class TaskRepository:
                 expected={"intent":request.intent,"arguments":request.arguments.model_dump(mode="json")}
                 if chat is None or chat["status"]!="completed" or chat["action_status"]!="proposed" or chat["proposal_json"]!=canonical(expected) or json.loads(chat["request_json"]).get("node_id")!=str(node_id) or chat["proposal_policy_version"]!=version:
                     raise Conflict("chat proposal binding changed")
+                conversation = await one(conn, "SELECT project_id FROM conversations WHERE conversation_id=?", (chat["conversation_id"],))
+                if conversation["project_id"] != (str(request.project_id) if request.project_id else None):
+                    raise Conflict("chat project binding changed")
                 if chat["auto_result_json"] and await one(conn, "SELECT 1 FROM chat_turns WHERE conversation_id=? AND rowid>(SELECT rowid FROM chat_turns WHERE turn_id=?)", (chat["conversation_id"], str(chat_turn_id))):
                     raise Conflict("chat automatic result context changed")
+            if request.intent in {"write_file","edit_file"}:
+                from nexus.contracts.basic import text_digest
+                preview = await one(conn, "SELECT * FROM tasks WHERE task_id=? AND owner_id=? AND node_id=?", (str(request.arguments.preview_task_id), str(owner_id), str(node_id)))
+                if preview is None or preview["status"] != "succeeded" or preview["execution_outcome"] != "known" or not preview["verification"] or not preview["result_json"]:
+                    raise Conflict("WRITE_PREVIEW_REQUIRED")
+                data = json.loads(preview["result_json"])
+                if (json.loads(preview["action_json"])["tool"] != ("filesystem.write_preview" if request.intent == "write_file" else "filesystem.edit_preview") or preview["project_id"] != (str(request.project_id) if request.project_id else None)
+                        or data["root_id"] != request.arguments.root_id or data["path"] != request.arguments.path
+                        or data["content_sha256"] != (text_digest(request.arguments.content) if request.intent == "write_file" else request.arguments.content_sha256) or data["previous_sha256"] != request.arguments.expected_sha256
+                        or data["preview_digest"] != request.arguments.preview_digest):
+                    raise Conflict("WRITE_PREVIEW_REQUIRED")
+                if request.intent == "edit_file":
+                    original = json.loads(preview["action_json"])["arguments"]
+                    actual = request.arguments.model_dump(mode="json")
+                    if any(actual.get(key) != value for key,value in original.items()) or data["bytes_written"] != request.arguments.bytes_written:
+                        raise Conflict("WRITE_PREVIEW_REQUIRED")
             if rate_limit:
                 recent = await one(conn, "SELECT count(*) FROM tasks WHERE owner_id=? AND created_at>?", (str(owner_id), timestamp(now - timedelta(minutes=1))))
                 if recent[0] >= 10:
@@ -172,6 +207,26 @@ class TaskRepository:
                 await conn.execute("UPDATE model_calls SET task_id=? WHERE chat_turn_id=?",(str(task_id),str(chat_turn_id)))
                 await audit(conn,str(owner_id),str(task_id),"chat.action_confirmed",now)
             await audit(conn, str(owner_id), str(task_id), "task.created", now)
+            if work_step_id is not None:
+                from nexus.core.security.work import operation
+                await operation(conn, work_step_id, "task:"+str(task_id), now)
+                if request.intent=='execute_plugin':
+                    # Reserve the bounded nested effects before dispatch. An
+                    # unknown result cannot release this reservation for retry.
+                    for index in range(request.arguments.max_subcalls):
+                        await operation(conn,work_step_id,f'plugin-subcall:{task_id}:{index}',now)
+                await conn.execute("INSERT INTO chat_work_tasks VALUES(?,?,?)", (str(task_id), str(work_step_id), work_role))
+                field = "preview_task_id" if work_role == "preview" else "task_id"
+                await conn.execute(f"UPDATE chat_work_steps SET {field}=?,status='waiting' WHERE step_id=?", (str(task_id), str(work_step_id)))
+            elif skill_run_id is not None:
+                from nexus.core.security.work import operation
+                work = await one(conn,"SELECT step_id FROM chat_work_steps WHERE skill_run_id=?",(str(skill_run_id),))
+                if work:
+                    await operation(conn, work[0], "task:"+str(task_id), now)
+            if skill_run_id is not None:
+                linked = await conn.execute("UPDATE skill_run_steps SET task_id=?,status='dispatchable',updated_at=? WHERE run_id=? AND step_index=? AND task_id IS NULL AND status='pending'", (str(task_id), timestamp(now), str(skill_run_id), skill_step_index))
+                if linked.rowcount != 1:
+                    raise Conflict("Skill step association changed")
             return await load_task(conn, task_id)
 
     async def get(self, task_id: UUID, owner_id: UUID) -> TaskRecord:
