@@ -177,7 +177,9 @@ def test_summary_provider_disallows_further_actions(world, monkeypatch):
         value = await chat.preview_result(world.owner, UUID(turn["turn_id"]), ChatResultPreview())
         await chat.consent_result(world.owner, UUID(turn["turn_id"]), consent(value))
         await chat.process_one()  # The deliberately hostile provider proposes a second tool.
-        assert provider.calls[1][1] == {"generate_title": False, "allow_tools": False, "final_result": True}
+        first_cost = (await rows(world))[0]["cost_microunits"]
+        assert provider.calls[1][1] == {"generate_title": False, "allow_tools": False, "final_result": True,
+                                      "output_budget_microunits": 50000-first_cost}
         assert (await chat.get(world.owner, turn["turn_id"]))["status"] == "failed"
         assert len(await rows(world, "tasks")) == 1
     asyncio.run(run())

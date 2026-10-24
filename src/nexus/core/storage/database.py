@@ -114,6 +114,11 @@ class Database:
                     if backup.execute("PRAGMA quick_check").fetchone()[0] != "ok":
                         raise RuntimeError("migration backup verification failed")
             await conn.execute("PRAGMA journal_mode = WAL")
+            # Work-step revisions rebuild the table without discarding references.
+            # Offline only: retain referencing rows, then verify all FKs before commit.
+            rebuild = any(version in {34, 36} for version, _ in pending)
+            if rebuild:
+                await conn.execute("PRAGMA foreign_keys = OFF")
             await conn.execute("BEGIN IMMEDIATE")
             try:
                 await conn.execute("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, checksum TEXT NOT NULL, applied_at TEXT NOT NULL)")
@@ -129,7 +134,12 @@ class Database:
                     await conn.execute("INSERT INTO schema_migrations VALUES (?, ?, ?)", (
                         version, hashlib.sha256(script.encode()).hexdigest(), timestamp(utc_now()),
                     ))
+                if await conn.execute_fetchall("PRAGMA foreign_key_check"):
+                    raise RuntimeError("migration foreign key verification failed")
                 await conn.commit()
             except BaseException:
                 await conn.rollback()
                 raise
+            finally:
+                if rebuild:
+                    await conn.execute("PRAGMA foreign_keys = ON")

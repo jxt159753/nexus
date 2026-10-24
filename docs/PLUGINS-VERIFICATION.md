@@ -45,7 +45,7 @@ Core、Node 和 SDK 源码来自同一固定 wheel；冻结 Node 额外包含 UT
 
 ## 边界与待验收项
 
-- 插件权限开关、管理/终端/交付物界面及 Windows 原生桥尚待用户控制 DSH 接入。旧 App 的 Node 启动仍会重写旧配置，不能用它代替本次独立执行端。
+- 插件权限开关、管理/终端/交付物界面及 Windows 原生桥已由用户直接指令 DSH 完成本地接入与安装版检查，见 [前端验证](PLUGINS-FRONTEND-VERIFICATION.md)；尚未部署生产。Windows `node.rs` 已改为合并保留本地插件配置，但本机独立 Node 仍在线使用同一数据目录，App Node 未接管该身份。
 - 生产未配置 MCP 外部服务器或浏览器目标，相应工具明确 unconfigured；本地真实协议/CDP 测试不等于这些外部环境已开通。
 - Stagehand 对应能力采用主模型规划加确定性 CDP，不增加另一个 Stagehand 模型；workflow 是有限节点序列/SDK，依赖子代理的 DSL 不在本轮。
 - 自写插件测试镜像当前只支持标准库和 SDK 契约桩；第三方依赖不会自动安装，隔离测试不连接宿主工具。契约用例通过不证明任意业务正确或宿主代码安全。

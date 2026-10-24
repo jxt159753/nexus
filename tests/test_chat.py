@@ -362,8 +362,9 @@ def test_strict_inputs_and_separate_chat_output_limit():
         with pytest.raises(ValidationError):
             ChatSubmission(**{**dict(request_id=uuid4(),expected_revision=1,text="hello"),**changes})
     assert ModelConfig(chat_enabled=True).max_output_tokens == 512
+    assert ModelConfig(chat_max_output_tokens=2049).chat_max_output_tokens == 2049
     with pytest.raises(ValidationError):
-        ModelConfig(chat_max_output_tokens=2049)
+        ModelConfig(chat_max_output_tokens=256001)
 
 
 def test_v6_upgrade_keeps_nonempty_ledger_and_consistent_backup(tmp_path):

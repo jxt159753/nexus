@@ -161,6 +161,15 @@ class TaskRepository:
                     raise Conflict("chat project binding changed")
                 if chat["auto_result_json"] and await one(conn, "SELECT 1 FROM chat_turns WHERE conversation_id=? AND rowid>(SELECT rowid FROM chat_turns WHERE turn_id=?)", (chat["conversation_id"], str(chat_turn_id))):
                     raise Conflict("chat automatic result context changed")
+            if request.intent == "receive_file":
+                from nexus.contracts.file_transfer import receiving_path
+                args = request.arguments
+                source = await one(conn, "SELECT a.*,c.archived FROM chat_attachments a JOIN conversations c USING(conversation_id) WHERE a.attachment_id=? AND a.conversation_id=? AND a.owner_id=? AND a.deleted_at IS NULL", (str(args.attachment_id),str(args.conversation_id),str(owner_id)))
+                if source is None or source["archived"]:
+                    raise PermissionError("File source is unavailable")
+                if (source["sha256"] != args.sha256 or source["size_bytes"] != args.size_bytes
+                        or args.path != receiving_path(request.request_id,source["filename"])):
+                    raise Conflict("FILE_TRANSFER_BINDING_CHANGED")
             if request.intent in {"write_file","edit_file"}:
                 from nexus.contracts.basic import text_digest
                 preview = await one(conn, "SELECT * FROM tasks WHERE task_id=? AND owner_id=? AND node_id=?", (str(request.arguments.preview_task_id), str(owner_id), str(node_id)))
@@ -207,6 +216,9 @@ class TaskRepository:
                 await conn.execute("UPDATE model_calls SET task_id=? WHERE chat_turn_id=?",(str(task_id),str(chat_turn_id)))
                 await audit(conn,str(owner_id),str(task_id),"chat.action_confirmed",now)
             await audit(conn, str(owner_id), str(task_id), "task.created", now)
+            if request.intent=='execute_plugin' and request.arguments.mcp_binding is not None:
+                await conn.execute('UPDATE mcp_operations SET task_id=? WHERE operation_id=? AND owner_id=? AND task_id IS NULL',
+                    (str(task_id),str(request.arguments.invocation_id),str(owner_id)))
             if work_step_id is not None:
                 from nexus.core.security.work import operation
                 await operation(conn, work_step_id, "task:"+str(task_id), now)

@@ -26,6 +26,9 @@ class ModelReply:
     proposal: dict | None = None
     native_tool_call: dict | None = None
     work_calls: tuple[tuple[dict,dict], ...] = ()
+    rejected_calls: tuple[dict, ...] = ()
+    validation_errors: tuple[dict, ...] = ()
+    memory_candidates: tuple[dict, ...] = ()
 
 
 class DecisionModel(Protocol):

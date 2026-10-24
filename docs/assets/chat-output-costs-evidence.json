@@ -1,0 +1,75 @@
+{
+  "release": "/opt/nexus/releases/output-costs-20261023-final",
+  "wheel_sha256": "d3bff5c4d6a256060ccc43bcab2c31ea80d04b774054e7791999c6133ffe07b7",
+  "runtime_files_checked": 212,
+  "changed_backend_files": 15,
+  "schema": 26,
+  "service": "active",
+  "single_core": true,
+  "pid": 3760176,
+  "paused": false,
+  "cost_limits_enabled": false,
+  "chat_max_output_tokens": 256000,
+  "daily_calls": 100,
+  "timeout_seconds": 30,
+  "model_calls": 99,
+  "unknown_cost_calls": 4,
+  "historical_records_preserved": true,
+  "counts": {
+    "tasks": 59,
+    "task_attempts": 57,
+    "conversations": 32,
+    "chat_turns": 58,
+    "model_calls": 99,
+    "identities": 3,
+    "grants": 28,
+    "memory_entries": 0,
+    "plugin_versions": 19,
+    "extension_versions": 1,
+    "chat_exchanges": 54
+  },
+  "backup": "/var/backups/nexus/before-output-costs-final-20261023T010509Z",
+  "backup_sha256": "3698e64b27d4fe32f4dbb9891d75a1f0ea4cee0daff2b1c8edaef2c71dce76a5",
+  "no_new_model_calls": true,
+  "linux_skipped": [
+    "test_plugin_dispatch_reuses_receipts_and_does_not_repeat_effect"
+  ],
+  "date": "2026-10-23",
+  "tests": {
+    "windows_related": {
+      "tests": "314",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "170.151"
+    },
+    "windows_final": {
+      "tests": "33",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "16.111"
+    },
+    "linux_related": {
+      "passed": 313,
+      "skipped": 1,
+      "seconds": 96.53
+    },
+    "linux_final": {
+      "passed": 32,
+      "skipped": 1,
+      "seconds": 6.93
+    }
+  },
+  "node_online_before_and_after": false,
+  "real_paid_model_calls_added": 0,
+  "verification_limits": [
+    "No real model generation or website write was retried.",
+    "Windows Node was offline before and after deployment.",
+    "No frontend, Node, dependency or schema upgrade was included."
+  ],
+  "concurrent_workspace_edits_excluded": [
+    "nexus/core/extensions/service.py",
+    "nexus/core/cognitive/chat_skills.py"
+  ]
+}

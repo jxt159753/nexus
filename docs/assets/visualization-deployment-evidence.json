@@ -1,0 +1,269 @@
+{
+  "recorded_at": "2026-10-24T02:58:32.918307+00:00",
+  "scope": "P82 visualization deployment and Windows 0.1.5; no other workspace changes",
+  "baseline_release": "unified-device-20261024-9c9c1609",
+  "release": "/opt/nexus/releases/visualization-20261024-d79ef941",
+  "wheel_sha256": "d79ef941a7e4ac4b6d28348fd36d78f59ef46f2a20c591a060c5850f495c39c7",
+  "changed_runtime_resources": [
+    "nexus/web/app/visualization.js"
+  ],
+  "runtime_resources_verified": 252,
+  "windows_source_changes": [
+    "package-lock.json",
+    "package.json",
+    "src-tauri/Cargo.lock",
+    "src-tauri/Cargo.toml",
+    "src-tauri/tauri.conf.json",
+    "ui/visualization.js"
+  ],
+  "windows_node_voice_resources_unchanged": true,
+  "server_tests": {
+    "passed": 51,
+    "seconds": 24.83
+  },
+  "final_local_tests": {
+    "passed": 3,
+    "seconds": 3.2
+  },
+  "fixed_browser": {
+    "passed": true,
+    "baseline": false,
+    "browser": "155.0.4283.62",
+    "evidence": [
+      {
+        "surface": "web",
+        "endpointError": 5.79553433516819e-16,
+        "particleMaterials": 7,
+        "allChecks": true
+      },
+      {
+        "surface": "windows",
+        "endpointError": 5.79553433516819e-16,
+        "particleMaterials": 7,
+        "allChecks": true
+      }
+    ],
+    "real_model_calls": 0
+  },
+  "native_webview": {
+    "passed": true,
+    "version": "0.1.5",
+    "webview": "155.0.4283.62",
+    "executable_sha256": "930f1f14f025cc62cc946aeb462ac0d41a1731e278da4348727e074fb34b10e9",
+    "visualization_sha256": "c7368cba2a6dd28f0c6b5d89116202735df62ee0f6cca964adb6e7eb1ff6ed6a",
+    "actual_bundled_module": true,
+    "synthetic_tasks": true,
+    "real_model_calls": 0,
+    "node_started": false,
+    "microphone_opened": false
+  },
+  "installer": {
+    "runtime": {
+      "nexus-windows.exe": "930f1f14f025cc62cc946aeb462ac0d41a1731e278da4348727e074fb34b10e9",
+      "binaries/nexus-node.exe": "6fcddb72e83253aaf6668bac98db828e7001d886d57275b0d4ffa18e02b7b7bf",
+      "binaries/nexus-voice.exe": "5c13916a66bd1dafbc02c5ce6aec4996cdd93436511b8a44d38906919dbb6879",
+      "binaries/voice-models/keywords.txt": "b203a76d0330538db67643a93408b6f55f7fc647ee87b78d97d4639fe2a5aa81",
+      "binaries/voice-models/voice-models.lock.json": "0dc5347f2905170172e9da5639ed0890ab0deebd4aa65ada94ccf58b72ec3988",
+      "binaries/voice-models/kws/decoder-epoch-13-avg-2-chunk-16-left-64.onnx": "63a22dd60f40fff082ac3e09afa507f6787da36df76ded2fbe145fa233e22c21",
+      "binaries/voice-models/kws/encoder-epoch-13-avg-2-chunk-16-left-64.int8.onnx": "408bbd740838c42d5bf6d1c5b80b3c88b616c7860b92d980328b5b068c76ae48",
+      "binaries/voice-models/kws/joiner-epoch-13-avg-2-chunk-16-left-64.int8.onnx": "190d4067b4cc20b72a42a1916e69d92052000fb7051a427ebb1bc72a69207dc1",
+      "binaries/voice-models/kws/tokens.txt": "2d3f32311f9b692b964da3c90e830258d3e78e013cb0c992dbfb15cd5a1a71b0"
+    },
+    "resources_unchanged": true,
+    "main_binary_difference": "Tauri BUNDLE_TYPE_VAR_UNK to BUNDLE_TYPE_VAR_NSS (3 bytes)",
+    "actual_installer_executable_tested": true,
+    "installed_user_copy": false
+  },
+  "https": {
+    "origin": "https://core.example.com",
+    "page_status": 200,
+    "visualization_sha256": "c7368cba2a6dd28f0c6b5d89116202735df62ee0f6cca964adb6e7eb1ff6ed6a",
+    "asset_cache_control": "no-store",
+    "downloads": [
+      {
+        "filename": "NEXUS_0.1.5_x64-setup.exe",
+        "sha256": "96adf22a80f4cbbbd9e76cb7b8fde610e94334f3c5aa63f71d8a0988e319afd7",
+        "bytes": 93512311,
+        "tls_download_verified": true
+      },
+      {
+        "filename": "NEXUS-Android-0.1.2-debug.apk",
+        "sha256": "0b70e3ab2c8d2ab482d5a3d394b508fe0a0b306884b68da6bb3397585e0c12c5",
+        "bytes": 11816178,
+        "tls_download_verified": true
+      },
+      {
+        "filename": "NEXUS_0.1.4_x64-setup.exe",
+        "sha256": "ec6cd10258fcd04ebda0f94c8ebbbe11bf8ff8a798ce7cc9d4a772fd30a0a74d",
+        "bytes": 93509280,
+        "tls_download_verified": true
+      }
+    ]
+  },
+  "backup": "/var/backups/nexus/before-visualization-20261024T025516Z",
+  "database_backup_sha256": "e7c8199e332d5ca225eaf5806e4a6a693e4c9285da7d31eac49273a74318ed45",
+  "schema": 33,
+  "business_tables_preserved": {
+    "tasks": {
+      "rows": 75,
+      "sha256": "fc0013ab8ff5675dbb8152df753df7f812cbdc5730597f2bfab73cacd8488f8a"
+    },
+    "task_attempts": {
+      "rows": 73,
+      "sha256": "bc8cdebc51a453fd5b64bbdf7a7cfe7305fdfb56736ca548ab3649a9666e11df"
+    },
+    "conversations": {
+      "rows": 61,
+      "sha256": "31baf6b79f0d4d9d8de5cf13722e83bffe0ecaaf38a12dcf45b3881693f133e5"
+    },
+    "chat_turns": {
+      "rows": 97,
+      "sha256": "d3862318779bdaa363f15930d40f0ad7e535af3e0c9ec9a020b22809b409490a"
+    },
+    "model_calls": {
+      "rows": 170,
+      "sha256": "43626c20929d3e74261102ec2115a6a4b123031f726adcc8ee459386ac2d7eae"
+    },
+    "identities": {
+      "rows": 4,
+      "sha256": "b15a25f4df698201ccf239a46e8c00e1aed605cc676a85059ba4640ae7cb37af"
+    },
+    "grants": {
+      "rows": 32,
+      "sha256": "3672778f88c0572e4c25da6dc0201611d3236bfff091d5d368ec4ab1b30c6667"
+    },
+    "memory_entries": {
+      "rows": 4,
+      "sha256": "f035f604dcbc5d28b53517cbe7eb21ecd7dc0137b4af03dd154ef056aad26deb"
+    },
+    "plugin_versions": {
+      "rows": 22,
+      "sha256": "1b9b4f09b8eaa054b6795d1829fb1764668a3aab02d574662e2de5c606be7324"
+    },
+    "extension_versions": {
+      "rows": 4,
+      "sha256": "f71ad709d3993d448c0140c028aa13271f31ffc6e3b195309bdd3a00167b89b6"
+    },
+    "chat_exchanges": {
+      "rows": 125,
+      "sha256": "7aa4668bc449df03cf317a6a33e21d9c94f4feb319f8abe813dd44515a2e178c"
+    },
+    "skill_runs": {
+      "rows": 2,
+      "sha256": "970df1bd9cf483d616bc45d2d08f0d8b908b47ffa598d708f44f2ee40ffd957c"
+    },
+    "memory_consents": {
+      "rows": 4,
+      "sha256": "710b388ff7606c4eec20afc68be212ce5ca3f7044ba698e1d4c9652643a98f0f"
+    },
+    "memory_policies": {
+      "rows": 1,
+      "sha256": "17647a6e0f2fdb938668189ba66c870f3a761f8fbba84f75a553971385316146"
+    },
+    "memory_policy_events": {
+      "rows": 8,
+      "sha256": "08bf6d331e87fab51b746047a78fe688000ee2ec85c88f939629652417b46184"
+    },
+    "voice_sessions": {
+      "rows": 9,
+      "sha256": "449524ad47bd9894fd2a81e3af6310c5a49455e21a7c37d7f111437e308aacbc"
+    },
+    "voice_utterances": {
+      "rows": 13,
+      "sha256": "10164b995390ebbc2b80253f1edd6e0256e9decfb34cb5ad9f2441f98f80cabe"
+    },
+    "chat_work_grants": {
+      "rows": 59,
+      "sha256": "2e6086f907ca104013a91d733098eda7d076c05ed81aa710df5b686794747534"
+    },
+    "chat_work_steps": {
+      "rows": 69,
+      "sha256": "6c8d62921bc1dbd4bba1276fc98425a72f4ba950f44ec6502e14f0720fdca729"
+    },
+    "chat_work_answers": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "chat_work_operations": {
+      "rows": 94,
+      "sha256": "aaaa564c6f4672fac5e2a407a554689135a21451cce38c4276aa3f9186ee3272"
+    },
+    "chat_work_tasks": {
+      "rows": 37,
+      "sha256": "fcf5cc0230af3d4b014012276f970877604786d7451a824acbc9ee6fd0c98b0d"
+    },
+    "plugin_goals": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "plugin_authorities": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "plugin_decisions": {
+      "rows": 6,
+      "sha256": "647bf935ad0d97b281bce556924feaed29b548bc18c8739beb2f0f22a0cdf774"
+    },
+    "goal_plans": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "goal_steps": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "goal_checkpoints": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "goal_evidence": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "cold_payloads": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "plugin_business_suites": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "plugin_rollouts": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "plugin_rollout_tasks": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "config_unchanged": true,
+  "config_sha256": "3acc7890ea616e2e866964426b028894397d9f57ee9717d578c0d162f7b34c60",
+  "single_active_core": {
+    "pid": 145444,
+    "status": "active"
+  },
+  "paused": false,
+  "workers": {
+    "harness": "running",
+    "chat": "running",
+    "language": "running",
+    "extensions": "running",
+    "skills": "running",
+    "plugins": "running",
+    "plugin_tests": "running"
+  },
+  "model_calls_before": 170,
+  "model_calls_after": 170,
+  "existing_unknown_tasks": 3,
+  "limitations": [
+    "User-installed copy was not overwritten; upgrade UX awaits user acceptance.",
+    "Native animation checks used synthetic task state, without Node execution, microphone or model calls.",
+    "Production real task animation and Android hardware were not exercised."
+  ],
+  "screenshots": {
+    "native-flight.png": "d53c3eb629651f60a595f4868ceed6d9ce467c2da5d86c9992b3965f642915d3",
+    "native-afterglow.png": "a56229dc3ee43edbd44e90b75491f70809a82f7c87149209773cdb29423f83dc",
+    "native-rotated.png": "c67ed29b946e611dc4c1e44313ce56a6def6eea32b1b196660c30aa1143ff2c1"
+  }
+}

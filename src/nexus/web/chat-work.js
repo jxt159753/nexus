@@ -1,8 +1,7 @@
 "use strict";
 const chatWorkState={grant:null,catalog:null,catalogNode:null,catalogAt:0,catalogLoading:false,permission:null,retry:null,nodes:new Map(),defaultNode:null,webEnabled:false};
 function chatWorkspaceReady() {
-  const node=chatWorkState.nodes.get($("chat-node").value);
-  return !!node && (chatWorkState.webEnabled || node.roots.includes("workspace") && ["filesystem.read@1","filesystem.search@1","filesystem.write@1","filesystem.read_lines@1","filesystem.glob@1","filesystem.grep@1","filesystem.edit@1","filesystem.read_image@1"].some(tool=>node.tools.includes(tool)));
+  return chatWorkState.nodes.size > 0 || chatWorkState.webEnabled;
 }
 function chatWorkReset() {
   chatWorkState.grant=null; chatWorkState.catalog=null; chatWorkState.catalogNode=null; chatWorkState.catalogAt=0; chatWorkState.catalogLoading=false; chatWorkState.permission=null; chatWorkState.retry=null;
@@ -10,7 +9,7 @@ function chatWorkReset() {
   $("chat-work-enabled").checked=false; chatWorkRender();
 }
 function chatWorkImageAvailable() {
-  return chatWorkState.catalogNode===$("chat-node").value && !!(chatWorkState.catalog?.catalog || []).some(item=>item.name==="read_image");
+  return !!(chatWorkState.catalog?.catalog || []).some(item=>(item.route_intent || item.name)==="read_image");
 }
 function chatWorkJson(value, limit=12000) {
   if (window.NexusImages?.safeJson) return window.NexusImages.safeJson(value, limit);
@@ -19,13 +18,13 @@ function chatWorkJson(value, limit=12000) {
   return raw.length>limit ? raw.slice(0,limit)+"…" : raw;
 }
 function chatWorkEnsureCatalog() {
-  const nodeId=$("chat-node").value;
+  const nodeId="all";
   if (!nodeId || !chatWorkspaceReady() || chatWorkState.catalogLoading) return;
   if (chatWorkState.catalogNode===nodeId && Date.now()-chatWorkState.catalogAt<60000) return;
   chatWorkState.catalogLoading=true;
   chatWorkState.catalogAt=Date.now();
-  api(`/api/v1/chat/work-catalog?node_id=${nodeId}`).then(directory=>{
-    if ($("chat-node").value!==nodeId) return;
+  api("/api/v1/chat/work-catalog").then(directory=>{
+    if (!state.logged) return;
     chatWorkState.catalog=directory; chatWorkState.catalogNode=nodeId; chatWorkState.catalogAt=Date.now();
     const pre=$("chat-work-catalog"); if (pre) pre.textContent=JSON.stringify(directory.catalog,null,2);
     chatRender();
@@ -34,25 +33,23 @@ function chatWorkEnsureCatalog() {
 function chatWorkRender() {
   const grant=chatWorkState.grant;
   const automatic=chatWorkspaceReady();
-  const usable=grant && grant.valid!==false && !grant.revoked_at && new Date(grant.expires_at)>new Date() && grant.used_operations<grant.max_operations && grant.node_id===$("chat-node").value;
-  $("chat-work-enabled").disabled=!(usable || automatic);
-  if (automatic && chatWorkState.defaultNode!==$("chat-node").value) {$("chat-work-enabled").checked=true;chatWorkState.defaultNode=$("chat-node").value;}
-  if (!usable && !automatic) $("chat-work-enabled").checked=false;
-  $("chat-work-controls").hidden=automatic;
-  $("chat-work-status").textContent=automatic ? "已配置的 workspace 内读写、查找默认可用，无需会话授权或写入确认。路径检查、文件变更检查、执行记录和预算仍生效。" : usable ? `本会话授权有效至 ${new Date(grant.expires_at).toLocaleTimeString()}，已用 ${grant.used_operations}/${grant.max_operations} 次操作。` : "当前设备未配置完整工作区工具；仅已登记的能力可用。";
-  $("chat-work-grant").disabled=!chatState.conversation || !!chatState.active || !!chatState.conversation?.archived || !$("chat-node").value;
-  $("chat-work-revoke").disabled=!grant || !!grant.revoked_at;
-  if (automatic || usable) chatWorkEnsureCatalog();
+  $("chat-work-enabled").disabled=!automatic;
+  if (automatic && !chatWorkState.defaultNode) {$("chat-work-enabled").checked=true;chatWorkState.defaultNode="all";}
+  if (!automatic) $("chat-work-enabled").checked=false;
+  $("chat-work-status").textContent="Core 根据自然语言选择已授权设备；各设备的权限、执行记录和审批分别检查。可直接说我的电脑、我的手机或设备名称。";
+  $("chat-work-revoke").hidden=!grant || !!grant.revoked_at;
+  if (automatic) chatWorkEnsureCatalog();
 }
 function chatWorkActive() {
   return $("chat-tools").checked && $("chat-work-enabled").checked && !$("chat-work-enabled").disabled;
 }
 async function chatWorkSubmission() {
   if (!chatWorkActive()) return {};
-  const directory=await api(`/api/v1/chat/work-catalog?node_id=${$("chat-node").value}`);
-  chatWorkState.catalog=directory; chatWorkState.catalogNode=$("chat-node").value; chatWorkState.catalogAt=Date.now();
-  return chatWorkspaceReady() ? {workspace_work:true,work_digest:directory.work_digest,allow_work_results:true} : {work_grant_id:chatWorkState.grant.grant_id,work_digest:directory.work_digest,allow_work_results:true};
+  const directory=await api("/api/v1/chat/work-catalog");
+  chatWorkState.catalog=directory; chatWorkState.catalogNode="all"; chatWorkState.catalogAt=Date.now();
+  return {workspace_work:true,all_nodes:true,work_digest:directory.work_digest,allow_work_results:true};
 }
+
 function chatWorkOffset(minutes) {
   if (!Number.isInteger(minutes)) return "";
   const absolute=Math.abs(minutes);
@@ -248,7 +245,7 @@ function chatWorkCards(turn) {
     if (result?.execution_outcome==="unknown") card.append(el("p","执行结果未知；Core 保留证据并核对，不能当作成功或直接重跑。","hint"));
     if (result?.status && result.status!=="succeeded" && !result.error_code) card.append(el("p",`实际结果状态：${result.status}`,"hint"));
     if (step.request_text) card.append(el("p",step.request_text,"chat-prose"));
-    if (result?.error_code) card.append(el("p",`本次工具未完成：${result.error_code}`,"hint"));
+    if (result?.error_code) card.append(el("p",result.message || "这一步未能完成，具体原因保留在执行详情中。","hint"));
     if (result?.error?.message) card.append(el("p",result.error.message,"hint"));
     if (step.permission_text) card.append(el("p",`你的答复：${step.permission_text}`));
     const details=el("details");details.append(el("summary","查看执行详情"),el("pre",chatWorkJson({action:step.proposal,result:step.result})));
@@ -272,15 +269,6 @@ async function chatWorkAnswer(turn) {
   chatWorkState.retry=null; $("chat-text").value=""; await chatHistory();
 }
 function initChatWork() {
-  $("chat-work-grant").onclick=action(async()=>{
-    const conv=chatState.conversation;
-    if (!conv) return;
-    const directory=await api(`/api/v1/chat/work-catalog?node_id=${$("chat-node").value}`);
-    $("chat-work-catalog").textContent=JSON.stringify(directory.catalog,null,2);
-    const value=await api(`/api/v1/chat/conversations/${conv.conversation_id}/work-grant`,{method:"POST",body:JSON.stringify({request_id:crypto.randomUUID(),node_id:$("chat-node").value,profile:$("chat-work-profile").value,consent:true,duration_minutes:30,max_operations:20})});
-    chatWorkState.grant=value.grant; chatWorkState.catalog=directory; chatWorkState.catalogNode=$("chat-node").value; chatWorkState.catalogAt=Date.now(); chatWorkRender();
-    $("chat-work-enabled").checked=true; $("chat-tools").checked=true; $("chat-skills").checked=false; chatRender();
-  });
   $("chat-work-revoke").onclick=action(async()=>{if (!chatState.conversation) return; await api(`/api/v1/chat/conversations/${chatState.conversation.conversation_id}/work-grant`,{method:"DELETE",body:"{}"});chatWorkReset();await chatHistory();});
   $("chat-work-enabled").onchange=()=>chatRender();
 }

@@ -2,11 +2,13 @@
 
 import hashlib
 import json
+from nexus.core.cognitive import node_routing
 from dataclasses import asdict
 from uuid import UUID, uuid4
 
 from nexus.contracts.extensions import canonical, digest_value
 from nexus.core.models.chat import request_body
+from nexus.core.models.config import CHAT_MAX_TEXT_BYTES
 from nexus.core.memory import context as memory_context
 from nexus.core.security import work as permissions
 from nexus.core.security.types import AccessDenied
@@ -39,7 +41,8 @@ WHERE t.status='queued' AND t.recovery_required=0 AND NOT EXISTS(
 async def capacity(conn):
     size = await one(conn,"SELECT coalesce(sum(length(CAST(request_body AS BLOB))+length(CAST(partial_text AS BLOB))+coalesce(length(CAST(response_json AS BLOB)),0)),0) FROM chat_exchanges")
     compact = await one(conn,"SELECT coalesce(sum(length(CAST(source_messages_json AS BLOB))+length(CAST(summary_text AS BLOB))),0) FROM chat_compactions")
-    return size[0]+compact[0]+262144 <= 268435456
+    # JSON escaping can expand response text sixfold; partial_text is separate.
+    return size[0]+compact[0]+7*CHAT_MAX_TEXT_BYTES+262144 <= 268435456
 
 
 async def begin(conn, config, row, call_id, messages, options, now):
@@ -53,8 +56,10 @@ async def begin_payload(conn, turn_id, call_id, body, now):
     await conn.execute("INSERT INTO chat_exchanges(call_id,turn_id,request_body,request_sha256,created_at) VALUES(?,?,?,?,?)",(call_id,turn_id,body,hashlib.sha256(body.encode()).hexdigest(),timestamp(now)))
 
 
-async def finish(conn, call_id, reply, partial, status, now):
-    await conn.execute("UPDATE chat_exchanges SET response_json=?,partial_text=?,outcome=?,finished_at=? WHERE call_id=? AND outcome='started'",(canonical(asdict(reply)) if reply else None,partial,status if status in {"completed","failed","stopped","interrupted"} else "unknown",timestamp(now),call_id))
+async def finish(conn, call_id, reply, partial, status, now, *, failure=None):
+    response = asdict(reply) if reply else {"content": partial, "complete": False, **failure} if failure else None
+    outcome = "failed" if reply and getattr(reply, "rejected_calls", ()) else status
+    await conn.execute("UPDATE chat_exchanges SET response_json=?,partial_text=?,outcome=?,finished_at=? WHERE call_id=? AND outcome='started'",(canonical(response) if response is not None else None,partial,outcome if outcome in {"completed","failed","stopped","interrupted"} else "unknown",timestamp(now),call_id))
 
 
 async def corrections(conn, turn_id):
@@ -70,10 +75,13 @@ class ChatJournal:
         async with self.chat.database.transaction(write=False) as conn:
             await self.owned(conn,principal,turn_id)
             exchanges=await conn.execute_fetchall("SELECT e.*,m.provider,m.model,m.cost_status,m.cost_microunits FROM chat_exchanges e JOIN model_calls m USING(call_id) WHERE e.turn_id=? ORDER BY e.rowid",(str(turn_id),))
+            from nexus.core.storage.archive import hydrate
+            exchanges=[await hydrate(conn,'chat_exchanges',row) for row in exchanges]
             if any(hashlib.sha256(row["request_body"].encode()).hexdigest()!=row["request_sha256"] for row in exchanges):
                 raise AccessDenied("RESULT_INVALID")
             controls=await conn.execute_fetchall("SELECT control_id,kind,text,applied_call_id,created_at FROM chat_controls WHERE turn_id=? ORDER BY rowid",(str(turn_id),))
             compactions=await conn.execute_fetchall("SELECT * FROM chat_compactions WHERE turn_id=?",(str(turn_id),))
+            compactions=[await hydrate(conn,'chat_compactions',row) for row in compactions]
             return {"exchanges":[dict(row) for row in exchanges],"controls":[dict(row) for row in controls],"compactions":[dict(row) for row in compactions]}
 
     async def owned(self, conn, principal, turn_id):
@@ -94,7 +102,7 @@ class ChatJournal:
                 return
             if (not row["work_grant_id"] or row["recovery_required"] or not(row["work_status"] or row["status"] in {"queued","generating"}) or row["status"] in {"stopping","stopped","failed","interrupted"}):
                 raise AccessDenied("ALREADY_FINISHED")
-            await permissions.valid_grant(conn,row["work_grant_id"],utc_now(),owner_id=principal.identity_id,scope=self.chat.harness.scope(UUID(json.loads(row["request_json"])["node_id"])))
+            await node_routing.validate_turn(self.chat,conn,row,utc_now())
             if (await one(conn,"SELECT count(*) FROM chat_controls WHERE turn_id=? AND kind='steer'",(str(turn_id),)))[0]>=8:
                 raise AccessDenied("BUSY")
             await conn.execute("INSERT INTO chat_controls(control_id,turn_id,request_id,request_json,kind,text,created_at) VALUES(?,?,?,?,'steer',?,?)",(str(uuid4()),str(turn_id),str(value.request_id),encoded,value.text,timestamp(utc_now())))
@@ -111,7 +119,7 @@ class ChatJournal:
                 return
             if not row["recovery_required"] or row["expires_at"]<=timestamp(utc_now()):
                 raise AccessDenied("APPROVAL_EXPIRED")
-            await permissions.valid_grant(conn,row["work_grant_id"],utc_now(),owner_id=principal.identity_id,scope=self.chat.harness.scope(UUID(json.loads(row["request_json"])["node_id"])))
+            await node_routing.validate_turn(self.chat,conn,row,utc_now())
             if await one(conn,"SELECT 1 FROM model_calls WHERE work_root_turn_id=? AND (outcome!='completed' OR cost_status!='calculated')",(str(turn_id),)):
                 raise AccessDenied("EXECUTION_UNKNOWN")
             tasks=await conn.execute_fetchall("""SELECT t.* FROM tasks t WHERE t.task_id IN (
@@ -139,6 +147,8 @@ class ChatJournal:
         records=[]
         for identifier in turn_ids:
             row=await self.owned(conn,principal,identifier)
+            from nexus.core.storage.archive import hydrate
+            row=await hydrate(conn,'chat_turns',row)
             source=await one(conn,"SELECT project_id FROM conversations WHERE conversation_id=?",(row["conversation_id"],))
             if json.loads(row["references_json"]) or source[0]!=project_id or row["status"]!="completed" or row["work_status"] or row["recovery_required"]:
                 raise AccessDenied("POLICY_DENIED")

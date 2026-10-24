@@ -34,7 +34,10 @@ def execute_tool(command: CommandExecute, config: NodeConfig) -> ToolResult:
         root = config.roots.get(command.arguments.root_id)
         if root is None:
             raise PermissionError("resource not configured")
-        if command.tool.startswith("interaction."):
+        if command.tool == "filesystem.receive":
+            from nexus.node.tools.receive import receive_file
+            result = receive_file(command, config)
+        elif command.tool.startswith("interaction."):
             target=config.interaction_targets.get(command.arguments.target_id)
             if target is None:
                 raise PermissionError("interaction target not configured")

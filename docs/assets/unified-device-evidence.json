@@ -1,0 +1,196 @@
+{
+  "date": "2026-10-24",
+  "status": "deployed; user device acceptance pending",
+  "scope": [
+    "Core default automatic routing for new clients",
+    "Windows and web automatic authorized device choice",
+    "independent device presence sync",
+    "Android send consent and first conversation"
+  ],
+  "release": "/opt/nexus/releases/unified-device-20261024-9c9c1609",
+  "baseline": "/opt/nexus/releases/android-routing-20261024-d6069378",
+  "wheel_sha256": "9c9c160973c3431aceb659185a1165147e99e55ae470fdde1c5648a22abbb2e0",
+  "schema": 33,
+  "runtime_resources_checked": 252,
+  "changed_core_web_resources": [
+    "nexus/contracts/chat.py",
+    "nexus/web/chat-skills.js",
+    "nexus/web/chat-work.js",
+    "nexus/web/chat.js",
+    "nexus/web/index.html",
+    "nexus/web/app/api.js",
+    "nexus/web/app/main.js",
+    "nexus/web/app/render.js"
+  ],
+  "backup": "/var/backups/nexus/before-unified-device-20261024T021950Z",
+  "backup_sha256": "e1362172c7de1fae7f202d3a6342fafe35cb07e1f39935b4ad5dfc77d9a7c1e5",
+  "history_tables_preserved": 33,
+  "history_counts": {
+    "tasks": 72,
+    "task_attempts": 70,
+    "conversations": 59,
+    "chat_turns": 93,
+    "model_calls": 160,
+    "identities": 4,
+    "grants": 32,
+    "memory_entries": 4,
+    "plugin_versions": 22,
+    "extension_versions": 4,
+    "chat_exchanges": 115,
+    "skill_runs": 2,
+    "memory_consents": 4,
+    "memory_policies": 1,
+    "memory_policy_events": 8,
+    "voice_sessions": 9,
+    "voice_utterances": 13,
+    "chat_work_grants": 51,
+    "chat_work_steps": 63,
+    "chat_work_answers": 0,
+    "chat_work_operations": 88,
+    "chat_work_tasks": 34,
+    "plugin_goals": 0,
+    "plugin_authorities": 0,
+    "plugin_decisions": 5,
+    "goal_plans": 0,
+    "goal_steps": 0,
+    "goal_checkpoints": 0,
+    "goal_evidence": 0,
+    "cold_payloads": 0,
+    "plugin_business_suites": 0,
+    "plugin_rollouts": 0,
+    "plugin_rollout_tasks": 0
+  },
+  "config_unchanged": true,
+  "grants_unchanged": true,
+  "new_model_calls": 0,
+  "main_pid": 32868,
+  "paused": false,
+  "workers": {
+    "harness": "running",
+    "chat": "running",
+    "language": "running",
+    "extensions": "running",
+    "skills": "running",
+    "plugins": "running",
+    "plugin_tests": "running"
+  },
+  "historical_unknown_tasks": 3,
+  "nodes_at_verify": [
+    {
+      "label": "我的电脑",
+      "online": true
+    },
+    {
+      "label": "我的手机",
+      "online": false
+    }
+  ],
+  "downloads": [
+    {
+      "filename": "NEXUS-Android-0.1.2-debug.apk",
+      "sha256": "0b70e3ab2c8d2ab482d5a3d394b508fe0a0b306884b68da6bb3397585e0c12c5",
+      "bytes": 11816178,
+      "tls_download_verified": true
+    },
+    {
+      "filename": "NEXUS_0.1.4_x64-setup.exe",
+      "sha256": "ec6cd10258fcd04ebda0f94c8ebbbe11bf8ff8a798ce7cc9d4a772fd30a0a74d",
+      "bytes": 93509280,
+      "tls_download_verified": true
+    }
+  ],
+  "android_signing_sha256": "4aae1191da4be22ca8b49c65e770426763db177df293672aa830b37ca76486cd",
+  "android_upgrade_preserves_data": true,
+  "windows_node_voice_binaries_unchanged": true,
+  "validation": {
+    "local_core": {
+      "passed": 39,
+      "seconds": 18.33
+    },
+    "frozen_linux": {
+      "passed": 124,
+      "seconds": 52.74
+    },
+    "android_instrumentation": {
+      "passed": 4,
+      "seconds": 31.559,
+      "classes": [
+        "SendFlowTest",
+        "AutoSyncTest",
+        "CoreIntegrationTest",
+        "UiSnapshotTest"
+      ]
+    },
+    "android_jvm": [
+      {
+        "suite": "ai.nexus.android.VoiceOrderingTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0
+      },
+      {
+        "suite": "ai.nexus.protocol.VoiceWireTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0
+      },
+      {
+        "suite": "ai.nexus.protocol.WireTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0
+      }
+    ],
+    "android_build_and_lint": "passed",
+    "browser": [
+      {
+        "mode": "web",
+        "latency_ms": 1903,
+        "slow_history_independent": true,
+        "global_catalog": true,
+        "rename_preserves_draft": true,
+        "image_consent": true,
+        "failure_recovery": true
+      },
+      {
+        "mode": "windows",
+        "latency_ms": 1747,
+        "slow_history_independent": true,
+        "global_catalog": true,
+        "rename_preserves_draft": true,
+        "image_consent": true,
+        "failure_recovery": true
+      }
+    ],
+    "legacy": [
+      {
+        "mode": "legacy",
+        "global_catalog": true,
+        "no_manual_device": true
+      }
+    ],
+    "native_webview2": [
+      {
+        "mode": "native",
+        "latency_ms": 633,
+        "slow_history_independent": true,
+        "global_catalog": true,
+        "rename_preserves_draft": true,
+        "image_consent": true,
+        "failure_recovery": true
+      }
+    ],
+    "syntax": "workspace and frozen JS passed"
+  },
+  "repaired_during_validation": [
+    "device rename callback returned promise, fixed and browser retested",
+    "Android stale pooled GET EOF, read-only retry within timeout added; writes never retried automatically",
+    "legacy fixture extension response completed"
+  ],
+  "not_verified": [
+    "user phone and vendor background limits",
+    "real model semantic routing on user devices",
+    "human voice and acoustics",
+    "Windows installer upgrade on user current installation"
+  ]
+}

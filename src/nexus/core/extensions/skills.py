@@ -17,6 +17,7 @@ from nexus.contracts.extensions import (
     canonical,
     digest_value,
     validate_instance,
+    validate_skill_result,
 )
 from nexus.contracts.task import ListDirectoryArguments, ListDirectoryRequest, SystemInfoArguments, SystemInfoRequest
 from nexus.core.security.types import AccessDenied, Principal
@@ -115,14 +116,19 @@ class SkillService:
                     elif step.get("tool") == "filesystem.list":
                         ListDirectoryArguments.model_validate(arguments)
                         output = _directory_result(truncated)
+                    elif step.get('tool')=='plugin.call':
+                        from nexus.core.extensions.native_steps import standin
+                        output=standin(step,arguments)
                     else:
                         raise ValueError("unsupported built-in tool")
                     results[step["id"]] = output
                     observed.append({"id": step["id"], "output": output})
-                validate_instance(manifest["output_schema"], results)
+                validate_skill_result(manifest,results)
                 cases.append({"name": "truncated" if truncated else "normal", "truncated": truncated,
                               "observed": observed})
-            return {"passed": True, "controller": "trusted-skill-v1", "cases": cases}, "passed"
+            native=any(step.get('tool')=='plugin.call' for step in steps)
+            return {"passed": True, "controller": "trusted-skill-v1", "cases": cases,
+                    **({'native_execution':'not_run','verification':'contract_standins_only'} if native else {})}, "passed"
         except (ValueError, KeyError, TypeError, LookupError) as exc:
             return {"passed": False, "controller": "trusted-skill-v1", "cases": cases,
                     "reason": type(exc).__name__}, "failed"
@@ -139,13 +145,14 @@ class SkillService:
             return Principal(UUID(owner_id), "owner", row["token_hash"])
 
     async def start(self, principal: Principal, version_id: UUID, node_id: UUID, input_value: dict, *, request_id: UUID | None = None,
-                    chat_turn_id: UUID | None = None, plan_digest: str | None = None, work_step_id: UUID | None = None) -> dict:
+                    chat_turn_id: UUID | None = None, plan_digest: str | None = None, work_step_id: UUID | None = None, conversation_id: UUID | None = None) -> dict:
         self.extensions.require_enabled()
         input_value = json.loads(json.dumps(input_value, allow_nan=False))
         if type(input_value) is not dict:
             raise ValueError("Skill input must be an object")
         request_id = request_id or uuid4()
-        request_digest = digest_value({"version_id": str(version_id), "node_id": str(node_id), "input": input_value})
+        request_digest = digest_value({"version_id": str(version_id), "node_id": str(node_id), "input": input_value,
+                                      **({'conversation_id':str(conversation_id)} if conversation_id else {})})
         existing_id = None
         async with self.harness.operation:
             async with self.database.transaction() as conn:
@@ -187,6 +194,20 @@ class SkillService:
                 if policy is None:
                     raise AccessDenied("POLICY_DENIED")
                 steps = json.loads(version["steps_json"])
+                permission_context=None;permission_fingerprint=None
+                from nexus.core.extensions.native_steps import native, dependency
+                if native(version):
+                    associated=await one(conn,'SELECT c.conversation_id,c.owner_id,c.archived,c.plan_mode FROM conversations c JOIN chat_turns t USING(conversation_id) LEFT JOIN chat_work_steps s USING(turn_id) WHERE t.turn_id=? OR s.step_id=?',
+                        (str(chat_turn_id) if chat_turn_id else '',str(work_step_id) if work_step_id else ''))
+                    permission_context=str(conversation_id) if conversation_id else associated['conversation_id'] if associated else None
+                    context=await one(conn,'SELECT * FROM conversations WHERE conversation_id=? AND owner_id=?',(permission_context,str(principal.identity_id)))
+                    if context is None or context['archived'] or context['plan_mode'] or associated and associated['conversation_id']!=permission_context:
+                        raise AccessDenied('NATIVE_SKILL_CONVERSATION_REQUIRED')
+                    from nexus.core.security.modes import effective
+                    permission_fingerprint=(await effective(conn,permission_context))['fingerprint']
+                    for definition in steps:
+                        if definition.get('tool')=='plugin.call':
+                            await dependency(conn,principal.identity_id,definition)
                 # Resolve and validate all input-dependent builtins before the first task.
                 for definition in steps:
                     for argument in definition.get("arguments", {}).values():
@@ -194,6 +215,10 @@ class SkillService:
                             _resolve({"value": argument}, {}, input_value)
                     if definition.get("tool") == "filesystem.list":
                         ListDirectoryArguments.model_validate(_resolve(definition.get("arguments", {}), {}, input_value))
+                    elif definition.get('tool')=='plugin.call':
+                        from nexus.core.extensions.native_steps import preflight
+                        if not any(isinstance(item,dict) and '$ref' in item for item in definition.get('arguments',{}).values()):
+                            preflight(definition,_resolve(definition.get('arguments',{}),{},input_value))
                     elif definition.get("tool_version_id"):
                         dependency = await one(conn, "SELECT manifest_json FROM extension_versions WHERE version_id=?", (definition["tool_version_id"],))
                         schema = json.loads(dependency[0])["input_schema"]
@@ -217,6 +242,8 @@ class SkillService:
                         str(run_id), index, step["id"], timestamp(now), timestamp(now),
                     ))
                 await conn.execute("UPDATE skill_runs SET request_id=?,request_digest=? WHERE run_id=?", (str(request_id), request_digest, str(run_id)))
+                if permission_context:
+                    await conn.execute('UPDATE skill_runs SET permission_context_id=?,permission_fingerprint=? WHERE run_id=?',(permission_context,permission_fingerprint,str(run_id)))
                 if work_step_id is not None:
                     await conn.execute("UPDATE chat_work_steps SET skill_run_id=?,status='waiting' WHERE step_id=? AND skill_run_id IS NULL",(str(run_id),str(work_step_id)))
                 if chat_turn_id is not None:
@@ -291,6 +318,12 @@ class SkillService:
         request_id = uuid5(NAMESPACE_URL, f"nexus-skill:{run['run_id']}:{step['step_index']}")
         if definition.get("tool") == "system.info":
             request = SystemInfoRequest(request_id=request_id, intent="get_system_info", arguments=SystemInfoArguments())
+        elif definition.get('tool')=='plugin.call':
+            from nexus.core.extensions.native_steps import arguments as native_arguments
+            from nexus.core.storage.tasks import REQUEST
+            async with self.harness.operation,self.database.transaction() as conn:
+                args=await native_arguments(conn,run,definition,arguments,request_id)
+            request=REQUEST.validate_json(canonical({'request_id':str(request_id),'intent':'execute_plugin','arguments':args.model_dump(mode='json')}))
         else:
             request = ListDirectoryRequest(request_id=request_id, intent="list_directory", arguments=ListDirectoryArguments.model_validate(arguments))
         async with self.database.transaction(write=False) as conn:
@@ -301,16 +334,26 @@ class SkillService:
             return await self.harness.submit(principal, UUID(run["node_id"]), request, rate_limit=False,
                                              skill_run_id=UUID(run["run_id"]), skill_step_index=step["step_index"])
 
-    async def _finish(self, run_id: str, status: str, *, result: dict | None = None, error: str | None = None) -> None:
+    async def _finish(self, run_id: str, status: str, *, result: dict | None = None, error: str | None = None,
+                      failed_step_result: str | None = None) -> None:
         async with self.database.transaction() as conn:
             run = await one(conn, "SELECT * FROM skill_runs WHERE run_id=?", (run_id,))
             if run is None or run["status"] in {"succeeded", "failed", "cancelled", "timed_out"}:
                 return
             if status == "succeeded" and run["cancel_requested"]:
                 return
+            error_value = {"code": error} if error else None
+            if failed_step_result is not None:
+                step = await one(conn, "SELECT step_id,task_id FROM skill_run_steps WHERE run_id=? AND step_index=?",
+                                 (run_id, run["current_step"]))
+                # This is the bounded, schema-checked Node result, not an
+                # exception string or a new execution attempt.
+                error_value.update(step_id=step["step_id"], task_id=step["task_id"], tool_result=json.loads(failed_step_result))
+                await conn.execute("UPDATE skill_run_steps SET status='failed',result_json=?,updated_at=? WHERE run_id=? AND step_index=?",
+                                   (failed_step_result, timestamp(utc_now()), run_id, run["current_step"]))
             await conn.execute("UPDATE skill_runs SET status=?,result_json=?,error_json=?,revision=revision+1,updated_at=? WHERE run_id=?", (
                 status, canonical(result) if result is not None else None,
-                json.dumps({"code": error}) if error else None, timestamp(utc_now()), run_id,
+                canonical(error_value) if error_value else None, timestamp(utc_now()), run_id,
             ))
             await audit(conn, run["owner_id"], None, f"extension.skill_{status}", utc_now())
 
@@ -325,6 +368,14 @@ class SkillService:
             paused = bool((await one(conn, "SELECT paused FROM system_state WHERE singleton=1"))[0])
             recovery_hold = await one(conn,"SELECT 1 FROM chat_work_steps s JOIN chat_turns t USING(turn_id) WHERE s.skill_run_id=? AND t.recovery_required=1",(run_id,))
         now = utc_now()
+        if run['permission_context_id']:
+            from nexus.core.extensions.native_steps import context
+            try:
+                async with self.database.transaction(write=False) as conn: await context(conn,run)
+            except AccessDenied:
+                await self._cancel_step(run,step)
+                await self._finish(run_id,'failed',error='PERMISSION_MODE_CHANGED')
+                return
         if run["expires_at"] <= timestamp(now):
             if step is not None and step["task_id"]:
                 try:
@@ -363,7 +414,7 @@ class SkillService:
             results = {item["step_id"]: json.loads(item["result_json"]) for item in steps if item["result_json"]}
             release = json.loads(version["release_json"])
             try:
-                validate_instance(release["manifest"]["output_schema"], results)
+                validate_skill_result(release['manifest'],results)
             except ValueError:
                 await self._finish(run_id, "failed", error="RESULT_INVALID")
                 return
@@ -376,6 +427,19 @@ class SkillService:
                 await self._finish(run_id, "failed", error="TASK_MISSING")
                 return
             if task["status"] == "succeeded":
+                definition=json.loads(version['steps_json'])[step['step_index']-1]
+                if definition.get('tool')=='plugin.call':
+                    from nexus.core.extensions.native_steps import successful
+                    if not successful(task['result_json']):
+                        await self._finish(run_id,'failed',error='NATIVE_STEP_FAILED',failed_step_result=task['result_json'])
+                        return
+                    if definition['plugin_id']=='builtin.mcp':
+                        from nexus.core.plugins.mcp import discovery_succeeded
+                        async with self.harness.operation,self.database.transaction() as conn:
+                            activated=await discovery_succeeded(conn,await load_task(conn,UUID(step['task_id'])))
+                        if not activated:
+                            await self._finish(run_id,'failed',error='MCP_DISCOVERY_NOT_ACTIVATED')
+                            return
                 await self._step_succeeded(run, step, task["result_json"])
                 return
             if task["status"] in {"failed", "cancelled", "timed_out"}:
@@ -478,7 +542,7 @@ class SkillService:
                 value = {item["step_id"]: json.loads(item["result_json"]) for item in results}
                 version = await one(conn, "SELECT release_json FROM extension_versions WHERE version_id=?", (run["version_id"],))
                 try:
-                    validate_instance(json.loads(version["release_json"])["manifest"]["output_schema"], value)
+                    validate_skill_result(json.loads(version['release_json'])['manifest'],value)
                 except (ValueError, KeyError, TypeError):
                     await conn.execute("UPDATE skill_runs SET status='failed',error_json=?,revision=revision+1,updated_at=? WHERE run_id=?", (
                         json.dumps({"code": "RESULT_INVALID"}), timestamp(utc_now()), run["run_id"]))

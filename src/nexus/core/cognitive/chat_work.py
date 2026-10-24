@@ -1,6 +1,7 @@
 """Bounded chat work coordination; all effects use the existing executors."""
 
 import json
+from nexus.core.cognitive import node_routing
 from datetime import timedelta
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
@@ -34,9 +35,17 @@ def task_feedback(task: TaskRecord) -> dict:
     return data
 
 
-def request_for(step, role, project_id, command_digests, preview=None, interaction_digests=None):
+def request_for(step, role, project_id, command_digests, preview=None, interaction_digests=None, file_source=None):
     proposal = json.loads(step["proposal_json"])
     intent, arguments = WORK_INTENTS.get(proposal["intent"],proposal["intent"]), dict(proposal["arguments"])
+    request_id=uuid5(NAMESPACE_URL,f"nexus-work:{step['step_id']}:{role}")
+    if intent == 'send_file':
+        from nexus.contracts.file_transfer import receiving_path
+        if file_source is None:
+            raise AccessDenied('FILE_SOURCE_UNAVAILABLE')
+        intent='receive_file'
+        arguments={key:file_source[key] for key in ('attachment_id','conversation_id','sha256','size_bytes')}
+        arguments.update(root_id='workspace',path=receiving_path(request_id,file_source['filename']))
     if intent in {"observe_target","interact_target"}:
         arguments["template_digest"]=(interaction_digests or {}).get(arguments["target_id"],"")
     if intent == "run_command":
@@ -50,7 +59,7 @@ def request_for(step, role, project_id, command_digests, preview=None, interacti
             arguments.update(expected_sha256=preview["previous_sha256"], preview_task_id=step["preview_task_id"],preview_digest=preview["preview_digest"])
             if intent == "edit_file":
                 arguments.update(content_sha256=preview["content_sha256"],bytes_written=preview["bytes_written"])
-    return REQUEST.validate_json(canonical({"request_id":str(uuid5(NAMESPACE_URL,f"nexus-work:{step['step_id']}:{role}")),"project_id":project_id,"intent":intent,"arguments":arguments}))
+    return REQUEST.validate_json(canonical({"request_id":str(request_id),"project_id":project_id,"intent":intent,"arguments":arguments}))
 
 
 async def validate_task(conn, step_id, role, owner_id, node_id, request, now):
@@ -60,6 +69,13 @@ async def validate_task(conn, step_id, role, owner_id, node_id, request, now):
     project = await one(conn,"SELECT c.project_id FROM conversations c JOIN chat_turns t USING(conversation_id) WHERE t.turn_id=?",(step["turn_id"],))
     proposal = json.loads(step["proposal_json"])
     arguments = proposal["arguments"]
+    if proposal['intent']=='send_file':
+        from nexus.core.cognitive.chat_files import bound_attachment
+        source=await bound_attachment(conn,owner_id,grant['conversation_id'],arguments)
+        expected=request_for(step,role,project[0],{},file_source=source)
+        if role!='execute' or request!=expected:
+            raise AccessDenied('POLICY_DENIED')
+        return
     if request.intent == 'execute_plugin' and proposal['intent'] == 'plugin_execute' and role == 'execute':
         if (request.arguments.plugin_id != arguments['plugin_id'] or request.arguments.tool != arguments['tool']
                 or request.arguments.input != arguments['input'] or str(request.arguments.invocation_id) != str(step_id)
@@ -101,6 +117,7 @@ class WorkService:
         self.database = chat.database
         from nexus.core.cognitive.web_work import WebWork
         self.web = WebWork(self)
+        self.feedback_pending = set()
 
     async def grant(self, principal, conversation_id, value):
         async with self.chat.harness.operation, self.database.transaction() as conn:
@@ -122,6 +139,7 @@ class WorkService:
             await conn.execute("INSERT INTO chat_work_grants(grant_id,conversation_id,owner_id,node_id,request_id,request_json,profile,scope_digest,policy_version,max_operations,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",(
                 identifier,str(conversation_id),str(principal.identity_id),str(value.node_id),str(value.request_id),encoded,value.profile,
                 scope_digest(self.chat.harness.scope(value.node_id)),(await one(conn,"SELECT version FROM policy_state WHERE singleton=1"))[0],value.max_operations,timestamp(now),timestamp(now+timedelta(minutes=value.duration_minutes))))
+            await conn.execute("UPDATE chat_work_grants SET operation_limits_enabled=? WHERE grant_id=?", (int(self.chat.config.call_limits_enabled), identifier))
             await audit(conn,str(principal.identity_id),None,"chat.work_granted",now)
             from nexus.core.security.modes import bind_grant
             await bind_grant(conn, identifier, conversation_id)
@@ -129,7 +147,7 @@ class WorkService:
 
     @staticmethod
     def public_grant(row):
-        return {key:row[key] for key in ("grant_id","conversation_id","node_id","profile","max_operations","used_operations","expires_at","revoked_at","permission_mode")}
+        return {key:row[key] for key in ("grant_id","conversation_id","node_id","profile","max_operations","used_operations","operation_limits_enabled","expires_at","revoked_at","permission_mode")}
 
     async def revoke(self,principal,conversation_id):
         async with self.chat.harness.operation, self.database.transaction() as conn:
@@ -154,10 +172,12 @@ class WorkService:
         return value
 
     async def steps(self,conn,turn_id):
-        rows = await conn.execute_fetchall("SELECT * FROM chat_work_steps WHERE turn_id=? ORDER BY step_index",(str(turn_id),))
+        rows = await conn.execute_fetchall("SELECT s.*,g.node_id FROM chat_work_steps s JOIN chat_turns t USING(turn_id) LEFT JOIN chat_work_grants g ON g.grant_id=COALESCE(s.routed_grant_id,t.work_grant_id) WHERE s.turn_id=? ORDER BY step_index",(str(turn_id),))
+        labels = await node_routing.names(conn,self.chat.harness.link.config)
         output=[]
         for row in rows:
             value=dict(row)
+            value['node_label'] = labels.get(value['node_id'],'设备')
             value["proposal"] = json.loads(value.pop("proposal_json"))
             value["result"] = json.loads(value.pop("result_json")) if row["result_json"] else None
             value.pop("native_json")
@@ -165,13 +185,16 @@ class WorkService:
         return output
 
     async def prepare(self,conn,principal,conversation_id,value):
+        if value.all_nodes:
+            from nexus.core.cognitive.node_routing import prepare
+            return await prepare(self,conn,principal,conversation_id,value)
         directory = await work_catalog.catalog(self.chat,conn,principal,value.node_id)
         if directory["work_digest"] != value.work_digest:
             raise Conflict("IDEMPOTENCY_CONFLICT")
         if value.workspace_work:
             # Existing configured workspace + persisted identity grants are the
             # authorization. This internal scope is not an extra user approval.
-            if not {"read_file","find_files","write_file","read","glob","grep","edit","web_search","web_fetch","read_image","plugin_inspect","plugin_execute"}.intersection(item["name"] for item in directory["catalog"]):
+            if not {"get_node_status","get_system_info","android_device_status","android_notification_digest","read_file","find_files","write_file","read","glob","grep","edit","web_search","web_fetch","read_image","plugin_inspect","plugin_execute","skill_create"}.intersection(item["name"] for item in directory["catalog"]):
                 raise AccessDenied("POLICY_DENIED")
             now=utc_now()
             if (await one(conn,"SELECT count(*) FROM chat_work_grants"))[0]>=10000:
@@ -179,56 +202,77 @@ class WorkService:
             identifier=str(uuid4())
             await conn.execute("INSERT INTO chat_work_grants(grant_id,conversation_id,owner_id,node_id,request_id,request_json,profile,scope_digest,policy_version,max_operations,created_at,expires_at,auto_files) VALUES(?,?,?,?,?,?,'standard',?,?,20,?,?,1)",(
                 identifier,str(conversation_id),str(principal.identity_id),str(value.node_id),str(value.request_id),canonical({"source":"configured_workspace","request_id":str(value.request_id)}),scope_digest(self.chat.harness.scope(value.node_id)),(await one(conn,"SELECT version FROM policy_state WHERE singleton=1"))[0],timestamp(now),timestamp(now+timedelta(minutes=5))))
+            await conn.execute("UPDATE chat_work_grants SET operation_limits_enabled=? WHERE grant_id=?", (int(self.chat.config.call_limits_enabled), identifier))
             await audit(conn,str(principal.identity_id),None,"chat.workspace_scope",now)
             from nexus.core.security.modes import bind_grant
             await bind_grant(conn, identifier, conversation_id)
             return directory["catalog"],identifier
         grant = await permissions.valid_grant(conn,value.work_grant_id,utc_now(),owner_id=principal.identity_id,node_id=value.node_id,scope=self.chat.harness.scope(value.node_id))
-        if grant["conversation_id"] != str(conversation_id) or grant["used_operations"] >= grant["max_operations"]:
+        if grant["conversation_id"] != str(conversation_id) or grant["operation_limits_enabled"] and grant["used_operations"] >= grant["max_operations"]:
             raise AccessDenied("WORK_PERMISSION_EXPIRED")
         return directory["catalog"],str(value.work_grant_id)
 
     async def model_start(self,conn,row,now):
-        grant = await permissions.valid_grant(conn,row["work_grant_id"],now,owner_id=row["owner_id"],scope=self.chat.harness.scope(UUID(json.loads(row["request_json"])["node_id"])))
-        if row["work_round"] > 4:
+        await node_routing.validate_turn(self.chat,conn,row,now)
+        if self.chat.config.call_limits_enabled and row["work_round"] > self.chat.config.chat_work_max_actions:
             raise AccessDenied("WORK_OPERATION_LIMIT")
         calls = await chat_compaction.root_calls(conn,row["turn_id"])
-        if sum(call["web_step_id"] is None and not call["compaction_call"] for call in calls) != row["work_round"] or any(call["cost_status"] != "calculated" or call["outcome"] != "completed" for call in calls):
+        if sum(call["web_step_id"] is None and not call["compaction_call"] for call in calls) != row["work_round"]:
             raise AccessDenied("BUDGET_EXCEEDED")
-        remaining = self.chat.config.task_cost_microunits-sum(call["cost_microunits"] for call in calls)
-        worst=(32768*self.chat.config.input_price+self.chat.config.chat_max_output_tokens*self.chat.config.output_price+999999)//1000000
-        if remaining < worst:
-            raise AccessDenied("BUDGET_EXCEEDED")
+        remaining = chat_compaction.remaining(self.chat.config, calls)
         messages = json.loads(row["work_messages_json"] or row["context_surface_json"] or row["context_json"])
         if json.loads(row["request_json"]).get("allow_compaction"):
             return remaining, messages
         count = (await one(conn,"SELECT count(*) FROM chat_work_steps WHERE turn_id=?",(row["turn_id"],)))[0]
-        options = self.chat.model_options(row, 4-count)
+        options = self.chat.model_options(row, self.chat.config.work_actions_remaining(count))
         projected = fit_work_context(self.chat.config, messages, options["work_catalog"],
                                      allow_tools=options["allow_tools"], work_limit=options["work_limit"],
-                                     generate_title=options["generate_title"],history_summary=json.loads(row["history_summary_json"]))
+                                     generate_title=options["generate_title"],history_summary=json.loads(row["history_summary_json"]),auto_memory=options.get('auto_memory',False))
         if projected != messages:
             await conn.execute("UPDATE chat_turns SET work_messages_json=?,context_truncated=1 WHERE turn_id=?",(canonical(projected),row["turn_id"]))
             await audit(conn,row["owner_id"],None,"chat.context_compacted",now)
         return remaining, projected
 
     async def proposed(self,conn,row,reply,now):
+        if row["phase"] == "summary":
+            raise AccessDenied("POLICY_DENIED")
         count=(await one(conn,"SELECT count(*) FROM chat_work_steps WHERE turn_id=?",(row["turn_id"],)))[0]
         calls=reply.work_calls or ((reply.proposal,reply.native_tool_call),)
-        if row["work_round"] >= 4 or not 1<=len(calls)<=4-count:
+        if (self.chat.config.call_limits_enabled and row["work_round"] >= self.chat.config.chat_work_max_actions) or not 1<=len(calls)<=min(4,self.chat.config.work_actions_remaining(count)):
             raise AccessDenied("WORK_STEP_LIMIT")
         entries=json.loads(row["work_catalog_json"])
         checked=[(work_catalog.checked(entries,proposal,native),native) for proposal,native in calls]
-        await permissions.valid_grant(conn,row["work_grant_id"],now,owner_id=row["owner_id"],scope=self.chat.harness.scope(UUID(json.loads(row["request_json"])["node_id"])))
+        await node_routing.validate_turn(self.chat,conn,row,now)
         messages=json.loads(row["work_messages_json"] or row["context_json"])
         identifiers=[native["id"] for _,native in checked]
         old_ids={call["id"] for message in messages for call in message.get("tool_calls",[])}
         if len(set(identifiers))!=len(identifiers) or old_ids.intersection(identifiers):
             raise AccessDenied("MODEL_RESPONSE_INVALID")
         for index,(proposal,native) in enumerate(checked,1):
-            await conn.execute("INSERT INTO chat_work_steps(step_id,turn_id,step_index,proposal_json,native_json,status,created_at) VALUES(?,?,?,?,?,'pending',?)",(str(uuid4()),row["turn_id"],count+index,canonical(proposal),canonical(native),timestamp(now)))
+            proposal, routed = await node_routing.bind_step(conn,row,proposal,now)
+            await conn.execute("INSERT INTO chat_work_steps(step_id,turn_id,step_index,proposal_json,native_json,status,created_at,routed_grant_id) VALUES(?,?,?,?,?,'pending',?,?)",(str(uuid4()),row["turn_id"],count+index,canonical(proposal),canonical(native),timestamp(now),routed))
         messages.append({"role":"assistant","content":reply.content or None,"tool_calls":[native for _,native in checked]})
         await conn.execute("UPDATE chat_turns SET work_status='waiting',work_messages_json=? WHERE turn_id=?",(canonical(messages),row["turn_id"]))
+
+    async def rejected(self,conn,row,reply,now):
+        """Known argument rejection has no execution; use the existing exchange budget."""
+        count=(await one(conn,"SELECT count(*) FROM chat_work_steps WHERE turn_id=?",(row["turn_id"],)))[0]
+        if (self.chat.config.call_limits_enabled and row["work_round"] >= self.chat.config.chat_work_max_actions) or not 1 <= len(reply.rejected_calls) <= min(4,self.chat.config.work_actions_remaining(count)) or not reply.validation_errors:
+            raise AccessDenied("WORK_STEP_LIMIT")
+        await node_routing.validate_turn(self.chat,conn,row,now)
+        messages=json.loads(row["work_messages_json"] or row["context_json"])
+        identifiers=[native["id"] for native in reply.rejected_calls]
+        old_ids={call["id"] for message in messages for call in message.get("tool_calls",[])}
+        if len(set(identifiers)) != len(identifiers) or old_ids.intersection(identifiers):
+            raise AccessDenied("MODEL_RESPONSE_INVALID")
+        messages.append({"role":"assistant","content":reply.content or None,"tool_calls":list(reply.rejected_calls)})
+        for index,native in enumerate(reply.rejected_calls):
+            evidence={"status":"failed","phase":"arguments","execution_outcome":"not_started","batch_executed":False,
+                      "error_code":"INVALID_TOOL_ARGUMENTS","errors":[item for item in reply.validation_errors if item["index"]==index],
+                      "message":"整批调用均未执行。按工具契约修正参数；write_file 每个文件正文最多 12000 UTF-8 字节，可精简或在剩余动作内拆文件。"}
+            messages.append({"role":"tool","tool_call_id":native["id"],"content":canonical(evidence)})
+        await conn.execute("UPDATE chat_turns SET work_round=work_round+1,work_messages_json=? WHERE turn_id=?",(canonical(messages),row["turn_id"]))
+        await audit(conn,row["owner_id"],None,"chat.tool_arguments_rejected",now)
 
     async def answer(self,principal,turn_id,value):
         async with self.chat.harness.operation, self.database.transaction() as conn:
@@ -242,7 +286,7 @@ class WorkService:
             turn=await one(conn,"SELECT * FROM chat_turns WHERE turn_id=? AND owner_id=?",(str(turn_id),str(principal.identity_id)))
             if not turn or not turn["work_grant_id"]:
                 raise LookupError("work turn not found")
-            step,grant=await permissions.allowed_step(conn,value.step_id,utc_now(),scope=self.chat.harness.scope(UUID(json.loads(turn["request_json"])["node_id"])))
+            step,grant=await permissions.allowed_step(conn,value.step_id,utc_now(),scope=self.chat.harness.scope(UUID((await permissions.step_grant(conn,value.step_id))["node_id"])))
             if not turn or step["turn_id"] != str(turn_id) or turn["revision"] != value.expected_revision or step["status"] != "permission":
                 raise Conflict("IDEMPOTENCY_CONFLICT")
             text=value.text.strip().rstrip("。.!！")
@@ -260,6 +304,7 @@ class WorkService:
             await audit(conn,str(principal.identity_id),None,"chat.work_"+decision,utc_now())
 
     async def abort(self,conn,turn_id,error,now):
+        self.feedback_pending.add(turn_id)
         self.web.cancel(turn_id)
         await cancel_children(conn,turn_id,now)
         await conn.execute("UPDATE chat_work_steps SET status='stopped' WHERE turn_id=? AND status IN ('pending','waiting','permission')",(turn_id,))
@@ -278,10 +323,10 @@ class WorkService:
         if not pending:
             await append_batch_images(conn, row["turn_id"], messages)
         count = (await one(conn,"SELECT count(*) FROM chat_work_steps WHERE turn_id=?",(row["turn_id"],)))[0]
-        options = self.chat.model_options({**dict(row), "work_round": row["work_round"]+1}, 4-count)
+        options = self.chat.model_options({**dict(row), "work_round": row["work_round"]+1}, self.chat.config.work_actions_remaining(count))
         try:
             projected = messages if json.loads(row["request_json"]).get("allow_compaction") else fit_work_context(self.chat.config, messages, options["work_catalog"],
-                                         allow_tools=options["allow_tools"], work_limit=options["work_limit"],history_summary=json.loads(row["history_summary_json"]))
+                                         allow_tools=options["allow_tools"], work_limit=options["work_limit"],history_summary=json.loads(row["history_summary_json"]),auto_memory=options.get('auto_memory',False))
         except AccessDenied as exc:
             # A full model context cannot erase an already verified execution.
             await self.abort(conn,row["turn_id"],exc.code,now)
@@ -295,7 +340,7 @@ class WorkService:
     async def advance(self):
         await self.web.reap()
         async with self.database.transaction(write=False) as conn:
-            steps=await conn.execute_fetchall("SELECT s.*,t.work_grant_id,t.owner_id,t.work_status,t.status AS turn_status,c.project_id,c.archived FROM chat_work_steps s JOIN chat_turns t USING(turn_id) JOIN conversations c USING(conversation_id) WHERE t.recovery_required=0 AND s.status IN ('pending','waiting','permission') ORDER BY s.rowid LIMIT 100")
+            steps=await conn.execute_fetchall("SELECT s.*,COALESCE(s.routed_grant_id,t.work_grant_id) AS work_grant_id,t.owner_id,t.work_status,t.status AS turn_status,c.project_id,c.archived FROM chat_work_steps s JOIN chat_turns t USING(turn_id) JOIN conversations c USING(conversation_id) WHERE t.recovery_required=0 AND s.status IN ('pending','waiting','permission') ORDER BY s.rowid LIMIT 100")
         for step in steps:
             # Independent native calls still use the ordered device executor.
             if any(other["turn_id"]==step["turn_id"] and other["step_index"]<step["step_index"] for other in steps):
@@ -321,6 +366,17 @@ class WorkService:
                             "phase":"prepare","error_code":error},now)
                     else:
                         await self.abort(conn,step["turn_id"],error,now)
+
+        from nexus.core.cognitive import chat_feedback
+        for turn_id in tuple(self.feedback_pending):
+            self.feedback_pending.discard(turn_id)
+            async with self.chat.harness.operation, self.database.transaction() as conn:
+                try:
+                    if await chat_feedback.queue(self, conn, turn_id, utc_now()) is False:
+                        self.feedback_pending.add(turn_id)
+                except AccessDenied:
+                    # No extra outbound consent or budget is inferred for feedback.
+                    pass
 
     async def advance_step(self,step):
         now=utc_now()
@@ -356,6 +412,10 @@ class WorkService:
         proposal=json.loads(step["proposal_json"])
         node_id=UUID(grant["node_id"])
         intent=proposal["intent"]
+        if intent == "skill_create":
+            from nexus.core.cognitive.work_creation import create_skill
+            await create_skill(self.chat, step, principal, node_id)
+            return
         if intent in {'plugin_inspect','plugin_execute','plugin_install'}:
             await self.chat.plugins.work_step(step,principal,node_id,proposal)
             return
@@ -377,7 +437,7 @@ class WorkService:
             async with self.chat.harness.operation, self.database.transaction() as conn:
                 await permissions.allowed_step(conn,step["step_id"],utc_now(),scope=self.chat.harness.scope(node_id))
                 row=await one(conn,"SELECT work_catalog_json FROM chat_turns WHERE turn_id=?",(step["turn_id"],))
-                entry=next((item for item in json.loads(row[0]) if item.get("version_id") == proposal["arguments"]["version_id"]),None)
+                entry=work_catalog.capability_snapshot(json.loads(row[0]),node_id,proposal['arguments']['version_id'],intent)
                 version=await one(conn,"SELECT * FROM extension_versions WHERE version_id=? AND owner_id=?",(proposal["arguments"]["version_id"],str(principal.identity_id)))
                 if not entry or not version or entry["artifact_digest"] != version["artifact_digest"] or self.chat.skills is None:
                     raise AccessDenied("VERSION_NOT_APPROVED")
@@ -440,7 +500,12 @@ class WorkService:
                     await conn.execute("UPDATE chat_turns SET work_status='permission',revision=revision+1 WHERE turn_id=?",(step["turn_id"],))
                 return
             role="preview" if intent in {"write_file","edit"} and not preview else "execute"
-            request=request_for(step,role,step["project_id"],self.chat.harness.scope(node_id).command_digests,preview,self.chat.harness.scope(node_id).interaction_digests)
+            file_source=None
+            if intent=='send_file':
+                from nexus.core.cognitive.chat_files import materialize
+                file_source=await materialize(self.chat,principal,grant['conversation_id'],**{
+                    'kind':proposal['arguments']['source_kind'],'identifier':proposal['arguments']['source_id']})
+            request=request_for(step,role,step["project_id"],self.chat.harness.scope(node_id).command_digests,preview,self.chat.harness.scope(node_id).interaction_digests,file_source)
             async with self.chat.harness.operation:
                 await self.chat.harness.submit(principal,node_id,request,work_step_id=UUID(step["step_id"]),work_role=role,rate_limit=False)
             return
@@ -459,7 +524,7 @@ class WorkService:
         arguments=proposal["arguments"]
         async with self.database.transaction(write=False) as conn:
             row=await one(conn,"SELECT * FROM chat_turns WHERE turn_id=?",(step["turn_id"],))
-            snapshot=next((item for item in json.loads(row["work_catalog_json"]) if item.get("version_id") == arguments["version_id"] and item["name"] == proposal["intent"]),None)
+            snapshot=work_catalog.capability_snapshot(json.loads(row['work_catalog_json']),node_id,arguments['version_id'],proposal['intent'])
             version=await one(conn,"SELECT * FROM extension_versions WHERE version_id=? AND owner_id=?",(arguments["version_id"],str(principal.identity_id)))
             if not snapshot or not version or version["artifact_digest"] != snapshot["artifact_digest"]:
                 raise AccessDenied("VERSION_NOT_APPROVED")

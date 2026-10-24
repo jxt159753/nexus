@@ -53,9 +53,12 @@ class ChatHTTP:
     async def reference_preview(self,conversation_id: UUID,request: Request):
         return await self.service.journal.preview_references(await self.guards.owner_http(request),conversation_id,await body(request,ChatReferences))
 
-    async def work_catalog(self, request: Request, node_id: UUID):
+    async def work_catalog(self, request: Request, node_id: UUID | None = None):
         principal=await self.guards.owner_http(request)
         async with self.service.database.transaction(write=False) as conn:
+            if node_id is None:
+                from nexus.core.cognitive.node_routing import directory
+                return await directory(self.service,conn,principal)
             return await work_catalog.catalog(self.service,conn,principal,node_id)
 
     async def work_grant(self,conversation_id: UUID,request: Request):

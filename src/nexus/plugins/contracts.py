@@ -3,7 +3,7 @@
 from typing import Any, Annotated, Literal
 from uuid import UUID
 
-from pydantic import Field, StrictBool, StrictInt, StrictStr, model_validator
+from pydantic import Field, StrictBool, StrictInt, StrictStr, model_validator, model_serializer
 
 from nexus.contracts.base import StrictContract, CommandDigest
 from nexus.contracts.extensions import digest_value
@@ -93,6 +93,14 @@ class PluginNodeArguments(PluginExecuteArguments):
     release: PluginRelease | None=None
     capability_digests: dict[PluginId,CommandDigest]=Field(default_factory=dict,max_length=64)
     max_subcalls: StrictInt=Field(default=8,ge=0,le=20)
+    mcp_binding: 'MCPBinding | None'=None
+
+    @model_serializer(mode='wrap')
+    def serialized(self,handler):
+        value=handler(self)
+        # Preserve the canonical identity of pre-MCP commands/receipts.
+        if self.mcp_binding is None: value.pop('mcp_binding',None)
+        return value
 
 
 class PluginNodeResult(StrictContract):
@@ -131,3 +139,7 @@ class PluginInstallArguments(StrictContract):
 class PluginInstallProposal(StrictContract):
     intent: Literal['plugin_install']
     arguments: PluginInstallArguments
+
+
+from nexus.plugins.mcp_contracts import MCPBinding
+PluginNodeArguments.model_rebuild()

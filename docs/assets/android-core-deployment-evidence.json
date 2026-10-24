@@ -1,0 +1,211 @@
+{
+  "task": "P80 Android Core deployment",
+  "date": "2026-10-23",
+  "deployed_at_local": "2026-10-23T18:35:00+08:00",
+  "status": "production_deployed_pending_user_phone_acceptance",
+  "baseline": {
+    "release": "voice-wake-20261023-34f806a7",
+    "resources": 237,
+    "schema": 29
+  },
+  "release": {
+    "path": "/opt/nexus/releases/android-20261023-c123af78",
+    "wheel_sha256": "c123af786800cf3ca57f75284c4724d6d8946a7ddabe270fd6a3e5ed31793685",
+    "resources_verified": 240,
+    "changed_resources": [
+      "nexus/contracts/basic.py",
+      "nexus/contracts/messages.py",
+      "nexus/contracts/task.py",
+      "nexus/contracts/tools.py",
+      "nexus/contracts/work.py",
+      "nexus/core/config.py",
+      "nexus/core/cognitive/router.py",
+      "nexus/core/cognitive/work_catalog.py",
+      "nexus/core/harness/http.py",
+      "nexus/core/plugins/lifecycle.py",
+      "nexus/core/security/service.py",
+      "nexus/core/security/work.py",
+      "nexus/contracts/android.py",
+      "nexus/core/storage/migrations/030_autonomy.sql",
+      "nexus/core/storage/migrations/031_android_tools.sql"
+    ],
+    "schema": 31,
+    "scope": "Android required resources plus legacy plugin_wakeups explicit-column INSERT compatibility; migration 030 structure included as prerequisite, P81 runtime and migration 032 excluded"
+  },
+  "backup": {
+    "path": "/var/backups/nexus/before-android-20261023T103510Z",
+    "database_sha256": "093ee8a3ffbc721a427f544a9f60813fe694cda558f217dd4f0e948afb2e69f4",
+    "made_while_core_stopped": true
+  },
+  "history": {
+    "original_records_preserved": true,
+    "verified_categories": 17,
+    "tables": {
+      "tasks": {
+        "rows": 70,
+        "sha256": "c2f5cbd64c7614f0697267b3d31734c1996b69436b8acde31e1ab39fa78745b9"
+      },
+      "task_attempts": {
+        "rows": 68,
+        "sha256": "58bb6b663af7a88439ed38638c8e829a930f4673e8764c2c38697638aeb8caef"
+      },
+      "conversations": {
+        "rows": 56,
+        "sha256": "a7f2127523130c6807e8d55b48670f7871d105583edc2169900e5d10bb64c7b1"
+      },
+      "chat_turns": {
+        "rows": 90,
+        "sha256": "ab1b34a3f3a84babef65756885b905176f83fc54041b21dbf6b19be18acb0635"
+      },
+      "model_calls": {
+        "rows": 157,
+        "sha256": "c9005d6eabfa60cd996cee2e52a5f042b6e2326d307648014ea5049c99952793"
+      },
+      "identities": {
+        "rows": 3,
+        "sha256": "e215e0904c4c4d0adbde98915dca70513b441413fdd2bef7dcab28e9a7b456b2"
+      },
+      "grants": {
+        "rows": 28,
+        "sha256": "7b1305fd62c3ec4acf8a77be99b45a17012c7c77480d0ba5d7c00b06de807c85"
+      },
+      "memory_entries": {
+        "rows": 4,
+        "sha256": "f035f604dcbc5d28b53517cbe7eb21ecd7dc0137b4af03dd154ef056aad26deb"
+      },
+      "plugin_versions": {
+        "rows": 21,
+        "sha256": "2d534ae0c1490c6ea93be2d1b8c1ee3b0fac65248eb356d0fdf1008352f433db"
+      },
+      "extension_versions": {
+        "rows": 4,
+        "sha256": "f71ad709d3993d448c0140c028aa13271f31ffc6e3b195309bdd3a00167b89b6"
+      },
+      "chat_exchanges": {
+        "rows": 112,
+        "sha256": "d59f748bcd982c9c7a5beafd10a58f48feec4baeebb06cd84cd3e71018ed54c1"
+      },
+      "skill_runs": {
+        "rows": 2,
+        "sha256": "970df1bd9cf483d616bc45d2d08f0d8b908b47ffa598d708f44f2ee40ffd957c"
+      },
+      "memory_consents": {
+        "rows": 4,
+        "sha256": "710b388ff7606c4eec20afc68be212ce5ca3f7044ba698e1d4c9652643a98f0f"
+      },
+      "memory_policies": {
+        "rows": 1,
+        "sha256": "17647a6e0f2fdb938668189ba66c870f3a761f8fbba84f75a553971385316146"
+      },
+      "memory_policy_events": {
+        "rows": 8,
+        "sha256": "08bf6d331e87fab51b746047a78fe688000ee2ec85c88f939629652417b46184"
+      },
+      "voice_sessions": {
+        "rows": 8,
+        "sha256": "5d77d8eb94a7ba1bbe9a26b5f915f5105e01f5354123af889ab3f346e1109dea"
+      },
+      "voice_utterances": {
+        "rows": 13,
+        "sha256": "10164b995390ebbc2b80253f1edd6e0256e9decfb34cb5ad9f2441f98f80cabe"
+      }
+    },
+    "new_phone_identities": 1,
+    "new_owner_and_node_grants": 4,
+    "original_credentials_preserved": true
+  },
+  "verification": {
+    "linux_fixed_wheel": {
+      "passed": 407,
+      "skipped": 2,
+      "seconds": 81.07,
+      "skipped_windows_tests": [
+        "test_voice_lifecycle::test_default_endpoints_reuse_portaudio_com_apartment",
+        "test_plugin_lifecycle::test_plugin_dispatch_reuses_receipts_and_does_not_repeat_effect"
+      ]
+    },
+    "production_database_copy_migration_preserved": true,
+    "rollback_candidate_reads_schema31": true,
+    "android_origin_owner_login": true,
+    "owner_api_readback": true,
+    "csrf_without_token_status": 403,
+    "node_authentication": {
+      "tls_verified": true,
+      "node_token_accepted": true,
+      "welcome_received": true,
+      "advertised_tools": [],
+      "tasks_executed": 0,
+      "audio_sent": false
+    },
+    "final_core": {
+      "main_pid": 1332579,
+      "core_pids": [
+        1332579
+      ],
+      "schema": 31,
+      "quick_check": "ok",
+      "foreign_key_errors": 0,
+      "model_calls": 157,
+      "paused": false,
+      "android_origin_allowed": true,
+      "phone_voice_enabled": true,
+      "legacy_voice_settings_preserved": true,
+      "node_grants": [
+        [
+          "android.device_status",
+          "android:device"
+        ],
+        [
+          "android.notification_digest",
+          "android:notifications"
+        ]
+      ]
+    },
+    "existing_windows_node_online_at_check": true,
+    "no_new_model_calls": true,
+    "active_voice_sessions_at_check": 0
+  },
+  "apk": {
+    "bytes": 11893209,
+    "sha256": "7307a9e3e07abef4cfbc64513cf234deb3dd695ed25944d48274a6493ff0d1e5",
+    "content_type": "application/vnd.android.package-archive",
+    "tls_verified": true,
+    "http_status": 200
+  },
+  "apk_download_path": "/static/downloads/NEXUS-Android-0.1.0-debug.apk",
+  "configuration": {
+    "original_settings_preserved": true,
+    "added_origin": "https://app.nexus.local",
+    "phone_tool_roots": [
+      [
+        "android.device_status",
+        "android:device"
+      ],
+      [
+        "android.notification_digest",
+        "android:notifications"
+      ]
+    ],
+    "phone_voice_enabled": true,
+    "max_concurrent_voice_sessions": 1,
+    "existing_voice_settings_preserved": true,
+    "credential_storage": "local Windows DPAPI; no plaintext credentials in evidence or APK"
+  },
+  "resolved_before_activation": [
+    "Quoted origins TOML key preserved by parser-aware preparation",
+    "DPAPI file newline trimmed before decryption",
+    "Legacy plugin_wakeups INSERT made explicit-column compatible with migration 030 and final candidate retested"
+  ],
+  "not_verified": [
+    "Physical Android installation and OEM background/battery behavior",
+    "Physical microphone/speaker/Bluetooth and real ASR/TTS round trip",
+    "Complete network switching and system process kill matrix",
+    "User acceptance"
+  ],
+  "boundaries": [
+    "Foreground half-duplex with button interruption, no acoustic barge-in or background wake word",
+    "Debug-signed APK; no store release or formal production signing",
+    "Authentication probe advertised no tools, executed no tasks and sent no audio",
+    "Rollback package prepared but production rollback not exercised"
+  ]
+}

@@ -1,0 +1,219 @@
+{
+  "schema_version": 1,
+  "voice_protocol_version": 1,
+  "generated_at": "2026-10-22",
+  "notes": "Optional local fallback only. Primary Windows ASR/TTS is Alibaba Bailian via Core (ADR 0030); KWS/VAD remain local. Verify every SHA-256 before use.",
+  "models": [
+    {
+      "id": "kws.zh-en.3m",
+      "kind": "kws",
+      "license": "Apache-2.0",
+      "source": {
+        "type": "archive",
+        "repo": "k2-fsa/sherpa-onnx",
+        "tag": "kws-models",
+        "asset": "sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20.tar.bz2",
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20.tar.bz2",
+        "bytes": 32885699,
+        "sha256": "68447f4fbc67e70eee3a93961f36e81e98f47aef73ce7e7ca00885c6cd3616a6",
+        "format": "tar.bz2",
+        "strip_components": 1
+      },
+      "sample_rate": 16000,
+      "files": [
+        {
+          "path": "kws/encoder-epoch-13-avg-2-chunk-16-left-64.int8.onnx",
+          "bytes": 4599656,
+          "sha256": "408bbd740838c42d5bf6d1c5b80b3c88b616c7860b92d980328b5b068c76ae48",
+          "archive_path": "encoder-epoch-13-avg-2-chunk-16-left-64.int8.onnx"
+        },
+        {
+          "path": "kws/decoder-epoch-13-avg-2-chunk-16-left-64.onnx",
+          "bytes": 759829,
+          "sha256": "63a22dd60f40fff082ac3e09afa507f6787da36df76ded2fbe145fa233e22c21",
+          "archive_path": "decoder-epoch-13-avg-2-chunk-16-left-64.onnx"
+        },
+        {
+          "path": "kws/joiner-epoch-13-avg-2-chunk-16-left-64.int8.onnx",
+          "bytes": 86629,
+          "sha256": "190d4067b4cc20b72a42a1916e69d92052000fb7051a427ebb1bc72a69207dc1",
+          "archive_path": "joiner-epoch-13-avg-2-chunk-16-left-64.int8.onnx"
+        },
+        {
+          "path": "kws/tokens.txt",
+          "bytes": 1928,
+          "sha256": "2d3f32311f9b692b964da3c90e830258d3e78e013cb0c992dbfb15cd5a1a71b0",
+          "archive_path": "tokens.txt"
+        }
+      ],
+      "aggregate_sha256": "26acd7c2e2fc34f3ef707943e04c904003c180be73a6015a354f22cc3d5de209"
+    },
+    {
+      "id": "vad.silero.v4",
+      "kind": "vad",
+      "license": "MIT",
+      "source": {
+        "type": "http",
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
+      },
+      "sample_rate": 16000,
+      "files": [
+        {
+          "path": "vad/silero_vad.onnx",
+          "bytes": 643854,
+          "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+          "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
+        }
+      ],
+      "aggregate_sha256": "76c77851c57f83e21e285f855fb18fba5135295bdaad511b3b17a1996641a655"
+    },
+    {
+      "id": "asr.streaming-zipformer-bilingual-zh-en-2023-02-20.int8",
+      "kind": "asr",
+      "license": "Apache-2.0",
+      "source": {
+        "type": "huggingface",
+        "repo": "csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20",
+        "commit": "98590b7ed6443e77b714204da2757d75e1a642f4"
+      },
+      "sample_rate": 16000,
+      "files": [
+        {
+          "path": "asr/encoder.int8.onnx",
+          "bytes": 181895032,
+          "sha256": "8fa764187a261844f859d7143ebaa563af5d10adfece4c18a8f414c88cba2a9b",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/resolve/98590b7ed6443e77b714204da2757d75e1a642f4/encoder-epoch-99-avg-1.int8.onnx"
+        },
+        {
+          "path": "asr/decoder.int8.onnx",
+          "bytes": 13091040,
+          "sha256": "1a70c593d71e53f023f5f55b0b4cfff5055abb786ee3992e5f63dc2e273cc4fa",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/resolve/98590b7ed6443e77b714204da2757d75e1a642f4/decoder-epoch-99-avg-1.int8.onnx"
+        },
+        {
+          "path": "asr/joiner.int8.onnx",
+          "bytes": 3228404,
+          "sha256": "1ed689c5ed19dbaa725d9d191bb4822b5f4855a39e1ffd28cbc1f340d25b2ee0",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/resolve/98590b7ed6443e77b714204da2757d75e1a642f4/joiner-epoch-99-avg-1.int8.onnx"
+        },
+        {
+          "path": "asr/tokens.txt",
+          "bytes": 56317,
+          "sha256": "a8e0e4ec53810e433789b54a5c0134a7eaa2ffca595a6334d54c00da858841d3",
+          "url": "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/resolve/98590b7ed6443e77b714204da2757d75e1a642f4/tokens.txt"
+        }
+      ],
+      "aggregate_sha256": "36e38007478b134ea50a000b3c4b8fab926c4cdb2c03b3b0e7883b3f500bf5a3"
+    },
+    {
+      "id": "tts.melo-zh-en.fp32",
+      "kind": "tts",
+      "license": "MIT",
+      "source": {
+        "type": "huggingface",
+        "repo": "csukuangfj/vits-melo-tts-zh_en",
+        "commit": "a0d5c6a264c0ef92d70d8661d8cc502d79627cd6"
+      },
+      "sample_rate": 44100,
+      "files": [
+        {
+          "path": "tts/model.onnx",
+          "bytes": 170429550,
+          "sha256": "bf30582eb1b012250a35b1a4a80e7dfbcf8485e7bb9de0d95efbbeef0e4ad86d",
+          "url": "https://huggingface.co/csukuangfj/vits-melo-tts-zh_en/resolve/a0d5c6a264c0ef92d70d8661d8cc502d79627cd6/model.onnx"
+        },
+        {
+          "path": "tts/lexicon.txt",
+          "bytes": 6837671,
+          "sha256": "7236884b02435ac5d10cf69b4be40a61b45aa676b5300f0e412f185748fee528",
+          "url": "https://huggingface.co/csukuangfj/vits-melo-tts-zh_en/resolve/a0d5c6a264c0ef92d70d8661d8cc502d79627cd6/lexicon.txt"
+        },
+        {
+          "path": "tts/tokens.txt",
+          "bytes": 655,
+          "sha256": "d18664a7e12bd7ea1022ddaf951e534e136815016c5a809d6b64156bffb4369d",
+          "url": "https://huggingface.co/csukuangfj/vits-melo-tts-zh_en/resolve/a0d5c6a264c0ef92d70d8661d8cc502d79627cd6/tokens.txt"
+        },
+        {
+          "path": "tts/dict/hmm_model.utf8",
+          "bytes": 519739,
+          "sha256": "f17790586ac86dd048c8adffed052c4bd2b28ed0682972c1275e59040c0589a7",
+          "url": "https://huggingface.co/csukuangfj/vits-melo-tts-zh_en/resolve/a0d5c6a264c0ef92d70d8661d8cc502d79627cd6/dict/hmm_model.utf8"
+        },
+        {
+          "path": "tts/dict/idf.utf8",
+          "bytes": 5998717,
+          "sha256": "dbd1e03d72b2263cc8d84a4304ed77677eed9e7deaf43a1a5133bbba9733b535",
+          "url": "https://huggingface.co/csukuangfj/vits-melo-tts-zh_en/resolve/a0d5c6a264c0ef92d70d8661d8cc502d79627cd6/dict/idf.utf8"
+        },
+        {
+          "path": "tts/dict/jieba.dict.utf8",
+          "bytes": 5071204,
+          "sha256": "3043b77068e09c9904f27cad82f12b6ebe9dbdb5aeff3b25e45ab7f9c1122b55",
+          "url": "https://huggingface.co/csukuangfj/vits-melo-tts-zh_en/resolve/a0d5c6a264c0ef92d70d8661d8cc502d79627cd6/dict/jieba.dict.utf8"
+        },
+        {
+          "path": "tts/dict/pos_dict/char_state_tab.utf8",
+          "bytes": 327139,
+          "sha256": "28b7be1dd7369766a51445af4d42e9a2ba4bf374c13be5bc1ca7721e27271dbb",
+          "url": "https://huggingface.co/csukuangfj/vits-melo-tts-zh_en/resolve/a0d5c6a264c0ef92d70d8661d8cc502d79627cd6/dict/pos_dict/char_state_tab.utf8"
+        },
+        {
+          "path": "tts/dict/pos_dict/prob_emit.utf8",
+          "bytes": 1687686,
+          "sha256": "c33c4cb7edf3b3a5947df7209b6e9f267eae1f21335d9e2bd2521ea07105457a",
+          "url": "https://huggingface.co/csukuangfj/vits-melo-tts-zh_en/resolve/a0d5c6a264c0ef92d70d8661d8cc502d79627cd6/dict/pos_dict/prob_emit.utf8"
+        },
+        {
+          "path": "tts/dict/pos_dict/prob_start.utf8",
+          "bytes": 4347,
+          "sha256": "13623ea0e9300bdb597cb2da28770b7b385d6c0098d66e516083fb01b6bd5d96",
+          "url": "https://huggingface.co/csukuangfj/vits-melo-tts-zh_en/resolve/a0d5c6a264c0ef92d70d8661d8cc502d79627cd6/dict/pos_dict/prob_start.utf8"
+        },
+        {
+          "path": "tts/dict/pos_dict/prob_trans.utf8",
+          "bytes": 124159,
+          "sha256": "f22363e2307408293d180c6f9f6b5cb75879d52f722f7764fa2d3d0ae2400236",
+          "url": "https://huggingface.co/csukuangfj/vits-melo-tts-zh_en/resolve/a0d5c6a264c0ef92d70d8661d8cc502d79627cd6/dict/pos_dict/prob_trans.utf8"
+        },
+        {
+          "path": "tts/dict/stop_words.utf8",
+          "bytes": 8974,
+          "sha256": "b788b8a939d2e2fe079abd579ea98f12f9fb84370bfd0dddd81bb9381f7ab42c",
+          "url": "https://huggingface.co/csukuangfj/vits-melo-tts-zh_en/resolve/a0d5c6a264c0ef92d70d8661d8cc502d79627cd6/dict/stop_words.utf8"
+        },
+        {
+          "path": "tts/dict/user.dict.utf8",
+          "bytes": 49,
+          "sha256": "495bbf49270408a1234690e1e6a97328f30a482a7a72aa769e8a12e8714b0c62",
+          "url": "https://huggingface.co/csukuangfj/vits-melo-tts-zh_en/resolve/a0d5c6a264c0ef92d70d8661d8cc502d79627cd6/dict/user.dict.utf8"
+        },
+        {
+          "path": "tts/date.fst",
+          "bytes": 59154,
+          "sha256": "eb8aa079ae3cb81d8f4404992f39d61a0cb990947512b5b8d1e54d1f6980e718",
+          "url": "https://huggingface.co/csukuangfj/vits-melo-tts-zh_en/resolve/a0d5c6a264c0ef92d70d8661d8cc502d79627cd6/date.fst"
+        },
+        {
+          "path": "tts/number.fst",
+          "bytes": 64482,
+          "sha256": "743f402181fcfebf76cc2f0546b71fa26476e626fbe4e460fb7b4c3a7a8bd5bd",
+          "url": "https://huggingface.co/csukuangfj/vits-melo-tts-zh_en/resolve/a0d5c6a264c0ef92d70d8661d8cc502d79627cd6/number.fst"
+        },
+        {
+          "path": "tts/phone.fst",
+          "bytes": 88630,
+          "sha256": "1ac2b6fa56b1442320c4de7db08353bab8963a2b57f365eebcdd3a2d3562f8d7",
+          "url": "https://huggingface.co/csukuangfj/vits-melo-tts-zh_en/resolve/a0d5c6a264c0ef92d70d8661d8cc502d79627cd6/phone.fst"
+        },
+        {
+          "path": "tts/new_heteronym.fst",
+          "bytes": 21974,
+          "sha256": "ca14b2127e27baa571664e4bb791e143e7425f56a6bc29db08d74f97e6aa4e29",
+          "url": "https://huggingface.co/csukuangfj/vits-melo-tts-zh_en/resolve/a0d5c6a264c0ef92d70d8661d8cc502d79627cd6/new_heteronym.fst"
+        }
+      ],
+      "aggregate_sha256": "afbcf6b95cc71dbe075479eb37ebec1b5f4088d9a9d5e7350a21805fcd4c5e5d"
+    }
+  ]
+}

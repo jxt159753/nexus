@@ -1,0 +1,244 @@
+{
+  "date": "2026-10-24",
+  "status": "deployed; device and user acceptance pending",
+  "release": "/opt/nexus/releases/android-routing-20261024-d6069378",
+  "baseline": "/opt/nexus/releases/autonomy-20261023-76b4788e/venv/bin/python",
+  "schema": 33,
+  "wheel_sha256": "d60693781ea57c5d687fbb97067252488a8df0c71f80bee5ca8e3bf48bbce619",
+  "runtime_resources_checked": 252,
+  "changed_resources": [
+    "nexus/contracts/chat.py",
+    "nexus/contracts/work.py",
+    "nexus/core/cognitive/chat.py",
+    "nexus/core/cognitive/chat_http.py",
+    "nexus/core/cognitive/chat_journal.py",
+    "nexus/core/cognitive/chat_work.py",
+    "nexus/core/cognitive/work_catalog.py",
+    "nexus/core/link/nodes.py",
+    "nexus/core/models/chat.py",
+    "nexus/core/plugins/service.py",
+    "nexus/core/security/work.py",
+    "nexus/core/cognitive/chat_feedback.py",
+    "nexus/core/voice/chat_bridge.py",
+    "nexus/core/cognitive/node_routing.py",
+    "nexus/core/storage/migrations/033_node_routing.sql"
+  ],
+  "backup": "/var/backups/nexus/before-android-routing-20261024T014901Z",
+  "backup_sha256": "c323ac4eaab9840ef256931047bd3586d94400e8cb34ad2c511e218d4709b838",
+  "history": {
+    "tasks": {
+      "rows": 72,
+      "sha256": "1b442832b7fd923b4c049f4d131a7d3a128909d64439fcfbc29f440041056dff"
+    },
+    "task_attempts": {
+      "rows": 70,
+      "sha256": "a53990fcf77af09e03eb5935c872d5687bbfa34b12b7217743b54a83551bb40e"
+    },
+    "conversations": {
+      "rows": 59,
+      "sha256": "f555b7bcd3a018c2f829e7fb004d99f4582e84d2cbf2d7de5fee3012ad50e83b"
+    },
+    "chat_turns": {
+      "rows": 92,
+      "sha256": "1313642d191058a1a10ed580b2955993c55f416463bbbea2b01992b7ce026b1e"
+    },
+    "model_calls": {
+      "rows": 159,
+      "sha256": "2564ce9095424a01217719771e680834ba2ff84e460eaf8dd95bad0aff9739d7"
+    },
+    "identities": {
+      "rows": 4,
+      "sha256": "b15a25f4df698201ccf239a46e8c00e1aed605cc676a85059ba4640ae7cb37af"
+    },
+    "grants": {
+      "rows": 32,
+      "sha256": "3672778f88c0572e4c25da6dc0201611d3236bfff091d5d368ec4ab1b30c6667"
+    },
+    "memory_entries": {
+      "rows": 4,
+      "sha256": "f035f604dcbc5d28b53517cbe7eb21ecd7dc0137b4af03dd154ef056aad26deb"
+    },
+    "plugin_versions": {
+      "rows": 22,
+      "sha256": "25918915320e979f5b9f24553df0568a7b447f1c8db9cbd1ca265fe7f7498a67"
+    },
+    "extension_versions": {
+      "rows": 4,
+      "sha256": "f71ad709d3993d448c0140c028aa13271f31ffc6e3b195309bdd3a00167b89b6"
+    },
+    "chat_exchanges": {
+      "rows": 114,
+      "sha256": "b7ad74e7c1b738c3e33ba9c7162befbe00cf7dbdc70b8efd6e50232f9d9cfc19"
+    },
+    "skill_runs": {
+      "rows": 2,
+      "sha256": "970df1bd9cf483d616bc45d2d08f0d8b908b47ffa598d708f44f2ee40ffd957c"
+    },
+    "memory_consents": {
+      "rows": 4,
+      "sha256": "710b388ff7606c4eec20afc68be212ce5ca3f7044ba698e1d4c9652643a98f0f"
+    },
+    "memory_policies": {
+      "rows": 1,
+      "sha256": "17647a6e0f2fdb938668189ba66c870f3a761f8fbba84f75a553971385316146"
+    },
+    "memory_policy_events": {
+      "rows": 8,
+      "sha256": "08bf6d331e87fab51b746047a78fe688000ee2ec85c88f939629652417b46184"
+    },
+    "voice_sessions": {
+      "rows": 9,
+      "sha256": "449524ad47bd9894fd2a81e3af6310c5a49455e21a7c37d7f111437e308aacbc"
+    },
+    "voice_utterances": {
+      "rows": 13,
+      "sha256": "10164b995390ebbc2b80253f1edd6e0256e9decfb34cb5ad9f2441f98f80cabe"
+    },
+    "chat_work_grants": {
+      "rows": 50,
+      "sha256": "80b2f05d27a29e78bf68e43313c33fff6ad07e62ed6d9b348f9fc5f51a79133a"
+    },
+    "chat_work_steps": {
+      "rows": 63,
+      "sha256": "4cb86cd450469c53c7041acc3063cc4cfacc9e8d822275cbd7faab3a4eb62d8e"
+    },
+    "chat_work_answers": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "chat_work_operations": {
+      "rows": 88,
+      "sha256": "abcb2267405a74cc0e5c18e8be5397fd60485b4cac56449224ffee7c53919bcc"
+    },
+    "chat_work_tasks": {
+      "rows": 34,
+      "sha256": "183cda9043926270f2b47079e787df25faf44198ac2699732a0133b4b0fb5327"
+    },
+    "plugin_goals": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "plugin_authorities": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "plugin_decisions": {
+      "rows": 5,
+      "sha256": "a7fffd78e3d8236b7f408d031f537cf8ee19c52e686232f17480c8662e2382a8"
+    },
+    "goal_plans": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "goal_steps": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "goal_checkpoints": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "goal_evidence": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "cold_payloads": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "plugin_business_suites": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "plugin_rollouts": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "plugin_rollout_tasks": {
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "historical_records_preserved": true,
+  "configuration_unchanged": true,
+  "new_grants": 0,
+  "no_new_model_calls": true,
+  "model_calls_after": 159,
+  "paused_after": false,
+  "main_pid": 4112221,
+  "routing": {
+    "nodes": [
+      {
+        "node_id": "6603cabe-a0cd-48f0-b150-947c4619e011",
+        "name": "我的手机",
+        "online": false
+      },
+      {
+        "node_id": "6cb88e0a-e645-498d-8dcd-81cc6a2cda94",
+        "name": "我的电脑",
+        "online": false
+      }
+    ],
+    "functions": 26,
+    "work_digest": "da40db14d2f80f7ba28683e8a9c2636292ac546368f68b8355be94cabe342e4b"
+  },
+  "health": {
+    "status": "degraded",
+    "workers": {
+      "harness": "running",
+      "chat": "running",
+      "language": "running",
+      "extensions": "running",
+      "skills": "running",
+      "plugins": "running",
+      "plugin_tests": "running"
+    },
+    "unknown_tasks": 3
+  },
+  "tests": {
+    "linux_fixed_package": {
+      "passed": 461,
+      "skipped": 4,
+      "seconds": 112.76
+    },
+    "local_routing_final": {
+      "passed": 5,
+      "seconds": 3.92
+    },
+    "android_instrumentation_distinct_passed": 7,
+    "final_apk_ui_rerun_passed": 1,
+    "jvm_passed": 8,
+    "lint_errors": 0,
+    "lint_warnings": 12,
+    "migration_copy_preserved": true,
+    "rollback_reads_schema33": true,
+    "production_rollback_exercised": false,
+    "production_request_bytes": 29103
+  },
+  "apk": {
+    "filename": "NEXUS-Android-0.1.1-debug.apk",
+    "sha256": "996b04d974f51ffb1ab8493599a1519bc8bcb823b9e8532669259f52ae98ce0f",
+    "bytes": 11879676,
+    "https_download_hash_verified": true,
+    "certificate_sha256": "4aae1191da4be22ca8b49c65e770426763db177df293672aa830b37ca76486cd",
+    "same_certificate_as_0_1_0": true,
+    "url": "https://core.example.com/static/downloads/NEXUS-Android-0.1.1-debug.apk"
+  },
+  "intermediate_findings": [
+    "Oversized duplicated catalog corrected before release; original 32933 bytes exceeded 32768.",
+    "Pinned plugin metadata retained for routed plugin execution.",
+    "Notification test fixture component corrected before rerun.",
+    "Prior candidate refused production schema change during P81 deployment; rebased on the deployed P81 wheel.",
+    "Last shared-counter edit was interrupted by approval reviewer usage limit; resumed, corrected and tested on 2026-10-24."
+  ],
+  "not_verified": [
+    "Physical Android device, vendor background policies and network handoff matrix",
+    "Live model natural-language device selection",
+    "Human microphone, speaker, Bluetooth and acoustic quality",
+    "Production device execution after this update: both Nodes offline at verification"
+  ],
+  "screenshots": [
+    "android-routing-chat.png",
+    "android-routing-device.png"
+  ]
+}

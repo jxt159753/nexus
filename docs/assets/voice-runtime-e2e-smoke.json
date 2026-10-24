@@ -1,0 +1,38 @@
+{
+  "schema": "nexus.voice.runtime-e2e-smoke.v1",
+  "generated_at": "2026-10-22T23:50:00+08:00",
+  "real_microphone": true,
+  "live_human": false,
+  "path": "Windows runtime -> Core /ws/v1/voice/audio -> Fun-ASR -> Core fake responder -> CosyVoice -> runtime playback",
+  "source": "A recorded human sample (sherpa-onnx test_wavs/zh_3.wav) was played through Realtek speakers and captured by the Realtek microphone array.",
+  "ground_truth": "文森特·卡索是全球知名的法国性格派演员。",
+  "asr": {
+    "model": "fun-asr-realtime-2026-02-28",
+    "partials": [
+      "对",
+      "文身",
+      "文身特达",
+      "文森特·卡索是",
+      "文森特·卡索是全球",
+      "文森特·卡索是全球知名",
+      "文森特卡索是全球知名的法",
+      "文森特卡索是全球知名的法国性"
+    ],
+    "observed_final_in_core_speak": "文森特卡索是全球知名的法国性。"
+  },
+  "core": {
+    "responder": "fake deterministic responder",
+    "speak_text": "收到：文森特卡索是全球知名的法国性。"
+  },
+  "tts": {
+    "model": "cosyvoice-v3.5-flash",
+    "voice_design": true,
+    "played_by_runtime": true
+  },
+  "limitations": [
+    "Not a live human speaking; a prerecorded sample was acoustically replayed.",
+    "No wake word, AEC, or barge-in in this run.",
+    "No measured first-audio latency or false-wake statistics.",
+    "Not full acceptance evidence."
+  ]
+}

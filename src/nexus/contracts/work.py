@@ -13,6 +13,7 @@ from nexus.contracts.chat import SkillArguments, SkillProposal
 from nexus.contracts.language import SystemProposal, DirectoryProposal
 from nexus.contracts.web import WebSearchArguments, WebFetchArguments
 from nexus.plugins.contracts import PluginInspectProposal, PluginExecuteProposal, PluginInstallProposal
+from nexus.contracts.extensions import SkillGeneration
 
 
 class WorkGrantCreate(StrictContract):
@@ -114,6 +115,23 @@ class CapabilityProposal(StrictContract):
     arguments: CapabilityArguments
 
 
+class SkillCreateArguments(StrictContract):
+    reason: StrictStr = Field(min_length=1, max_length=500)
+    skill: SkillGeneration
+
+    @model_validator(mode="after")
+    def tested_plan(self):
+        ids = [step.id for step in self.skill.steps]
+        if not self.reason.strip() or not self.skill.tests or any(case.expected_steps != ids for case in self.skill.tests):
+            raise ValueError("creation requires a reason and tests covering the ordered steps")
+        return self
+
+
+class SkillCreateProposal(StrictContract):
+    intent: Literal["skill_create"]
+    arguments: SkillCreateArguments
+
+
 class WebSearchProposal(StrictContract):
     intent: Literal["web_search"]
     arguments: WebSearchArguments
@@ -154,4 +172,38 @@ class InteractProposal(StrictContract):
     arguments: WorkInteractArguments
 
 
-WORK_PROPOSAL = TypeAdapter(Annotated[SystemProposal | DirectoryProposal | ReadProposal | SearchProposal | WriteProposal | CommandProposal | StatusProposal | SkillProposal | ToolProposal | CapabilityProposal | WebSearchProposal | WebFetchProposal | LinesProposal | GlobProposal | GrepProposal | EditProposal | ObserveProposal | InteractProposal | ImageProposal | TimeProposal | JobListProposal | JobOutputProposal | PluginInspectProposal | PluginExecuteProposal | PluginInstallProposal, Field(discriminator="intent")])
+from nexus.contracts.android import AndroidDeviceStatusArguments, AndroidNotificationDigestArguments
+
+
+class AndroidDeviceStatusProposal(StrictContract):
+    intent: Literal["android_device_status"]
+    arguments: AndroidDeviceStatusArguments
+
+
+class AndroidNotificationDigestProposal(StrictContract):
+    intent: Literal["android_notification_digest"]
+    arguments: AndroidNotificationDigestArguments
+
+
+from nexus.contracts.file_transfer import SendFileArguments
+
+
+class SendFileProposal(StrictContract):
+    intent: Literal['send_file']
+    arguments: SendFileArguments
+
+
+WORK_ACTION = Annotated[SendFileProposal | AndroidDeviceStatusProposal | AndroidNotificationDigestProposal | SystemProposal | DirectoryProposal | ReadProposal | SearchProposal | WriteProposal | CommandProposal | StatusProposal | SkillProposal | ToolProposal | CapabilityProposal | SkillCreateProposal | WebSearchProposal | WebFetchProposal | LinesProposal | GlobProposal | GrepProposal | EditProposal | ObserveProposal | InteractProposal | ImageProposal | TimeProposal | JobListProposal | JobOutputProposal | PluginInspectProposal | PluginExecuteProposal | PluginInstallProposal, Field(discriminator="intent")]
+
+
+class NodeAction(StrictContract):
+    node_id: UUID
+    action: WORK_ACTION
+
+
+class RoutedProposal(StrictContract):
+    intent: Literal["on_node"]
+    arguments: NodeAction
+
+
+WORK_PROPOSAL = TypeAdapter(Annotated[WORK_ACTION | RoutedProposal, Field(discriminator="intent")])

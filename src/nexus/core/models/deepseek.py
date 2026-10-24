@@ -27,9 +27,10 @@ Do not infer missing resources or claim execution. If ambiguous, return unsuppor
 class ProviderFailure(ValueError):
     """No remote body, credential or transport exception is exposed to clients."""
 
-    def __init__(self, code: str, *, usage: tuple[int,int] | None = None, model: str | None = None):
+    def __init__(self, code: str, *, usage: tuple[int,int] | None = None, model: str | None = None, diagnostic: dict | None = None):
         super().__init__(code)
         self.usage, self.model = usage, model
+        self.diagnostic = diagnostic
 
 
 class DeepSeekProvider:
@@ -37,12 +38,12 @@ class DeepSeekProvider:
         self.key, self.config, self.transport = key, config, transport
 
     def estimate(self, request: str) -> int:
-        return self.config.task_cost_microunits
+        return self.config.model_reservation(input_tokens=16384, output_tokens=self.config.max_output_tokens)
 
     async def invoke(self, text: str, limits: ModelLimits | None = None) -> ModelReply:
         output_tokens, timeout = self.config.max_output_tokens, self.config.timeout_seconds
         if limits is not None:
-            if limits.max_calls < 1 or limits.max_cost_microunits < self.estimate(text) or limits.max_output_tokens < 1 or limits.timeout_seconds <= 0:
+            if limits.max_calls < 1 or (self.config.cost_limits_enabled and limits.max_cost_microunits < self.estimate(text)) or limits.max_output_tokens < 1 or limits.timeout_seconds <= 0:
                 raise ProviderFailure("MODEL_BUDGET_INVALID")
             output_tokens = min(output_tokens, limits.max_output_tokens)
             timeout = min(timeout, limits.timeout_seconds)

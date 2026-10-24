@@ -6,7 +6,7 @@ This module does not execute steps. SkillService and Harness own execution.
 import json
 from uuid import NAMESPACE_URL, UUID, uuid5
 
-from nexus.contracts.extensions import RESULT_FIELDS, canonical, digest_value, validate_instance
+from nexus.contracts.extensions import RESULT_FIELDS, canonical, digest_value, validate_instance, validate_skill_result
 from nexus.contracts.tools import validate_result
 from nexus.core.extensions.skills import _resolve
 from nexus.core.extensions.tools import reference_stats
@@ -43,7 +43,13 @@ async def eligible(skills, conn, owner_id: str, version, node_id: UUID) -> list[
                              "node_id": approved["node_id"]})
         else:
             tool = step["tool"]
-            root = "workspace" if tool == "filesystem.list" else ""
+            root = "workspace" if tool in {"filesystem.list","plugin.call"} else ""
+            if tool=='plugin.call':
+                from nexus.core.extensions.native_steps import dependency
+                await dependency(conn,owner_id,step)
+                if not scope.plugin_digest: raise AccessDenied('PLUGIN_NODE_POLICY_CHANGED')
+                plugin=await one(conn,'SELECT version_id,digest FROM plugin_versions WHERE owner_id=? AND plugin_id=? AND digest=?',(owner_id,step['plugin_id'],step['plugin_digest']))
+                bindings.append({'version_id':plugin['version_id'],'artifact_digest':plugin['digest'],'environment_digest':scope.plugin_digest,'approval_id':None})
             key = f"{tool}@1"
             if key not in scope.tools or key not in scope.local_tools or (root and (root not in scope.roots or root not in scope.local_roots)):
                 raise AccessDenied("POLICY_DENIED")
@@ -68,7 +74,7 @@ async def catalog(chat, conn, principal, node_id: UUID) -> dict:
                      "revision": version["revision"], "artifact_digest": version["artifact_digest"],
                      "description": manifest["description"], "input_schema": manifest["input_schema"],
                      "steps": [{"id": step["id"], "tool": step.get("tool", "approved_json_tool"),
-                                "approval_required": step.get("tool") == "filesystem.list"}
+                                "approval_required": step.get("tool") in {"filesystem.list","plugin.call"}}
                                for step in json.loads(version["steps_json"])]}
             if len(canonical([*entries, entry]).encode()) <= 8192:
                 entries.append(entry)
@@ -90,6 +96,10 @@ async def build_plan(skills, conn, row, proposal: dict, input_value: dict, *, re
     node_id = UUID(json.loads(row["request_json"])["node_id"])
     bindings = await eligible(skills, conn, row["owner_id"], version, node_id)
     manifest = json.loads(version["manifest_json"])
+    permission=None
+    if any(step.get('tool')=='plugin.call' for step in json.loads(version['steps_json'])):
+        from nexus.core.security.modes import effective
+        permission=await effective(conn,row['conversation_id'])
     ready = True
     try:
         validate_instance(manifest["input_schema"], input_value)
@@ -100,6 +110,11 @@ async def build_plan(skills, conn, row, proposal: dict, input_value: dict, *, re
             if step.get("tool") == "filesystem.list":
                 from nexus.contracts.task import ListDirectoryArguments
                 ListDirectoryArguments.model_validate(resolved)
+            elif step.get('tool')=='plugin.call':
+                from nexus.core.extensions.native_steps import contract
+                from nexus.plugins.schema import checked
+                properties=contract(step).input_schema['properties']
+                for key,value in resolved.items(): checked(properties[key],value)
             elif step.get("tool_version_id"):
                 dependency = await one(conn, "SELECT manifest_json FROM extension_versions WHERE version_id=?", (step["tool_version_id"],))
                 properties = json.loads(dependency[0])["input_schema"]["properties"]
@@ -116,13 +131,14 @@ async def build_plan(skills, conn, row, proposal: dict, input_value: dict, *, re
         for key, value in step.get("arguments", {}).items():
             arguments[key] = input_value.get(value["$input"]["field"], value) if isinstance(value, dict) and "$input" in value else value
         steps.append({"index": index, "id": step["id"], "tool": step.get("tool", "approved_json_tool"),
+                      **({key:step[key] for key in ('plugin_id','plugin_tool','plugin_digest')} if step.get('tool')=='plugin.call' else {}),
                       "tool_version_id": step.get("tool_version_id"), "tool_version": step.get("tool_version"),
                       "arguments": arguments, "node_id": dependency_nodes[step["tool_version_id"]] if step.get("tool_version_id") else str(node_id),
-                      "approval_required": step.get("tool") == "filesystem.list"})
+                      "approval_required": step.get("tool") == "filesystem.list" or (step.get('tool')=='plugin.call' and permission['effective_mode']!='full')})
     return {"turn_id": row["turn_id"], "version_id": version_id, "capability_id": version["capability_id"],
             "revision": version["revision"], "artifact_digest": version["artifact_digest"], "bindings": bindings,
             "input": input_value, "input_schema": manifest["input_schema"], "steps": steps, "ready": ready,
-            "node_id": str(node_id), "policy_version": (await one(conn, "SELECT version FROM policy_state WHERE singleton=1"))[0],
+            "node_id": str(node_id), **({'permission_fingerprint':permission['fingerprint']} if permission else {}), "policy_version": (await one(conn, "SELECT version FROM policy_state WHERE singleton=1"))[0],
             "scope_digest": scope_digest(skills.harness.scope(node_id)), "expires_at": row["expires_at"],
             "result_policy": "成功后选择步骤，预览白名单结果再同意外发；最多追加一次，沿用本轮 USD 0.05。"}
 
@@ -165,7 +181,7 @@ async def result_source(chat, conn, row) -> tuple[dict, dict]:
     if bindings != plan["bindings"]:
         raise AccessDenied("POLICY_DENIED")
     result = json.loads(run["result_json"])
-    validate_instance(json.loads(version["manifest_json"])["output_schema"], result)
+    validate_skill_result(json.loads(version['manifest_json']),result)
     steps = await conn.execute_fetchall("SELECT * FROM skill_run_steps WHERE run_id=? ORDER BY step_index", (run["run_id"],))
     safe = {}
     if len(steps) != len(plan["steps"]):
@@ -180,10 +196,15 @@ async def result_source(chat, conn, row) -> tuple[dict, dict]:
         if step["task_id"]:
             task = await load_task(conn, UUID(step["task_id"]))
             expected_request = uuid5(NAMESPACE_URL, f"nexus-skill:{run['run_id']}:{step['step_index']}")
+            args_match=(task.action.arguments.model_dump(mode='json')==arguments)
+            if definition['tool']=='plugin.call':
+                actual=task.action.arguments
+                args_match=(actual.input==arguments and actual.plugin_id==definition['plugin_id'] and actual.tool==definition['plugin_tool']
+                    and actual.release_digest==definition['plugin_digest'] and str(actual.context_id)==run['permission_context_id'] and actual.invocation_id==expected_request)
             if (task.status != "succeeded" or task.execution_outcome != "known" or task.verification != "node_report_schema_checked"
                     or task.result is None or task.result.model_dump(mode="json") != evidence or task.owner_id != UUID(row["owner_id"]) or task.node_id != UUID(run["node_id"])
                     or task.request.request_id != expected_request or task.action.tool != definition["tool"]
-                    or task.action.tool_version != 1 or task.action.arguments.model_dump(mode="json") != arguments):
+                    or task.action.tool_version != 1 or not args_match):
                 raise AccessDenied("RESULT_UNAVAILABLE")
             await chat.harness.security._policy_eligible(conn, task, chat.harness.scope(task.node_id), utc_now(), require_unexpired=False)
             validate_result(task.action, task.result, 32768)

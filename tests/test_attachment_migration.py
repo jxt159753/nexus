@@ -39,7 +39,8 @@ def test_attachment_upgrade_has_verified_backup_and_no_implicit_disclosure(tmp_p
             names=','.join('"'+name+'"' for name in columns[table])
             after=conn.execute(f'SELECT {names} FROM "{table}"').fetchall()
             if table=="schema_migrations":
-                assert after[:21]==rows and len(after)==26
+                expected=sum(p.name.endswith('.sql') for p in files('nexus.core.storage').joinpath('migrations').iterdir())
+                assert after[:21]==rows and len(after)==expected
             elif table=="chat_turns":
                 assert after==rows
                 assert conn.execute('SELECT attachments_json FROM chat_turns').fetchone()==('[]',)

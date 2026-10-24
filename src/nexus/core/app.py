@@ -41,6 +41,9 @@ from nexus.core.security.modes import PermissionHTTP
 from nexus.core.plugins.http import PluginHTTP
 from nexus.core.storage.database import Database
 from nexus.core.storage.tasks import Conflict
+from nexus.core.voice.link import VoiceLink
+from nexus.core.voice.providers import FakeAsrProvider, FakeTtsProvider
+from nexus.core.voice.service import VoiceService
 from nexus.locking import DataDirectoryLock
 
 
@@ -75,6 +78,32 @@ def create_app(config: CoreConfig) -> FastAPI:
     chat.skills = skills
     from nexus.core.plugins.testing import PluginTester
     chat.plugins.tester = PluginTester(chat.plugins, sandbox_link, tools)
+    voice_asr = FakeAsrProvider()
+    voice_tts = FakeTtsProvider()
+    if config.voice.enabled and config.voice.provider == "bailian":
+        from nexus.core.voice.bailian import BailianAsrProvider, BailianTtsProvider
+        voice_asr = BailianAsrProvider(config.voice)
+        voice_tts = BailianTtsProvider(config.voice)
+    voice_responder = None
+    voice_conversation = None
+    voice_streamer = voice_canceller = None
+    if chat_provider is not None:
+        from nexus.core.voice.chat_bridge import ChatVoiceBridge
+        bridge = ChatVoiceBridge(chat, config.owner_id)
+        voice_responder, voice_conversation = bridge.respond, bridge.create_conversation
+        voice_streamer, voice_canceller = bridge.stream, bridge.cancel
+    elif config.voice.provider == "fake":
+        async def voice_echo(session, text):
+            return f"收到：{text}"
+        voice_responder = voice_echo
+    voice = VoiceService(
+        database, config.voice, config.owner_id,
+        asr=voice_asr, tts=voice_tts,
+        responder=voice_responder, conversation_factory=voice_conversation,
+        streamer=voice_streamer, canceller=voice_canceller, model_config=config.models,
+    )
+    voice_link = VoiceLink(guards, config, voice)
+    voice.validate_owner = guards.service.validate_principal
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -87,11 +116,16 @@ def create_app(config: CoreConfig) -> FastAPI:
         skill_runner = None
         plugin_scheduler = None
         plugin_tester = None
+        voice_watcher = None
+        health_watcher = None
         try:
             await database.initialize()
             await harness.executions.resume_verification()
             await language.recover()
             await chat.recover()
+            await voice.recover()
+            if config.voice.enabled:
+                voice_watcher = asyncio.create_task(voice.watch())
             from nexus.core.plugins.lifecycle import recover as recover_plugins
             await recover_plugins(chat.plugins)
             await extensions.recover()
@@ -106,14 +140,18 @@ def create_app(config: CoreConfig) -> FastAPI:
             chatter = asyncio.create_task(chat.run())
             generator = asyncio.create_task(extensions.run())
             skill_runner = asyncio.create_task(skills.run())
+            chat.plugins.health.workers = {'harness':scheduler,'chat':chatter,'language':interpreter,'extensions':generator,
+                'skills':skill_runner,'plugins':plugin_scheduler,'plugin_tests':plugin_tester}
+            health_watcher = asyncio.create_task(chat.plugins.health.run())
             yield
         finally:
             try:
-                for task in (plugin_tester, plugin_scheduler, skill_runner, generator, chatter, interpreter, scheduler):
+                for task in (health_watcher, voice_watcher, plugin_tester, plugin_scheduler, skill_runner, generator, chatter, interpreter, scheduler):
                     if task is not None:
                         task.cancel()
-                await asyncio.gather(*(task for task in (plugin_tester, plugin_scheduler, skill_runner, generator, chatter, interpreter, scheduler) if task is not None), return_exceptions=True)
+                await asyncio.gather(*(task for task in (health_watcher, voice_watcher, plugin_tester, plugin_scheduler, skill_runner, generator, chatter, interpreter, scheduler) if task is not None), return_exceptions=True)
                 await chat.work.web.close()
+                await voice_link.close()
                 await link.close()
                 await sandbox_link.close()
                 await clients.close()
@@ -130,7 +168,16 @@ def create_app(config: CoreConfig) -> FastAPI:
     app.include_router(ChatHTTP(chat, guards).router)
     app.include_router(PermissionHTTP(chat, guards).router)
     app.include_router(PluginHTTP(chat.plugins, guards).router)
+    from nexus.core.plugins.autonomy_http import AutonomyHTTP
+    app.include_router(AutonomyHTTP(chat.plugins, guards).router)
+    from nexus.core.plugins.mcp_http import MCPHTTP
+    app.include_router(MCPHTTP(chat.plugins, guards).router)
+    app.include_router(voice_link.router)
+    from nexus.core.voice.http import VoiceHTTP
+    app.include_router(VoiceHTTP(voice, chat, guards, config).router)
     app.include_router(AttachmentHTTP(chat, guards).router)
+    from nexus.core.cognitive.file_transfer import FileTransferHTTP
+    app.include_router(FileTransferHTTP(chat, guards, harness).router)
     app.include_router(ExtensionHTTP(extensions, guards).router)
     app.include_router(sandbox_link.router)
     app.state.node_link = link
@@ -143,6 +190,8 @@ def create_app(config: CoreConfig) -> FastAPI:
     app.state.extensions = extensions
     app.state.skills = skills
     app.state.sandbox_link = sandbox_link
+    app.state.voice = voice
+    app.state.voice_link = voice_link
     app.state.decision_model = DisabledDecisionModel()
     web = files("nexus.web")
     # Python's mimetypes does not know .mjs on every platform; browsers refuse

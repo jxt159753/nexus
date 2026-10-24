@@ -1,0 +1,21 @@
+{
+  "schema": "nexus.voice.standby-resource.v1",
+  "generated_at": "2026-10-22T23:58:00+08:00",
+  "real_microphone": true,
+  "live_human": false,
+  "duration_s": 10,
+  "frames": 100,
+  "wake_hits": 0,
+  "cpu_percent": 2.5,
+  "rss_mib": 96.7,
+  "target_cpu_percent": 3,
+  "target_met": true,
+  "input": "麦克风 (iKF-V11 Max)",
+  "output": "耳机 (iKF-V11 Max)",
+  "aec": false,
+  "note": "Standby KWS + 16 kHz capture, input-only (no output stream); no TTS playback. KWS decode cadence is every 4 x 100 ms to meet CPU target; wake response may incur up to ~400 ms decode cadence. Ambient/synthetic audio only; not a wake-word accuracy test.",
+  "cpu_percent_range": [
+    1.7,
+    2.5
+  ]
+}

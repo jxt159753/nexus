@@ -1,0 +1,115 @@
+{
+  "task": "P81",
+  "recorded_at": "2026-10-23T11:17:56.509617+00:00",
+  "scope": "local backend/interfaces; no frontend changes, deployment or paid model calls",
+  "tests": [
+    {
+      "log": "var/autonomy-regression-02.log",
+      "passed": 205,
+      "failed": 1,
+      "known_failure": "test_chat_context old stopped expectation; already recorded in P79"
+    },
+    {
+      "log": "var/autonomy-final-01.log",
+      "passed": 75,
+      "failed": 0
+    },
+    {
+      "log": "var/autonomy-context-01.log",
+      "passed": 38,
+      "failed": 0
+    },
+    {
+      "log": "var/autonomy-final-02.log",
+      "passed": 37,
+      "failed": 0,
+      "scope": "final specialty tests including real Core/Windows Node restart and file observation"
+    },
+    {
+      "log": "var/autonomy-dependencies-01.log",
+      "passed": 15,
+      "failed": 0,
+      "scope": "final dependency freshness and goal evidence"
+    },
+    {
+      "log": "var/autonomy-root-budget-01.log",
+      "passed": 31,
+      "failed": 0,
+      "scope": "root goal creation and original bounds"
+    },
+    {
+      "log": "var/autonomy-consent-01.log",
+      "passed": 92,
+      "failed": 0,
+      "scope": "source consent revocation and goals/observations/storage/memory/lifecycle regression"
+    }
+  ],
+  "counts_overlap": true,
+  "real_paid_model_calls": 0,
+  "sandbox_business_transport": "simulated; real runsc not rerun in this task",
+  "host_safety_verified": false,
+  "source_sha256": {
+    "src/nexus/contracts/autonomy.py": "225445779a20ebf7ce588ce141d95d4897d3fb50246ba05301e4ce37f1b8973b",
+    "src/nexus/core/plugins/goals.py": "ae616f9107da68be2ce7308c2db42825b24ef87bafe31d0f3bd7c91ad15b6581",
+    "src/nexus/core/plugins/observations.py": "3362b81ec9351c4455b20dd9b6a49fb21a9aff9e1b60335cd61851bcf23bd159",
+    "src/nexus/core/plugins/business.py": "6ad9ec9a7f8bc87a05a017ed31f427f288a47bd59e6bc8e192b81807522116b8",
+    "src/nexus/core/plugins/session_context.py": "c82e57d85649d6130743c5b726ca3a2c0a6f806aca2bc738b7b1c1f502cdff04",
+    "src/nexus/core/plugins/autonomy_http.py": "31737b669b1f3e0c003d84a3b07dd16f5792ce31836c86204841ebc21de158dc",
+    "src/nexus/core/plugins/health.py": "f8aa4ce5e256194d17b57d25449cbbc8e2013b74e2ead3fd350914bb3a01d332",
+    "src/nexus/core/storage/archive.py": "0e27df0a2fbaaec5c9c24afcc0d913cdebc0d637efd987b4dbb08de2161bfb00",
+    "src/nexus/core/plugins/core_tools.py": "8a911d5479b5e950ad812222e8c3e2a3c2520f41adfb351786f8245ecda96b17",
+    "src/nexus/core/plugins/lifecycle.py": "41f9df1408f918411c5e14bdae16111792b0d375ed17ce20a9f433e3a18f0517",
+    "src/nexus/core/plugins/testing.py": "3b3645d7d7478997f435e2d3b128e4989ac32239cb2f0ab4cf5849355996018d",
+    "src/nexus/core/plugins/service.py": "a6f3368b31c560fc033600a3ad6c32c7a554598378934c69c06704ced179df99",
+    "src/nexus/core/plugins/schedule.py": "a4b99bca7a0dad7a6bea60fee9dba114804f4359c6dedb026c0ebc236fccfde8",
+    "src/nexus/core/cognitive/chat.py": "6ee4b93ae142eb91c9660da7a45c5259efa92b785780ae1e561d60509523db14",
+    "src/nexus/core/cognitive/chat_journal.py": "b71ce06f55e1cfcd8bfdd1d1f4dff7407bc00ed70ce6e7710027471d633fab5d",
+    "src/nexus/core/app.py": "4cbb1d0a78738193fd1e24df4e6528ef8ee5a710c524f8b7f7335e3b61cf5044",
+    "src/nexus/node/receipts.py": "3faed63612eb62b65317e0e51723f8386b1d897ff5241b66266f3ff9cdf7bad1",
+    "src/nexus/plugins/catalog.py": "60c33bc3651b67be0cbb18bd85455aeff9a894d0beb182ad4682e86415a83f45",
+    "src/nexus/core/storage/migrations/030_autonomy.sql": "ce544fe93adf53c3f5afbdef56f7a71ea39d9ca5e01fced4851d5a52f38bff15",
+    "src/nexus/core/storage/migrations/032_archive_sources.sql": "fef800b13879b83614d6fba719bb5192bd4d7ecc1e9afd21929a3f5b9e260d94",
+    "src/nexus/node/migrations/003_receipt_archive.sql": "7add695a8f961852db57fb9ea14edc837343c1b1074c4dc849c90c080e1f53ce"
+  },
+  "long_run": {
+    "status": "stopped_by_user",
+    "seconds_requested": 7200,
+    "log": "var/autonomy-soak-03.log",
+    "evidence": "var/test-autonomy-soak-03/test_autonomy_process_restart_0/soak-evidence.json",
+    "scope": "real file observation across separate Core/Windows Node processes; models disabled",
+    "observed_seconds": 4370.45,
+    "started_at": "2026-10-23T10:03:40.074651+00:00",
+    "health_sample_count": 291,
+    "health_states": [
+      "ok"
+    ],
+    "task_statuses": {
+      "succeeded": 139
+    },
+    "event_count": 3,
+    "unique_event_count": 3,
+    "model_calls": 0,
+    "core_restarts": 1,
+    "node_restarts": 1,
+    "all_test_processes_stopped": true,
+    "original_evidence_sha256": "81714f9bd5a79051e680aaeb561924ba8940437400b283427a80deccf6add230",
+    "pytest_exit_code": 1,
+    "pytest_exit_reason": "test runner terminated at explicit user request, not a completed two-hour pytest case",
+    "final_long_run_assertions": "not reached; final new-file effect and stop-watch endpoint already passed in short process test"
+  },
+  "prior_long_run": {
+    "log": "var/autonomy-soak-02.log",
+    "status": "failed",
+    "elapsed_seconds": 957.07,
+    "finding": "normal in-flight unknown outcome was treated as an unhealthy unresolved task; corrected and regression tested"
+  },
+  "checks": {
+    "python_ast_files": 23,
+    "local_document_links": 380,
+    "missing_links": 0,
+    "diff_whitespace": "passed"
+  },
+  "user_acceptance": "pending",
+  "production_deployment": "not_performed",
+  "frontend": "DSH work order in docs/autonomy.md"
+}

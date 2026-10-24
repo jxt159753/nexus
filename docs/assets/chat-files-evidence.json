@@ -1,0 +1,269 @@
+{
+  "task": "P85",
+  "release": "/opt/nexus/releases/file-chat-20261024-327a91e4",
+  "wheel_sha256": "327a91e47473b97c879166367dc8c113e4a9a83c7bdd6ae6d8516248ea08510c",
+  "rollback_sha256": "234ed3dca980b8a1474f930ca75426c968e1eb87ec4eded55586865b6bf6c987",
+  "resources": 266,
+  "changed_resources": [
+    "nexus/contracts/file_transfer.py",
+    "nexus/contracts/work.py",
+    "nexus/contracts/chat.py",
+    "nexus/core/cognitive/chat_files.py",
+    "nexus/core/cognitive/file_transfer.py",
+    "nexus/core/cognitive/chat_work.py",
+    "nexus/core/cognitive/chat_presentation.py",
+    "nexus/core/cognitive/work_catalog.py",
+    "nexus/core/security/work.py",
+    "nexus/core/plugins/service.py",
+    "nexus/core/models/chat.py",
+    "nexus/web/app/render.js",
+    "nexus/web/app/chat-files.js",
+    "nexus/web/chat.js"
+  ],
+  "deployment": {
+    "release": "/opt/nexus/releases/file-chat-20261024-327a91e4",
+    "wheel_sha256": "327a91e47473b97c879166367dc8c113e4a9a83c7bdd6ae6d8516248ea08510c",
+    "backup": "/var/backups/nexus/before-file-chat-20261024T052609Z",
+    "backup_sha256": "165991a3500293aed20c5d3158a3becb74ba88d2af5ad427c93094fd9ef7a132",
+    "schema": 35,
+    "history": {
+      "tasks": {
+        "rows": 99,
+        "sha256": "28583f3a40545cf234be7b6a216f40e00c901cc6291beb270271571abf982e43"
+      },
+      "task_attempts": {
+        "rows": 94,
+        "sha256": "93f0a50f72904b7777ae6920742cc17eb9470123485be7854f2e2aa154e4bda7"
+      },
+      "conversations": {
+        "rows": 68,
+        "sha256": "802f3759b752cb42286754737621618f39c8745bfe4302a3727acdbcce5848cc"
+      },
+      "chat_turns": {
+        "rows": 110,
+        "sha256": "e037e91fb5262a0a681f626483417ff721015185ac0be45a33cad00db0c03be5"
+      },
+      "model_calls": {
+        "rows": 236,
+        "sha256": "0462b1b6db47e34c61e55056c7ffefc23c95ac32e6b74b0f6d636fbc775fc4b0"
+      },
+      "identities": {
+        "rows": 4,
+        "sha256": "b15a25f4df698201ccf239a46e8c00e1aed605cc676a85059ba4640ae7cb37af"
+      },
+      "grants": {
+        "rows": 35,
+        "sha256": "e1cbec273401e45d9baf37b931ae104dc7ce9ccf660e7fa303d6d746ef2a3b27"
+      },
+      "memory_entries": {
+        "rows": 4,
+        "sha256": "f035f604dcbc5d28b53517cbe7eb21ecd7dc0137b4af03dd154ef056aad26deb"
+      },
+      "plugin_versions": {
+        "rows": 23,
+        "sha256": "92515873673b3a6943eeb2b917cde175789486314d775da1d93c27654db99aff"
+      },
+      "extension_versions": {
+        "rows": 5,
+        "sha256": "d9968d38b7417c4045f57326d9778b3b565f98eedc846a85aed0814687fc0903"
+      },
+      "chat_exchanges": {
+        "rows": 191,
+        "sha256": "0e0417ee954cb916e98218427b91e3e4651538447740240c8a66e426fbe2aa60"
+      },
+      "skill_runs": {
+        "rows": 5,
+        "sha256": "b58deb88473c29ebf2b3712d3bb84d007b4f66f912709fd5d07cf485d7275d1d"
+      },
+      "memory_consents": {
+        "rows": 4,
+        "sha256": "710b388ff7606c4eec20afc68be212ce5ca3f7044ba698e1d4c9652643a98f0f"
+      },
+      "memory_policies": {
+        "rows": 1,
+        "sha256": "17647a6e0f2fdb938668189ba66c870f3a761f8fbba84f75a553971385316146"
+      },
+      "memory_policy_events": {
+        "rows": 8,
+        "sha256": "08bf6d331e87fab51b746047a78fe688000ee2ec85c88f939629652417b46184"
+      },
+      "voice_sessions": {
+        "rows": 9,
+        "sha256": "449524ad47bd9894fd2a81e3af6310c5a49455e21a7c37d7f111437e308aacbc"
+      },
+      "voice_utterances": {
+        "rows": 13,
+        "sha256": "10164b995390ebbc2b80253f1edd6e0256e9decfb34cb5ad9f2441f98f80cabe"
+      },
+      "chat_work_grants": {
+        "rows": 85,
+        "sha256": "a0db714af3f098ce74e54fdd8de326c2bd173889b3e018249395578c9cbbe8a3"
+      },
+      "chat_work_steps": {
+        "rows": 137,
+        "sha256": "ed825ae4ea429bb56c95210a7195e18ed0a5c397500592ab9064690facddc33c"
+      },
+      "chat_work_answers": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "chat_work_operations": {
+        "rows": 157,
+        "sha256": "278827ff366508530821c06a7194c64c95fae28a70b296e503e378eb7020f1a9"
+      },
+      "chat_work_tasks": {
+        "rows": 58,
+        "sha256": "420a30dda447919d0f9bae6e8fbb108e8c254675315a4451cee2f92cb3da2e8d"
+      },
+      "chat_attachments": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "chat_turn_attachments": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "mcp_registrations": {
+        "rows": 2,
+        "sha256": "fbb13f39f106fee97585e77155a08cb164d2702cdc39516a15deae6f82a2ce30"
+      },
+      "mcp_operations": {
+        "rows": 2,
+        "sha256": "5ae263c44cab763dcba114cdc208e7ed86913e07c78d1ca114fa1e8791e18b50"
+      },
+      "plugin_goals": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "plugin_authorities": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "plugin_decisions": {
+        "rows": 6,
+        "sha256": "647bf935ad0d97b281bce556924feaed29b548bc18c8739beb2f0f22a0cdf774"
+      },
+      "goal_plans": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "goal_steps": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "goal_checkpoints": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "goal_evidence": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "cold_payloads": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "plugin_business_suites": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "plugin_rollouts": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "plugin_rollout_tasks": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "historical_records_preserved": true,
+    "runtime_resources_checked": 266,
+    "node_id": "6603cabe-a0cd-48f0-b150-947c4619e011",
+    "new_grants": 0,
+    "no_new_model_calls": true,
+    "main_pid": 738076
+  },
+  "checks": {
+    "windows_initial": {
+      "passed": 38
+    },
+    "windows_final": {
+      "passed": 14
+    },
+    "linux_final": {
+      "passed": 95,
+      "skipped": 5
+    },
+    "android_markdown_and_file_cards": {
+      "passed": 2
+    },
+    "android_receive_core": {
+      "passed": 1
+    },
+    "android_build_unit_lint": true,
+    "edge_desktop_mobile_preview_download_native_bridge": true,
+    "overlapping_batches_not_added": true,
+    "changed_document_links_valid": true,
+    "single_core_process_verified": true
+  },
+  "live_verification": {
+    "targets": {
+      "nodes": [
+        {
+          "node_id": "6cb88e0a-e645-498d-8dcd-81cc6a2cda94",
+          "label": "我的电脑",
+          "online": true,
+          "available": false,
+          "reason": "upgrade_required"
+        },
+        {
+          "node_id": "6603cabe-a0cd-48f0-b150-947c4619e011",
+          "label": "我的手机",
+          "online": false,
+          "available": false,
+          "reason": "offline"
+        }
+      ],
+      "max_file_bytes": 16777216,
+      "destination": "NEXUS-Inbox",
+      "overwrite": false
+    },
+    "downloads": [
+      {
+        "filename": "NEXUS_0.1.9_x64-setup.exe",
+        "bytes": 104092165,
+        "sha256": "4c7acea7c7705d560be5bae8091286768bf4e60b17ad39c96ccd87a41a3f20d8"
+      },
+      {
+        "filename": "NEXUS-Android-0.1.4-debug.apk",
+        "bytes": 12038625,
+        "sha256": "a7d88010b492efc22bb5060210e245ebd8c1d0dacb450c3b1cf01bad95728b3d"
+      }
+    ],
+    "tls_verified": true,
+    "static_resources_match": true,
+    "unauthenticated_download_rejected": true
+  },
+  "paused": false,
+  "model_calls": 236,
+  "model_calls_delta": 0,
+  "limits": {
+    "export_per_file_bytes": 4194304,
+    "receive_bytes": 16777216,
+    "execution_seconds": 10
+  },
+  "not_verified": [
+    "user_phone",
+    "windows_native_upgrade_ui",
+    "paid_model_routing",
+    "slow_network",
+    "production_rollback"
+  ],
+  "user_demo_file_delivered": false,
+  "user_acceptance": false,
+  "screenshots": [
+    "chat-files-android.png",
+    "chat-files-mobile.png"
+  ],
+  "unrelated_document_check_note": "全库旧文档检查发现既有 ADR0029 指向 realtime-voice.md 的参考实现锚点失效，本轮未修改；本轮六篇文档链接检查通过。"
+}

@@ -112,7 +112,8 @@ class AttachmentService:
                 raise LookupError("attachment not found")
             if row["deleted_at"]:
                 return
-            if await one(conn,"SELECT 1 FROM chat_turn_attachments WHERE attachment_id=?",(str(attachment_id),)):
+            if (await one(conn,"SELECT 1 FROM chat_turn_attachments WHERE attachment_id=?",(str(attachment_id),))
+                    or await one(conn,"SELECT 1 FROM tasks WHERE json_extract(action_json,'$.tool')='filesystem.receive' AND json_extract(action_json,'$.arguments.attachment_id')=? LIMIT 1",(str(attachment_id),))):
                 raise AccessDenied("ATTACHMENT_IN_USE")
             await conn.execute("UPDATE chat_attachments SET content=NULL,preview_json=NULL,deleted_at=? WHERE attachment_id=?",(timestamp(utc_now()),str(attachment_id)))
             await audit(conn,str(principal.identity_id),None,"chat.attachment_removed",utc_now())

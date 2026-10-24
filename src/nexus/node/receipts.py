@@ -2,6 +2,8 @@
 
 import hashlib
 import sqlite3
+import json
+import zlib
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from importlib.resources import files
@@ -95,6 +97,8 @@ class ReceiptStore:
                 expected = {"schema_migrations", "node_identity", "execution_receipts"}
                 if len(applied) >= 2:
                     expected.add("cancellation_tombstones")
+                if len(applied) >= 3:
+                    expected.add("receipt_archives")
                 if names != expected:
                     raise RuntimeError("unversioned or unknown receipt database")
                 if applied != list(enumerate(checksums[:len(applied)], 1)):
@@ -122,6 +126,9 @@ class ReceiptStore:
     def cancel_pending(self, attempt_id: UUID) -> None:
         """Fence both absent and received commands before acknowledging a stop."""
         with self.transaction() as conn:
+            known = self._lookup(conn, attempt_id)
+            if known and known.execution_stopped and known.phase in {'completed', 'cancelled'}:
+                return
             old = conn.execute("SELECT 1 FROM cancellation_tombstones WHERE attempt_id=?", (str(attempt_id),)).fetchone()
             if old is None and conn.execute("SELECT count(*) FROM cancellation_tombstones").fetchone()[0] >= self.max_receipts:
                 raise ProtocolError(ErrorCode.BUSY, "Cancellation receipt capacity reached")
@@ -140,18 +147,56 @@ class ReceiptStore:
 
     def get(self, attempt_id: UUID) -> Receipt | None:
         with self.transaction() as conn:
-            return self._receipt(conn.execute("SELECT * FROM execution_receipts WHERE attempt_id=?", (str(attempt_id),)).fetchone())
+            return self._lookup(conn, attempt_id)
+
+    def _lookup(self, conn, attempt_id):
+        row=conn.execute('SELECT * FROM execution_receipts WHERE attempt_id=?',(str(attempt_id),)).fetchone()
+        if row is not None:
+            return self._receipt(row)
+        row=conn.execute('SELECT * FROM receipt_archives WHERE attempt_id=?',(str(attempt_id),)).fetchone()
+        if row is None:
+            return None
+        if not 0<row['original_bytes']<=512*1024:
+            raise RuntimeError('receipt archive invalid')
+        decoder=zlib.decompressobj()
+        raw=decoder.decompress(row['content'],row['original_bytes']+1)
+        if not decoder.eof or decoder.unused_data or len(raw)!=row['original_bytes'] or hashlib.sha256(raw).hexdigest()!=row['sha256']:
+            raise RuntimeError('receipt archive integrity failure')
+        value=json.loads(raw)
+        if value['attempt_id']!=str(attempt_id) or not value['acknowledged'] or not value['execution_stopped'] or value['phase'] not in {'completed','cancelled'}:
+            raise RuntimeError('receipt archive identity failure')
+        return self._receipt(value)
+
+    def _archive(self, conn):
+        used=conn.execute('SELECT coalesce(sum(length(content)),0) FROM receipt_archives').fetchone()[0]
+        rows=conn.execute("SELECT * FROM execution_receipts WHERE acknowledged=1 AND execution_stopped=1 AND phase IN ('completed','cancelled') ORDER BY rowid LIMIT 100").fetchall()
+        for row in rows:
+            raw=json.dumps(dict(row),ensure_ascii=False,separators=(',',':')).encode()
+            compressed=zlib.compress(raw,6)
+            if len(raw)>512*1024 or used+len(compressed)>256*1024*1024:
+                break
+            conn.execute('INSERT INTO receipt_archives VALUES(?,?,?,?)',(row['attempt_id'],hashlib.sha256(raw).hexdigest(),len(raw),compressed))
+            # Readback before replacing a hot receipt. The same transaction
+            # preserves either the original or the verified archive on failure.
+            saved=conn.execute('SELECT * FROM receipt_archives WHERE attempt_id=?',(row['attempt_id'],)).fetchone()
+            if zlib.decompress(saved['content'])!=raw:
+                raise RuntimeError('receipt archive readback failed')
+            conn.execute('DELETE FROM execution_receipts WHERE attempt_id=?',(row['attempt_id'],))
+            conn.execute('DELETE FROM cancellation_tombstones WHERE attempt_id=?',(row['attempt_id'],))
+            used+=len(compressed)
 
     def accept(self, command: CommandExecute, boot_id: UUID) -> Receipt:
         identity = command_identity(command, self.node_id)
         with self.transaction() as conn:
-            old = self._receipt(conn.execute("SELECT * FROM execution_receipts WHERE attempt_id=?", (str(command.attempt_id),)).fetchone())
+            old = self._lookup(conn, command.attempt_id)
             if old is not None:
                 if old.identity_json != identity or old.command_digest != command.command_digest:
                     raise ProtocolError(ErrorCode.IDEMPOTENCY_CONFLICT, "Attempt identity differs")
                 return old
             if conn.execute("SELECT count(*) FROM execution_receipts").fetchone()[0] >= self.max_receipts:
-                raise ProtocolError(ErrorCode.BUSY, "Local receipt capacity reached")
+                self._archive(conn)
+                if conn.execute("SELECT count(*) FROM execution_receipts").fetchone()[0] >= self.max_receipts:
+                    raise ProtocolError(ErrorCode.BUSY, "Local receipt capacity reached")
             conn.execute("INSERT INTO execution_receipts(attempt_id, task_id, command_digest, identity_json, boot_id, phase) VALUES(?, ?, ?, ?, ?, 'received')", (
                 str(command.attempt_id), str(command.task_id), command.command_digest, identity, str(boot_id),
             ))
@@ -193,5 +238,8 @@ class ReceiptStore:
 
     def acknowledge(self, attempt_id: UUID) -> None:
         with self.transaction() as conn:
+            old=self._lookup(conn,attempt_id)
+            if old and old.acknowledged:
+                return
             if conn.execute("UPDATE execution_receipts SET acknowledged=1 WHERE attempt_id=? AND (phase='completed' OR phase='cancelled' OR (phase='unknown' AND execution_stopped=1))", (str(attempt_id),)).rowcount != 1:
                 raise ValueError("no settled receipt to acknowledge")

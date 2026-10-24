@@ -1,0 +1,73 @@
+{
+  "release": "/opt/nexus/releases/file-transfer-final-20261024-403ff992",
+  "wheel_sha256": "403ff9922c151aa497a404bcfd44b849f22e2248f07bf6aca1a27f23705d9b53",
+  "schema": 35,
+  "backup": "/var/backups/nexus/before-file-transfer-final-20261024T044256Z",
+  "backup_sha256": "82f8acf45dc8616236084f5874e0ff6df871b195fb0b7fea1e7b4cdb060bf0d3",
+  "historical_counts": {
+    "tasks": 96,
+    "task_attempts": 91,
+    "conversations": 66,
+    "chat_turns": 109,
+    "model_calls": 230,
+    "identities": 4,
+    "grants": 35,
+    "memory_entries": 4,
+    "plugin_versions": 23,
+    "extension_versions": 5,
+    "chat_exchanges": 185,
+    "skill_runs": 5,
+    "memory_consents": 4,
+    "memory_policies": 1,
+    "memory_policy_events": 8,
+    "voice_sessions": 9,
+    "voice_utterances": 13,
+    "chat_work_grants": 83,
+    "chat_work_steps": 131,
+    "chat_work_answers": 0,
+    "chat_work_operations": 151,
+    "chat_work_tasks": 55,
+    "chat_attachments": 0,
+    "chat_turn_attachments": 0,
+    "mcp_registrations": 2,
+    "mcp_operations": 2,
+    "plugin_goals": 0,
+    "plugin_authorities": 0,
+    "plugin_decisions": 6,
+    "goal_plans": 0,
+    "goal_steps": 0,
+    "goal_checkpoints": 0,
+    "goal_evidence": 0,
+    "cold_payloads": 0,
+    "plugin_business_suites": 0,
+    "plugin_rollouts": 0,
+    "plugin_rollout_tasks": 0
+  },
+  "downloads": [
+    {
+      "filename": "NEXUS_0.1.8_x64-setup.exe",
+      "sha256": "1e5bec77aa1de22745532982c411e4f36d450d08d97be57b26771500276209b7",
+      "bytes": 104095659
+    },
+    {
+      "filename": "NEXUS-Android-0.1.3-debug.apk",
+      "sha256": "94d221a6c9ed5f3dd336c972d722100b54829e166dba7b69095a9867b02a9459",
+      "bytes": 11858519
+    }
+  ],
+  "linux_initial": {
+    "passed": 185,
+    "skipped": 3
+  },
+  "linux_final": {
+    "passed": 47,
+    "skipped": 3
+  },
+  "windows_initial": 86,
+  "windows_final_file_transfer": 14,
+  "rust_passed": 7,
+  "android_real_device": false,
+  "android_emulator_core_roundtrip": true,
+  "new_model_calls": 0,
+  "user_accepted": false
+}

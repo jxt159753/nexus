@@ -1,3 +1,4 @@
+from nexus.contracts.file_transfer import FileReceiveCall, FileReceiveResult
 from nexus.plugins.contracts import PluginNodeCall, PluginNodeResult,PluginId,ToolId
 """JARVIS Link v1 payloads. These types do not authorize or execute actions."""
 
@@ -17,7 +18,9 @@ from nexus.contracts.base import (
     Version1,
 )
 from nexus.contracts.errors import ErrorPayload
-from nexus.contracts.basic import ToolName, CommandId
+from nexus.contracts.basic import ToolName, CommandId, ResourceId
+from nexus.contracts.android import AndroidDeviceStatusArguments, AndroidNotificationDigestArguments, AndroidDeviceStatusResult, AndroidNotificationDigestResult, AndroidDeviceStatusCall, AndroidNotificationDigestCall
+
 from nexus.contracts.interaction import InteractionResult
 from nexus.contracts.tools import ImageReadCall, ImageReadResult
 from nexus.contracts.tools import ObserveCall, InteractCall, FileLinesCall, FileLinesResult, FileGlobCall, FileGlobResult, FileGrepCall, FileGrepResult, FileEditPreviewCall, FileEditPreviewResult, FileEditCall, FileEditResult, FileReadCall, FileSearchCall, FilePreviewCall, FileWriteCall, CommandRunCall, FileReadResult, FileSearchResult, FilePreviewResult, FileWriteResult, CommandRunResult
@@ -106,16 +109,16 @@ class NodeHello(StrictContract):
     plugin_tools: dict[PluginId,list[ToolId]]=Field(default_factory=dict,max_length=32)
     node_id: UUID
     node_version: StrictStr = Field(min_length=1, max_length=50)
-    tools: list[ToolCapability] = Field(max_length=14)
+    tools: list[ToolCapability] = Field(max_length=20)
     interaction_digests: dict[CommandId, CommandDigest] = Field(default_factory=dict, max_length=16)
     command_digests: dict[CommandId, CommandDigest] = Field(default_factory=dict, max_length=16)
-    roots: list[Literal["workspace"]] = Field(max_length=1)
+    roots: list[ResourceId] = Field(max_length=3)
     boot_id: UUID
 
     @model_validator(mode="after")
     def check_unique_capabilities(self) -> Self:
         keys = [(item.tool, item.tool_version) for item in self.tools]
-        if len(set(keys)) != len(keys):
+        if len(set(keys)) != len(keys) or len(set(self.roots)) != len(self.roots):
             raise ValueError("duplicate tool capability")
         return self
 
@@ -226,8 +229,20 @@ class PluginNodeExecute(CommandExecuteBase, PluginNodeCall):
     pass
 
 
+class AndroidDeviceStatusExecute(CommandExecuteBase, AndroidDeviceStatusCall):
+    pass
+
+
+class AndroidNotificationDigestExecute(CommandExecuteBase, AndroidNotificationDigestCall):
+    pass
+
+
+class FileReceiveExecute(CommandExecuteBase, FileReceiveCall):
+    pass
+
+
 CommandExecute = Annotated[
-    SystemInfoExecute | ListDirectoryExecute | FileReadExecute | FileSearchExecute | FilePreviewExecute | FileWriteExecute | CommandRunExecute | FileLinesExecute | FileGlobExecute | FileGrepExecute | FileEditPreviewExecute | FileEditExecute | ObserveExecute | InteractExecute | ImageReadExecute | PluginNodeExecute, Field(discriminator="tool")
+    SystemInfoExecute | ListDirectoryExecute | FileReadExecute | FileSearchExecute | FilePreviewExecute | FileWriteExecute | CommandRunExecute | FileLinesExecute | FileGlobExecute | FileGrepExecute | FileEditPreviewExecute | FileEditExecute | ObserveExecute | InteractExecute | ImageReadExecute | PluginNodeExecute | AndroidDeviceStatusExecute | AndroidNotificationDigestExecute | FileReceiveExecute, Field(discriminator="tool")
 ]
 
 
@@ -342,8 +357,30 @@ class PluginNodeCommandResult(CommandResultBase):
     result: PluginNodeResult | None = None
 
 
+class AndroidDeviceStatusCommandResult(CommandResultBase):
+    tool: Literal["android.device_status"]
+    result: AndroidDeviceStatusResult | None = None
+
+
+class AndroidNotificationDigestCommandResult(CommandResultBase):
+    tool: Literal["android.notification_digest"]
+    result: AndroidNotificationDigestResult | None = None
+
+    @model_validator(mode="after")
+    def notification_times(self) -> Self:
+        from datetime import timedelta
+        if self.result and any(entry.posted_at > self.observed_at + timedelta(seconds=5) for entry in self.result.entries):
+            raise ValueError("notification timestamp is in the future")
+        return self
+
+
+class FileReceiveCommandResult(CommandResultBase):
+    tool: Literal["filesystem.receive"]
+    result: FileReceiveResult | None = None
+
+
 CommandResult = Annotated[
-    SystemInfoCommandResult | ListDirectoryCommandResult | FileReadCommandResult | FileSearchCommandResult | FilePreviewCommandResult | FileWriteCommandResult | CommandRunCommandResult | FileLinesCommandResult | FileGlobCommandResult | FileGrepCommandResult | FileEditPreviewCommandResult | FileEditCommandResult | ObserveCommandResult | InteractCommandResult | ImageReadCommandResult | PluginNodeCommandResult, Field(discriminator="tool")
+    SystemInfoCommandResult | ListDirectoryCommandResult | FileReadCommandResult | FileSearchCommandResult | FilePreviewCommandResult | FileWriteCommandResult | CommandRunCommandResult | FileLinesCommandResult | FileGlobCommandResult | FileGrepCommandResult | FileEditPreviewCommandResult | FileEditCommandResult | ObserveCommandResult | InteractCommandResult | ImageReadCommandResult | PluginNodeCommandResult | AndroidDeviceStatusCommandResult | AndroidNotificationDigestCommandResult | FileReceiveCommandResult, Field(discriminator="tool")
 ]
 
 

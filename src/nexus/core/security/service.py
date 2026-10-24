@@ -15,6 +15,7 @@ from nexus.core.security.types import (
 )
 from nexus.core.storage.database import Database, audit, one, timestamp, utc_now
 from nexus.contracts.tools import TOOL_ARGUMENT_MODELS
+from nexus.contracts.basic import TOOL_RESOURCE
 from nexus.core.storage.tasks import (
     TaskRecord, canonical, load_task, transition,
 )
@@ -127,11 +128,12 @@ class SecurityService:
                 granted.append({(f"{row['tool']}@{row['tool_version']}", row['root_id']) for row in rows})
             shared = granted[0] & granted[1]
             tools = frozenset(key for key in scope.tools & scope.local_tools if (
-                key == "system.info@1" and (key, "") in shared
-                or key != "system.info@1" and (key, "workspace") in shared
-                and "workspace" in scope.roots & scope.local_roots
+                key in TOOL_ARGUMENT_MODELS
+                and (key, TOOL_RESOURCE[key.split("@")[0]]) in shared
+                and (not TOOL_RESOURCE[key.split("@")[0]]
+                     or TOOL_RESOURCE[key.split("@")[0]] in scope.roots & scope.local_roots)
             ))
-            roots = frozenset({"workspace"}) if tools-{"system.info@1"} else frozenset()
+            roots = frozenset(TOOL_RESOURCE[key.split("@")[0]] for key in tools if TOOL_RESOURCE[key.split("@")[0]])
             return NodeScope(scope.node_id, tools, roots, scope.local_tools, scope.local_roots, scope.resource_version, scope.command_digests, scope.interaction_digests,scope.plugin_digest)
 
     async def login(self, token: SecretStr, *, now: datetime | None = None) -> BrowserSession:
@@ -185,7 +187,7 @@ class SecurityService:
 
     async def set_grant(self, identity_id: UUID, tool: str, *, root_id: str = "", enabled: bool = True) -> None:
         """Explicit offline configuration, separate for owner and each Node."""
-        if (f"{tool}@1" not in TOOL_ARGUMENT_MODELS or root_id != ("" if tool == "system.info" else "workspace")) or type(enabled) is not bool:
+        if (f"{tool}@1" not in TOOL_ARGUMENT_MODELS or root_id != TOOL_RESOURCE.get(tool)) or type(enabled) is not bool:
             raise ValueError("unsupported grant")
         async with self.database.transaction() as conn:
             row = await one(conn, "SELECT revoked_at FROM identities WHERE identity_id=?", (str(identity_id),))
@@ -228,7 +230,9 @@ class SecurityService:
             raise AccessDenied("POLICY_DENIED")
         if task.action.tool.startswith("interaction.") and scope.interaction_digests.get(task.action.arguments.target_id)!=task.action.arguments.template_digest:
             raise AccessDenied("POLICY_DENIED")
-        root = getattr(task.action.arguments, "root_id", "")
+        root = TOOL_RESOURCE[task.action.tool]
+        if getattr(task.action.arguments, "root_id", root) != root:
+            raise AccessDenied("POLICY_DENIED")
         if root and (root not in scope.roots or root not in scope.local_roots):
             raise AccessDenied("POLICY_DENIED")
         for identity in (task.owner_id, task.node_id):
@@ -268,14 +272,14 @@ class SecurityService:
     async def _prepare(self, conn: aiosqlite.Connection, task: TaskRecord, scope: NodeScope, version: int, now: datetime) -> Authorization:
         from nexus.core.security.work import check_task
         work_allowed = await check_task(conn, task, scope, now)
-        automatic_file = task.action.tool in {"filesystem.read","filesystem.search","filesystem.write_preview","filesystem.write","filesystem.read_lines","filesystem.glob","filesystem.grep","filesystem.edit_preview","filesystem.edit","filesystem.read_image"}
+        automatic_file = task.action.tool in {"filesystem.receive", "filesystem.read","filesystem.search","filesystem.write_preview","filesystem.write","filesystem.read_lines","filesystem.glob","filesystem.grep","filesystem.edit_preview","filesystem.edit","filesystem.read_image"}
         if task.status == "recovering" and not task.cancel_requested:
             old = await one(conn, "SELECT execution_stopped,phase FROM task_attempts WHERE attempt_id=?", (str(task.current_attempt_id),))
             if old is not None and old["execution_stopped"] and old["phase"] == "completed":
                 task = await transition(conn, task, "ready", task.owner_id, now, execution=True)
         if task.status not in {"queued", "awaiting_approval", "ready"}:
             raise AccessDenied("POLICY_DENIED")
-        if task.action.tool == "system.info":
+        if task.action.tool in {"system.info", "android.device_status"}:
             if task.status != "ready":
                 await transition(conn, task, "ready", task.owner_id, now)
             return Authorization("allow", version)
@@ -354,7 +358,7 @@ class SecurityService:
         await check_task(conn, task, scope, now)
         if task.status != "ready":
             raise AccessDenied("POLICY_DENIED")
-        if task.action.tool == "system.info":
+        if task.action.tool in {"system.info", "android.device_status"}:
             return Authorization("allow", version)
         row = await one(conn, "SELECT * FROM approvals WHERE task_id=? AND policy_version=? AND scope_digest=? AND decision='approve' ORDER BY rowid DESC LIMIT 1", (str(task.task_id), version, scope_digest(scope)))
         if row is None or not self._matches(row, task, version, scope):

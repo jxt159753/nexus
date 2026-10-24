@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "NEXUS desktop main window",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

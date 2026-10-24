@@ -20,11 +20,6 @@ export const STATUS_LABELS = {
 };
 
 export const TASK_TERMINAL = new Set(["succeeded", "failed", "cancelled", "timed_out"]);
-export const WORK_TOOLS = new Set([
-  "read_file", "find_files", "write_file", "read", "glob", "grep", "edit",
-  "web_search", "web_fetch", "run_command", "get_system_info", "list_directory",
-  "read_image",
-]);
 export const TOOL_LABELS = {
   read_file: "读取文件",
   find_files: "查找文件",
@@ -47,6 +42,9 @@ export const TOOL_LABELS = {
   run_skill: "运行流程",
   run_tool: "运行工具",
   inspect_capability: "查看能力",
+  plugin_execute: "原生插件",
+  plugin_inspect: "插件目录",
+  plugin_install: "自写插件",
 };
 
 const PREFS_KEY = "nexus.chat.prefs.v1";
@@ -57,6 +55,7 @@ export const state = {
   ready: false,
   view: "home",
   nodes: [],
+  nodesFresh: false,
   projects: [],
   usage: null,
   control: { paused: false, revision: 0 },
@@ -71,7 +70,6 @@ export const state = {
   taskFetchAt: new Map(),
   previews: new Map(),
   prefs: {
-    nodeId: "",
     projectId: "",
     tools: true,
     resultFeedback: false,
@@ -112,7 +110,7 @@ export function loadPrefs() {
     const raw = localStorage.getItem(PREFS_KEY);
     if (raw) {
       const value = JSON.parse(raw);
-      if (value && typeof value === "object") state.prefs = { ...state.prefs, ...value };
+      if (value && typeof value === "object") { state.prefs = { ...state.prefs, ...value }; delete state.prefs.nodeId; }
     }
   } catch { /* display preference only */ }
 }
@@ -129,7 +127,7 @@ export function setPref(key, value) {
 export function clearPrefs() {
   try { localStorage.removeItem(PREFS_KEY); } catch { /* ignore */ }
   state.prefs = {
-    nodeId: "", projectId: "", tools: true, resultFeedback: false,
+    projectId: "", tools: true, resultFeedback: false,
     context: true, lastConversationId: "",
   };
 }
@@ -194,6 +192,7 @@ export function resetState() {
   state.session = null;
   state.ready = false;
   state.nodes = [];
+  state.nodesFresh = false;
   state.projects = [];
   state.usage = null;
   state.control = { paused: false, revision: 0 };
@@ -211,13 +210,6 @@ export function resetState() {
   state.pending = [];
   state.prefs.lastConversationId = "";
   savePrefs();
-}
-
-function pickNode() {
-  const saved = state.nodes.find((node) => node.node_id === state.prefs.nodeId);
-  if (saved) return saved.node_id;
-  const online = state.nodes.find((node) => node.online);
-  return online?.node_id || state.nodes[0]?.node_id || "";
 }
 
 function pickConversation() {
@@ -242,7 +234,7 @@ export async function loadCore() {
   state.conversations = conversations.conversations || [];
   state.tasks.clear();
   for (const task of snapshot.tasks || []) state.tasks.set(task.task_id, { task });
-  state.prefs.nodeId = pickNode();
+  state.nodesFresh = true;
   const conversation = pickConversation();
   state.ready = true;
   if (conversation) {
@@ -255,10 +247,7 @@ export async function loadCore() {
 export async function loadNodes() {
   const value = await api("/api/v1/nodes");
   state.nodes = value.nodes || [];
-  if (!state.nodes.some((node) => node.node_id === state.prefs.nodeId)) {
-    state.prefs.nodeId = pickNode();
-    savePrefs();
-  }
+  state.nodesFresh = true;
   return state.nodes;
 }
 
@@ -430,28 +419,25 @@ export async function taskDetail(taskId) {
   return value;
 }
 
-export async function prepareSend(text, { allowWork = false, toolsOverride = null } = {}) {
+export async function prepareSend(text, { allowWork = false, toolsOverride = null, hasAttachments = false, attachmentFields = true } = {}) {
   const trimmed = String(text || "").trim();
-  if (!trimmed) throw new ApiError(400, "EMPTY_MESSAGE");
+  if (!trimmed && !hasAttachments) throw new ApiError(400, "EMPTY_MESSAGE");
   if (!state.conversation) {
     await createConversation(state.prefs.projectId || null);
     await loadHistory(state.conversation.conversation_id);
   }
-  const node = state.nodes.find((item) => item.node_id === state.prefs.nodeId) || null;
   const tools = toolsOverride === null ? !!state.prefs.tools : !!toolsOverride;
   let catalog = null;
-  if (tools && node) {
-    try { catalog = await api(`/api/v1/chat/work-catalog?node_id=${node.node_id}`); } catch { catalog = null; }
-  }
+  if (tools) catalog = await api("/api/v1/chat/work-catalog");
   const entries = catalog?.catalog || [];
-  const workAvailable = entries.some((item) => WORK_TOOLS.has(item.name));
-  const imageAvailable = entries.some((item) => item.name === "read_image");
+  const workAvailable = entries.length > 0;
+  const imageAvailable = entries.some((item) => (item.route_intent || item.name) === "read_image");
   // Image snapshots are always a fresh, per-round outbound choice. A remembered
   // "result feedback" preference only covers text results and never consents to
   // sending an image snapshot in a later round.
   const workConsented = allowWork || (!imageAvailable && state.prefs.resultFeedback);
   if (workAvailable && !workConsented) {
-    return { kind: "consent", text: trimmed, catalog, node, imageAvailable };
+    return { kind: "consent", text: trimmed, catalog, imageAvailable };
   }
   const useWork = workAvailable && workConsented;
   const payload = {
@@ -460,15 +446,29 @@ export async function prepareSend(text, { allowWork = false, toolsOverride = nul
     text: trimmed,
     include_context: !!state.prefs.context,
     allow_model: true,
-    allow_tools: !!(tools && node),
-    node_id: tools && node ? node.node_id : null,
+    allow_tools: !!useWork,
     allow_skills: false,
+    // Attachments stay unselected here. Only the explicit model-preview
+    // consent sheet fills these fields together with its digest. An older Core
+    // without the attachment contract rejects unknown fields, so in that case
+    // the message omits them entirely and the UI explains the interface is
+    // unavailable.
+    ...(attachmentFields ? {
+      attachment_ids: [],
+      attachments_digest: null,
+      allow_attachment_model: false,
+    } : {}),
     ...(useWork ? {
       workspace_work: true,
+      all_nodes: true,
       work_digest: catalog.work_digest,
       allow_work_results: true,
     } : {}),
   };
+  if (useWork && window.__NEXUS_NATIVE__) {
+    const local = await window.__NEXUS_NATIVE__.loadNode().catch(() => null);
+    if (state.nodes.some((node) => node.node_id === local?.node_id)) payload.client_node_id = local.node_id;
+  }
   return { kind: "send", payload, workAvailable, imageAvailable };
 }
 
@@ -501,17 +501,23 @@ export async function cancelTask(taskId) {
   await refreshAfterAction();
 }
 
-export async function answerPermission(turnId, stepId, revision, agree) {
+export async function answerWorkStep(turnId, stepId, revision, text) {
+  const value = String(text || "").trim();
+  if (!value) throw new ApiError(400, "EMPTY_MESSAGE");
   await api(`/api/v1/chat/turns/${turnId}/permission`, {
     method: "POST",
     body: JSON.stringify({
       request_id: uuid(),
       step_id: stepId,
       expected_revision: revision,
-      text: agree ? "同意" : "不同意",
+      text: value,
     }),
   });
   await refreshAfterAction();
+}
+
+export async function answerPermission(turnId, stepId, revision, agree) {
+  await answerWorkStep(turnId, stepId, revision, agree ? "同意" : "不同意");
 }
 
 export async function decideAction(turnId, digest, decision, allowResult = false) {
@@ -586,8 +592,8 @@ export function projectName(projectId) {
 
 export function nodeName(nodeId) {
   const node = state.nodes.find((item) => item.node_id === nodeId);
-  if (!node) return "未选择设备";
-  return `Node · ${String(node.node_id).slice(0, 8)}`;
+  if (!node) return nodeId ? "设备" : "Core 自动选择设备";
+  return node.label || `设备 ${state.nodes.indexOf(node) + 1}`;
 }
 
 export function nodeOnline(nodeId) {

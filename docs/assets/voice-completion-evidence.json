@@ -1,0 +1,107 @@
+{
+  "recorded_at": "2026-10-23",
+  "scope": "P63 Windows voice completion; code upload and deployment",
+  "core": {
+    "release": "/opt/nexus/releases/persona-memory-final-20261023-ac0a8186",
+    "wheel_sha256": "ac0a8186a3a4aa073c60b1bf961269b3618a12157ea4d1d3fe7ba23bea85460c",
+    "resources_checked": 237,
+    "schema": 29,
+    "backup": "/var/backups/nexus/before-voice-final-20261023T091506Z",
+    "backup_sha256": "321919fff36b16afc6ba53d8cfae4fa13b4f69430d3b53112ce2b0bdcec10c6c",
+    "historical_table_categories": 17,
+    "historical_model_calls": 157,
+    "historical_records_preserved": true,
+    "deployment_model_calls": 0,
+    "tls_verified": true,
+    "node_online": true,
+    "paused": false,
+    "active_voice_sessions": 0,
+    "preserves_persona_auto_memory_and_previous_releases": true
+  },
+  "windows": {
+    "voice_sha256": "65c95be34c6d1532534ee8f992417a91238c11824250bd5aefd3743ab17af5ef",
+    "installer_sha256": "1fc7a214c47a1385697a7007988300bb232f8338f4b4bf21a5b6d9549715f39d",
+    "node_sha256": "6FCDDB72E83253AAF6668BAC98DB828E7001D886D57275B0D4FFA18E02B7B7BF",
+    "version": "0.1.1",
+    "installed_app_sha256": "31718a1e6d490a270716106b000267cd718f331c3a1ffff9a23141afe0869c22",
+    "node_configuration_preserved": true,
+    "binary_resources_verified": true,
+    "debug_port_closed_after_test": true,
+    "normal_app_reopened": true
+  },
+  "selected_voice": {
+    "voice_id": "cosyvoice-v3.5-flash-vd-nexusair-6c14832128494d63aed7fb82b28e3099",
+    "style": "original airy clear cool mature female; no celebrity imitation",
+    "tts_rate": 1.0,
+    "tts_pitch": 1.0,
+    "postprocessing": "none",
+    "human_feedback": "方向接近，可继续微调；三轮声音和续聊正常"
+  },
+  "tests": {
+    "linux_final_fixed_wheel": {
+      "passed": 158,
+      "skipped": 1,
+      "seconds": 64.01
+    },
+    "windows_final_core_and_device_runtime": {
+      "passed": 27,
+      "skipped": 1,
+      "seconds": 24.47,
+      "frozen_exe_test": true,
+      "real_microphone_opened_by_automated_tests": false
+    },
+    "browser_core_with_native_audio_fake": {
+      "passed": 1,
+      "seconds": 3.36,
+      "viewport_width": 390,
+      "model_calls": 0
+    },
+    "rust_previous_bridge_and_node_tests": {
+      "passed": 7
+    },
+    "counts_overlap": true,
+    "failed_isolated_test_runs": "Missing shared fixtures/modules and use of older Core-bundled device module corrected; only final complete run counted"
+  },
+  "human_test": {
+    "real_installed_app": true,
+    "headset": "iKF-V11 Max",
+    "real_asr_chat_tts_and_playback": true,
+    "minimum_nonempty_unique_turns": 5,
+    "observed_barge_in": true,
+    "user_barge_feedback": "基本可以",
+    "user_final_feedback": "三轮都完成了，声音和续聊正常",
+    "tool_validation": "real ChatWork integration tests; no human voice system-info execution claimed",
+    "raw_audio_saved": false,
+    "microphone_closed_after_test": true
+  },
+  "latency_observation": {
+    "kind": "programmatic single observation; not acoustic or percentile",
+    "final_to_first_queued_pcm_ms": 1853,
+    "detected_barge_to_listening_ms": 180
+  },
+  "accounting": {
+    "audio_usage": "estimated/unknown retained; not supplier invoice",
+    "historical_unknown_costs_preserved": true
+  },
+  "remaining_unverified": [
+    "long-duration wake false-trigger rate",
+    "10 minute speaker AEC",
+    "acoustic latency p95",
+    "all device competition/change combinations",
+    "Android client",
+    "full P63 acceptance matrix"
+  ],
+  "privacy": {
+    "credentials": false,
+    "raw_recordings": false,
+    "chat_transcripts": false
+  },
+  "github": {
+    "pull_request": "https://github.com/jxt159753/nexus/pull/2",
+    "branch": "codex/windows-voice-loop",
+    "initial_commit": "03d0f44f3ead6ef17deaa21833b5454f4a8610a5",
+    "draft": true,
+    "merged": false,
+    "remote_commit_verified": true
+  }
+}

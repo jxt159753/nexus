@@ -19,6 +19,7 @@ from nexus.contracts.extensions import (
     CAPABILITY_ID,
     RESULT_FIELDS,
     SKILL_PROFILE,
+    NATIVE_SKILL_PROFILE,
     TOOL_PROFILE,
     ExtensionGenerateConsent,
     ExtensionRequestCreate,
@@ -156,6 +157,11 @@ class ExtensionService:
 
     def outbound(self, value: ExtensionRequestCreate, parent, tools: list[dict]) -> dict:
         catalog = PUBLIC_TOOLS + "\nEnabled Tool versions (untrusted metadata):\n" + canonical(tools)
+        if self.harness.link.config.plugins.enabled and value.kind=='skill':
+            from nexus.plugins.catalog import RELEASES
+            catalog+='\nNative Skill plugins (fixed digest, Node current-user execution):\n'+canonical([
+                {'plugin_id':key,'plugin_digest':RELEASES[key].digest(),'tools':[item.model_dump(mode='json') for item in RELEASES[key].manifest.tools
+                    if key=='builtin.shell' or item.name not in {'mcp_list','mcp_remove'}]} for key in ('builtin.shell','builtin.mcp')])
         parent_plan = None if parent is None else {
             "version_id": parent["version_id"], "manifest": json.loads(parent["manifest_json"]),
             "steps": json.loads(parent["steps_json"]) if parent["steps_json"] else None,
@@ -171,7 +177,15 @@ class ExtensionService:
                 "parent_plan": parent_plan,
             }
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": SYSTEM_PROMPT+(
+                '\nNative Skill override when native plugins are listed: verification_profile=skill_native_steps_v1. '
+                'Steps use {id,tool:"plugin.call",tool_version:1,plugin_id,plugin_tool,plugin_digest,arguments}. '
+                'Only listed builtin.shell/MCP versions. Shell must finish: no persistent or background jobs. '
+                'Input schema retains the strict legacy subset; output_schema may use bounded object schemas with additionalProperties:true '
+                'for each step, whose actual result is {root_id,release_digest,tool,data,verification}. '
+                'Contract tests use stand-ins only; never claim the Shell or installation was tested. '
+                'The 1-3 step limit, no loops, approved versions, and normal/full session authority still apply.'
+                if self.harness.link.config.plugins.enabled and value.kind=='skill' else '')},
             {"role": "user", "content": (
                 f"Requested kind: {value.kind}\n"
                 f"Parent version: {value.parent_version_id or 'none'}\n"
@@ -187,7 +201,7 @@ class ExtensionService:
             "mode": "llm",
             "messages": messages,
             "max_output_tokens": self.config.max_output_tokens,
-            "reservation_microunits": self.models.task_cost_microunits,
+            "reservation_microunits": self.models.model_reservation(input_tokens=16384, output_tokens=self.config.max_output_tokens),
             "note": "Only this request, static contract, enabled Tool declarations and selected parent declaration are sent. No source, execution results or device files are included.",
         }
 
@@ -319,12 +333,68 @@ class ExtensionService:
                 raise LookupError("extension version not found")
             return await self._with_state(conn, row)
 
+    async def accept_chat_skill(self, conn, principal, request_id, node_id, step_id, arguments) -> str:
+        """Store an already generated candidate in the caller's authorization transaction.
+
+        No nested generator/provider call and no implicit version approval. The
+        request links to the native work step and therefore its existing ledger.
+        """
+        self.require_enabled()
+        if not self.config.generation_enabled:
+            raise AccessDenied("GENERATION_DISABLED")
+        await self.owner(conn, principal)
+        generation = arguments.skill
+        encoded = canonical({"origin":"chat", "work_step_id":str(step_id),
+                             "node_id":str(node_id), **arguments.model_dump(mode="json")})
+        old = await one(conn, "SELECT * FROM extension_requests WHERE request_id=?", (str(request_id),))
+        if old is not None:
+            if old["owner_id"] != str(principal.identity_id) or old["request_json"] != encoded:
+                raise Conflict("IDEMPOTENCY_CONFLICT")
+            return old["candidate_version_id"]
+        now = utc_now()
+        count = await one(conn, "SELECT count(*) FROM extension_requests WHERE owner_id=?", (str(principal.identity_id),))
+        recent = await one(conn, "SELECT count(*) FROM extension_requests WHERE owner_id=? AND created_at>?", (str(principal.identity_id), timestamp(now-timedelta(minutes=1))))
+        if count[0] >= 200 or recent[0] >= 10:
+            raise Conflict("BUSY")
+        # Repeated model requests may reuse identical content, never overwrite it
+        # or repurpose an existing capability with another node/approval scope.
+        _, digest, _ = build_release(generation, capability_id=generation.manifest.capability_id,
+            revision=1, parent_version_id=None, environment=environment_for("skill", None))
+        existing = await one(conn, "SELECT v.*,r.node_id FROM extension_versions v JOIN extension_requests r USING(request_id) WHERE v.owner_id=? AND v.capability_id=? ORDER BY v.revision DESC LIMIT 1",
+            (str(principal.identity_id), generation.manifest.capability_id))
+        if existing is not None and (existing["artifact_digest"] != digest or existing["node_id"] != str(node_id)):
+            raise ValueError("capability already exists; creation cannot overwrite a version")
+        provenance = canonical({"mode":"chat", "work_step_id":str(step_id), "additional_model_call":False})
+        await conn.execute("INSERT INTO extension_requests(request_id,owner_id,kind,need,capability_id,node_id,request_json,outbound_json,preview_digest,preview_at,status,created_at,updated_at) VALUES(?,?,'skill',?,?,?,?,?,?,?,'draft',?,?)",
+            (str(request_id), str(principal.identity_id), arguments.reason, generation.manifest.capability_id,
+             str(node_id), encoded, provenance, digest_value(provenance), timestamp(now), timestamp(now), timestamp(now)))
+        if existing is None:
+            made = await self._make_candidate(conn, await one(conn, "SELECT * FROM extension_requests WHERE request_id=?", (str(request_id),)), generation)
+            version_id = made["version_id"]
+        else:
+            version_id = existing["version_id"]
+            await conn.execute("UPDATE extension_requests SET status='candidate',candidate_version_id=? WHERE request_id=?", (version_id, str(request_id)))
+        await audit(conn, str(principal.identity_id), None, "extension.chat_candidate_created", now)
+        return version_id
+
     async def _resolve_steps(self, conn, owner_id: str, generation: SkillGeneration) -> list[dict]:
         resolved = []
         seen: dict[str, dict] = {}
         for step in generation.steps:
             value = step.model_dump(mode="json")
-            if step.tool_version_id is not None:
+            if step.tool=='plugin.call':
+                from nexus.core.extensions.native_steps import dependency
+                contract=await dependency(conn,owner_id,value)
+                properties=contract.input_schema.get('properties',{})
+                if set(step.arguments)-set(properties) or not set(contract.input_schema.get('required',[]))<=set(step.arguments):
+                    raise ValueError('native Skill arguments do not match the plugin contract')
+                from nexus.plugins.schema import checked
+                for key,item in step.arguments.items():
+                    if not isinstance(item,dict) or not set(item)&{'$ref','$input'}: checked(properties[key],item)
+                for reference in step.references():
+                    if reference.field not in seen[reference.step]['fields']: raise ValueError('reference field unavailable')
+                schema=None
+            elif step.tool_version_id is not None:
                 tool = await one(conn, "SELECT * FROM extension_versions WHERE version_id=? AND owner_id=? AND kind='tool'", (str(step.tool_version_id), owner_id))
                 if tool is None:
                     raise ValueError("referenced Tool version not found")
@@ -362,6 +432,8 @@ class ExtensionService:
                 fields = set(RESULT_FIELDS["system.info"])
             elif step.tool == "filesystem.list":
                 fields = set(RESULT_FIELDS["filesystem.list"])
+            elif step.tool=='plugin.call':
+                fields=set(RESULT_FIELDS['plugin.call'])
             elif schema is not None:
                 fields = set(schema.get("properties", {}))
             seen[step.id] = {"fields": fields, "tool": step.tool}
@@ -411,7 +483,7 @@ class ExtensionService:
                     validate_instance(generation.manifest.output_schema, case.expect_output)
             environment = self.sandbox_environment(UUID(request["node_id"]) if request["node_id"] else None)
         else:
-            if generation.manifest.verification_profile != SKILL_PROFILE:
+            if generation.manifest.verification_profile not in {SKILL_PROFILE,NATIVE_SKILL_PROFILE}:
                 raise ValueError("unsupported Skill verifier binding")
             await self._resolve_steps(conn, request["owner_id"], generation)
             for case in generation.tests:
@@ -468,13 +540,14 @@ class ExtensionService:
                 if row["mode"] != "llm" or not self.config.generation_enabled or self.provider is None:
                     await conn.execute("UPDATE extension_requests SET status='failed',error_code='MODEL_DISABLED' WHERE request_id=?", (row["request_id"],))
                     return None
-                error = await budget_error(conn, self.models, now, reservation=self.models.task_cost_microunits)
+                reservation = self.models.model_reservation(input_tokens=16384, output_tokens=self.config.max_output_tokens)
+                error = await budget_error(conn, self.models, now, reservation=reservation)
                 if error is not None:
                     await conn.execute("UPDATE extension_requests SET status='failed',error_code=? WHERE request_id=?", (error, row["request_id"]))
                     return None
                 call_id = str(uuid4())
                 await conn.execute("INSERT INTO model_calls(call_id,provider,model,cost_status,created_at,owner_id,reserved_microunits,pricing_json,outcome,extension_request_id) VALUES(?, 'deepseek', ?, 'reserved', ?, ?, ?, ?, 'started', ?)", (
-                    call_id, MODEL, timestamp(now), row["owner_id"], self.models.task_cost_microunits,
+                    call_id, MODEL, timestamp(now), row["owner_id"], reservation,
                     canonical({"input": self.models.input_price, "output": self.models.output_price,
                                "currency": "USD", "valid_until": self.models.price_valid_until.isoformat()}),
                     row["request_id"],
@@ -503,7 +576,7 @@ class ExtensionService:
                 return
             candidate = None
             failure = error_code
-            if reply is not None and reply.complete and cost is not None and cost <= self.models.task_cost_microunits:
+            if reply is not None and reply.complete and cost is not None and (not self.models.cost_limits_enabled or cost <= self.models.task_cost_microunits):
                 try:
                     generation = parse_generation(reply.content)
                     candidate = await self._make_candidate(conn, current, generation)
@@ -591,13 +664,19 @@ class ExtensionService:
             await conn.execute("UPDATE model_calls SET cost_status='unknown',outcome='unknown',finished_at=? WHERE extension_request_id IS NOT NULL AND outcome='started'", (timestamp(utc_now()),))
             await conn.execute("UPDATE extension_requests SET status='failed',error_code='MODEL_OUTCOME_UNKNOWN' WHERE status='generating'")
 
-    async def test_version(self, principal: Principal, version_id: UUID) -> dict:
+    async def test_version(self, principal: Principal, version_id: UUID, *, work_step_id=None) -> dict:
         self.require_enabled()
         async with self.database.transaction() as conn:
             await self.owner(conn, principal)
             row = await one(conn, "SELECT * FROM extension_versions WHERE version_id=? AND owner_id=?", (str(version_id), str(principal.identity_id)))
             if row is None:
                 raise LookupError("extension version not found")
+            if work_step_id is not None:
+                from nexus.core.security.work import creation_step
+                request = await one(conn, "SELECT node_id FROM extension_requests WHERE request_id=?", (row["request_id"],))
+                _, grant = await creation_step(conn, work_step_id, utc_now(), scope=self.harness.scope(UUID(request["node_id"])))
+                if grant["owner_id"] != row["owner_id"] or grant["node_id"] != request["node_id"] or row["kind"] != "skill":
+                    raise AccessDenied("POLICY_DENIED")
             if row["test_status"] == "passed":
                 return await self.get_version(principal, version_id)
             if (await one(conn, "SELECT paused FROM system_state WHERE singleton=1"))[0]:
@@ -660,6 +739,9 @@ class ExtensionService:
             return
         steps = json.loads(version["steps_json"])
         for step in steps:
+            if step.get('tool')=='plugin.call':
+                from nexus.core.extensions.native_steps import dependency
+                await dependency(conn,version['owner_id'],step)
             if not step.get("tool_version_id"):
                 continue
             tool = await one(conn, "SELECT * FROM extension_versions WHERE version_id=? AND kind='tool'", (step["tool_version_id"],))

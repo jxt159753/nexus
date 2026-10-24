@@ -1,0 +1,21 @@
+# 合入 Core TOML 的合法片段。密钥只从 DASHSCOPE_API_KEY 环境变量读取。
+# voice_id 必须属于所选 CosyVoice 模型，不是公开音色名称。
+[voice]
+enabled = true
+provider = "bailian"
+workspace_id = "YOUR_WORKSPACE_ID"
+region = "cn-beijing"
+voice_id = "YOUR_COSYVOICE_3_5_FLASH_VOICE_ID"
+asr_model = "fun-asr-realtime-2026-02-28"
+tts_model = "cosyvoice-v3.5-flash"
+tts_rate = 1.0
+tts_pitch = 1.0
+tts_volume = 50
+max_concurrent_sessions = 1
+max_session_seconds = 1800
+max_turns = 30
+max_tts_chars = 1000
+max_tts_seconds = 180
+daily_asr_seconds = 1800
+daily_tts_chars = 20000
+# 为每台实际节点另加 [nodes."<uuid>".voice] 和显式 features，见 core.example.toml。

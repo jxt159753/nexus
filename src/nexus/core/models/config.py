@@ -6,19 +6,26 @@ from pydantic import Field, StrictBool, StrictInt, model_validator
 
 from nexus.contracts.base import StrictContract
 
+CHAT_MAX_OUTPUT_TOKENS = 256_000
+CHAT_MAX_TEXT_BYTES = 1_048_576
+
 
 class ModelConfig(StrictContract):
     enabled: StrictBool = False
+    cost_limits_enabled: StrictBool = True
+    call_limits_enabled: StrictBool = True
     daily_cost_microunits: StrictInt = Field(default=1_000_000, ge=0, le=1_000_000)
     task_cost_microunits: StrictInt = Field(default=50_000, ge=0, le=50_000)
     daily_calls: StrictInt = Field(default=100, ge=0, le=100)
     max_output_tokens: StrictInt = Field(default=512, ge=32, le=512)
     chat_enabled: StrictBool = False
+    chat_work_max_actions: StrictInt = Field(default=4, ge=1, le=16)
     web_enabled: StrictBool = False
     chat_images_enabled: StrictBool = False
     web_request_cost_microunits: StrictInt = Field(default=750, ge=750, le=50_000)
-    chat_max_output_tokens: StrictInt = Field(default=2048, ge=32, le=2048)
-    chat_input_bytes: StrictInt = Field(default=32768, ge=8192, le=32768)
+    # DSH provider default; each actual request is also capped by its reservation.
+    chat_max_output_tokens: StrictInt = Field(default=CHAT_MAX_OUTPUT_TOKENS, ge=32, le=CHAT_MAX_OUTPUT_TOKENS)
+    chat_input_bytes: StrictInt = Field(default=32768, ge=8192, le=65536)
     # Adapter capacity and local admission budget are distinct. deepseek-flash
     # advertises a 1M context; costs/transport retain the stricter local limits.
     chat_context_window_tokens: StrictInt = Field(default=1_000_000, ge=4096, le=1_000_000)
@@ -32,14 +39,31 @@ class ModelConfig(StrictContract):
     output_price: StrictInt = Field(default=1_200_000, ge=1)
     price_valid_until: date = date(2026, 10, 25)
 
+    def work_actions_remaining(self, used: int = 0) -> int:
+        # A transport batch remains bounded; disabling quotas removes the total.
+        return max(0, self.chat_work_max_actions - used) if self.call_limits_enabled else 4
+
+    def chat_output_limit(self, reservation: int | None = None, *, compact: bool = False) -> int:
+        if not self.cost_limits_enabled:
+            return min(self.chat_max_output_tokens, 1024 if compact else CHAT_MAX_OUTPUT_TOKENS)
+        amount = self.task_cost_microunits if reservation is None else min(reservation, self.task_cost_microunits)
+        # Keep the existing conservative input allowance and integer cost ceiling.
+        affordable = (amount * 1_000_000 - 32768 * self.input_price) // self.output_price
+        return max(0, min(self.chat_max_output_tokens, 1024 if compact else CHAT_MAX_OUTPUT_TOKENS, affordable))
+
+    def model_reservation(self, *, input_tokens: int = 32768, output_tokens: int | None = None) -> int:
+        if self.cost_limits_enabled:
+            return self.task_cost_microunits
+        output_tokens = self.chat_max_output_tokens if output_tokens is None else output_tokens
+        return (input_tokens*self.input_price + output_tokens*self.output_price + 999999)//1_000_000
+
     @model_validator(mode="after")
     def check_reservation(self):
         if self.chat_context_window_tokens <= self.chat_max_output_tokens + self.chat_compaction_headroom_tokens:
             raise ValueError("context capacity must leave room for input, output and compaction")
         worst = (16384*self.input_price + self.max_output_tokens*self.output_price + 999999)//1000000
-        if self.enabled and self.task_cost_microunits and worst > self.task_cost_microunits:
+        if self.cost_limits_enabled and self.enabled and self.task_cost_microunits and worst > self.task_cost_microunits:
             raise ValueError("token price ceiling exceeds request budget")
-        chat_worst = (32768*self.input_price + self.chat_max_output_tokens*self.output_price + 999999)//1000000
-        if self.enabled and self.chat_enabled and self.task_cost_microunits and chat_worst > self.task_cost_microunits:
+        if self.enabled and self.chat_enabled and self.task_cost_microunits and self.chat_output_limit() < 32:
             raise ValueError("chat token price ceiling exceeds request budget")
         return self

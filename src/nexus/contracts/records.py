@@ -1,4 +1,4 @@
-"""Explicit, bounded owner input; memory is never extracted automatically."""
+"""Bounded owner records and explicit standing consent for automatic memory."""
 
 from typing import Literal, Self
 from uuid import UUID
@@ -53,6 +53,31 @@ class MemorySelection(StrictContract):
     def unique(self) -> Self:
         if len(set(self.memory_ids)) != len(self.memory_ids):
             raise ValueError("duplicate memories")
+        return self
+
+
+class MemoryPolicyUpdate(StrictContract):
+    expected_revision: StrictInt = Field(ge=0)
+    enabled: StrictBool
+    consent_save: StrictBool = False
+    consent_model: StrictBool = False
+
+    @model_validator(mode="after")
+    def consent(self) -> Self:
+        if self.enabled and not (self.consent_save and self.consent_model):
+            raise ValueError("saving and model reuse both require standing consent")
+        return self
+
+
+class MemoryCandidate(StrictContract):
+    quote: StrictStr = Field(min_length=4, max_length=300)
+    category: Literal["preference", "background", "ongoing"]
+    scope: Literal["personal", "project"]
+
+    @model_validator(mode="after")
+    def nonempty(self) -> Self:
+        if self.quote != self.quote.strip():
+            raise ValueError("quote must be a trimmed exact excerpt")
         return self
 
 

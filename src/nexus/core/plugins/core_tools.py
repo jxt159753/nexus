@@ -18,13 +18,8 @@ async def owned_conversation(conn,principal,current,identifier):
 
 
 async def visible_turn(conn,principal,current,identifier):
-    row=await one(conn,'SELECT t.* FROM chat_turns t JOIN conversations c USING(conversation_id) WHERE t.turn_id=? AND t.owner_id=? AND c.project_id IS ? AND c.archived=0',
-                  (identifier,str(principal.identity_id),current['project_id']))
-    if row is None: raise AccessDenied('SESSION_SCOPE_DENIED')
-    # Explicit private attachments, memories and references keep their own scope.
-    if row['memory_refs_json']!='[]' or row['references_json']!='[]' or row['attachments_json']!='[]':
-        raise AccessDenied('PRIVATE_REFERENCE_PREVIEW_REQUIRED')
-    return row
+    from nexus.core.plugins.session_context import visible
+    return await visible(conn,principal,current,identifier)
 
 
 async def execute(service,conn,principal,conversation,step,grant,plugin_id,name,value):
@@ -47,22 +42,25 @@ async def execute(service,conn,principal,conversation,step,grant,plugin_id,name,
         from nexus.core.cognitive.work_queries import query
         return await query(conn,step,grant,name,{'utc_offset_minutes':value.get('utc_offset_minutes',480)},now)
     if plugin_id=='builtin.session':
+        from nexus.core.plugins.session_context import search
         if name=='session_search':
-            rows=await conn.execute_fetchall("SELECT conversation_id,title FROM conversations WHERE owner_id=? AND project_id IS ? AND archived=0 AND (instr(lower(title),lower(?))>0 OR conversation_id IN (SELECT conversation_id FROM chat_turns WHERE memory_refs_json='[]' AND references_json='[]' AND attachments_json='[]' AND instr(lower(text),lower(?))>0)) ORDER BY rowid DESC LIMIT ?",
-                (str(principal.identity_id),conversation['project_id'],value['query'],value['query'],value.get('limit',10)))
-            return {'sessions':[dict(row) for row in rows]}
+            rows=await search(conn,principal,conversation,query=value['query'],limit=20)
+            sessions={row['conversation_id']:{key:row[key] for key in ('conversation_id','title')} for row in rows}
+            return {'sessions':list(sessions.values())[:value.get('limit',10)],'search_window':200}
         if name in {'session_event_search','session_trace'}:
             target=await owned_conversation(conn,principal,conversation,value['conversation_id'])
             query=value.get('query','')
-            rows=await conn.execute_fetchall("SELECT turn_id,status,text,response_text,memory_refs_json,references_json,attachments_json FROM chat_turns WHERE conversation_id=? AND (instr(lower(text),lower(?))>0 OR instr(lower(response_text),lower(?))>0) ORDER BY rowid DESC LIMIT ?",
-                (target['conversation_id'],query,query,value.get('limit',10)))
-            return {'turns':[{'turn_id':row['turn_id'],'status':row['status'],'input':row['text'][:500],'response':row['response_text'][:1000]} for row in rows if row['memory_refs_json']=='[]' and row['references_json']=='[]' and row['attachments_json']=='[]']}
+            return {'turns':await search(conn,principal,conversation,query=query,conversation_id=target['conversation_id'],limit=value.get('limit',10)),'search_window':200}
         turn=await visible_turn(conn,principal,conversation,value['turn_id'])
         if name=='session_event_read':
             return {'turn_id':turn['turn_id'],'status':turn['status'],'input':turn['text'],'response':turn['response_text'][:6000],'truncated':len(turn['response_text'])>6000}
-        rows=await conn.execute_fetchall('SELECT task_id,status,execution_outcome,verification FROM tasks WHERE owner_id=? AND task_id IN (SELECT k.task_id FROM chat_work_tasks k JOIN chat_work_steps w USING(step_id) WHERE w.turn_id=?) LIMIT 20',(str(principal.identity_id),turn['turn_id']))
+        rows=await conn.execute_fetchall('''SELECT task_id,status,execution_outcome,verification FROM tasks WHERE owner_id=? AND task_id IN (
+            SELECT task_id FROM chat_work_steps WHERE turn_id=? UNION
+            SELECT k.task_id FROM chat_work_tasks k JOIN chat_work_steps w USING(step_id) WHERE w.turn_id=? UNION
+            SELECT k.task_id FROM skill_run_steps k JOIN chat_work_steps w ON w.skill_run_id=k.run_id WHERE w.turn_id=?) LIMIT 21''',
+            (str(principal.identity_id),turn['turn_id'],turn['turn_id'],turn['turn_id']))
         calls=await conn.execute_fetchall('SELECT call_id,outcome,cost_status,cost_microunits FROM model_calls WHERE chat_turn_id=? OR work_root_turn_id=? LIMIT 20',(turn['turn_id'],turn['turn_id']))
-        return {'turn_id':turn['turn_id'],'tasks':[dict(row) for row in rows],'calls':[dict(row) for row in calls]}
+        return {'turn_id':turn['turn_id'],'tasks':[dict(row) for row in rows[:20]],'truncated':len(rows)>20,'calls':[dict(row) for row in calls]}
     if plugin_id=='builtin.todo':
         todos=value['todos']
         if len({item['id'] for item in todos})!=len(todos): raise ValueError('todo identifiers must be unique')
@@ -82,7 +80,13 @@ async def execute(service,conn,principal,conversation,step,grant,plugin_id,name,
         await conn.execute("UPDATE chat_turns SET work_status='permission',revision=revision+1 WHERE turn_id=?",(step['turn_id'],))
         return None
     if plugin_id=='builtin.goal':
+        from nexus.core.plugins import goals
+        current_turn_id=step['turn_id'] if 'turn_id' in step.keys() else None
         if name=='create_goal':
+            if await one(conn,'''SELECT 1 FROM plugin_wakeups WHERE turn_id=? UNION ALL
+                SELECT 1 FROM plugin_authorities WHERE root_turn_id=? AND kind='goal' LIMIT 1''',(step['turn_id'],step['turn_id'])):
+                raise AccessDenied('GOAL_NEW_USER_TURN_REQUIRED')
+            if (await one(conn,'SELECT count(*) FROM plugin_goals'))[0]>=1000: raise AccessDenied('GOAL_STORAGE_FULL')
             old=await one(conn,"SELECT goal_id FROM plugin_goals WHERE conversation_id=? AND status='active' AND expires_at>?",(conversation_id,timestamp(now)))
             if old: raise ValueError('an active goal already exists')
             identifier=str(uuid4())
@@ -91,18 +95,37 @@ async def execute(service,conn,principal,conversation,step,grant,plugin_id,name,
             await conn.execute('UPDATE plugin_goals SET rounds=1 WHERE goal_id=?',(identifier,))
             from nexus.core.plugins.lifecycle import attach
             await attach(service,conn,identifier,'goal',conversation,step,grant)
-            return dict(await one(conn,'SELECT * FROM plugin_goals WHERE goal_id=?',(identifier,)))
+            return goals.model_view(await goals.snapshot(conn,identifier))
         if name=='get_goal':
             row=await one(conn,'SELECT * FROM plugin_goals WHERE conversation_id=? ORDER BY rowid DESC LIMIT 1',(conversation_id,))
-            return {'goal':dict(row) if row else None}
+            if row:
+                from nexus.core.plugins.session_context import authority_allowed
+                await authority_allowed(conn,row['goal_id'],current_turn_id=current_turn_id)
+            return {'goal':goals.model_view(await goals.snapshot(conn,row['goal_id'],step_id=value.get('step_id'))) if row else None}
         row=await one(conn,'SELECT * FROM plugin_goals WHERE goal_id=? AND conversation_id=? AND owner_id=?',(value['goal_id'],conversation_id,str(principal.identity_id)))
         if row is None: raise LookupError('goal not found')
+        if name!='update_goal' or value['status'] not in {'paused','blocked'}:
+            from nexus.core.plugins.session_context import authority_allowed
+            await authority_allowed(conn,row['goal_id'],current_turn_id=current_turn_id)
+        if name=='goal_plan':
+            from nexus.contracts.autonomy import GoalPlan
+            return goals.model_view(await goals.set_plan(conn,row,GoalPlan.model_validate(value['plan'])))
+        if name=='goal_checkpoint':
+            from nexus.contracts.autonomy import GoalCheckpoint
+            return goals.model_view(await goals.checkpoint(conn,row,GoalCheckpoint.model_validate(value['checkpoint']),turn_id=step['turn_id']))
+        if name=='goal_wait':
+            if row['status']!='active' or row['expires_at']<=timestamp(now): raise AccessDenied('GOAL_NOT_ACTIVE')
+            watch=await one(conn,'SELECT watch_id FROM autonomy_watches WHERE watch_id=? AND goal_id=? AND paused=0 AND expires_at>?',(value['watch_id'],row['goal_id'],timestamp(now)))
+            if not watch: raise AccessDenied('WATCH_SCOPE_DENIED')
+            if not await one(conn,'SELECT 1 FROM goal_plans WHERE goal_id=?',(row['goal_id'],)): raise ValueError('goal plan required')
+            await conn.execute('UPDATE goal_plans SET waiting_for_event=1,waiting_watch_id=?,last_reason=? WHERE goal_id=?',(value['watch_id'],value['reason'],row['goal_id']))
+            return {'waiting':True,'goal_id':row['goal_id'],'model_calls_while_unchanged':0}
+        if row['status']=='complete' or row['expires_at']<=timestamp(now): raise AccessDenied('GOAL_ENDED')
+        if service.chat.config.call_limits_enabled and value['status']=='active' and row['rounds']>=row['max_rounds']: raise AccessDenied('PLUGIN_GOAL_LIMIT')
         if value['status']=='blocked' and row['rounds']<3: raise ValueError('blocked requires at least three goal rounds')
         verified=False
         if value['status']=='complete':
-            # Per-task evidence remains in traces. The model cannot certify
-            # arbitrary business objectives through a status declaration.
-            verified=False
+            verified=await goals.verify_completion(conn,row)
         await conn.execute('UPDATE plugin_goals SET status=?,completion_verified=? WHERE goal_id=?',(value['status'],int(verified),row['goal_id']))
         if value['status']=='active':
             from nexus.core.plugins.lifecycle import attach

@@ -17,23 +17,14 @@ function chatSkillsInvalidate() {
   $("chat-skills-catalog").replaceChildren(el("p","设备或工具选项已变化，请重新查看可用流程。","hint"));
 }
 function initChatSkills() {
-  $("chat-node").addEventListener("change",chatSkillsInvalidate);
   $("chat-tools").addEventListener("change",chatSkillsInvalidate);
   $("chat-skill-load").onclick=action(async()=>{
-    const node=$("chat-node").value;
-    if (!node || !$("chat-tools").checked) throw new Error("请先允许工具建议并选择设备");
-    const request=++chatSkillState.request, epoch=chatState.epoch;
-    $("chat-skills").checked=false; $("chat-skills").disabled=true;
-    const value=await api(`/api/v1/chat/skills?node_id=${encodeURIComponent(node)}`);
-    if (!state.logged || epoch!==chatState.epoch || request!==chatSkillState.request || node!==$("chat-node").value) return;
-    chatSkillState.catalog=value; chatSkillState.node=node;
-    const box=$("chat-skills-catalog"); box.replaceChildren(el("p",value.notice,"hint"));
-    if (!value.skills.length) box.append(el("p","此设备没有符合权限且已启用的流程。可继续普通聊天或使用单步工具；新能力须在“能力”页测试、批准并启用。","hint"));
-    else {
-      const details=el("details"); details.append(el("summary",`查看本轮可外发的 ${value.skills.length} 个流程（最多 8 个）`),el("pre",JSON.stringify(value.skills,null,2)));
-      box.append(details,el("p","勾选下方选项后发送，将把以上版本、说明、输入格式和步骤名称一并发送给 DeepSeek。","hint"));
-      $("chat-skills").disabled=false;
-    }
+    const epoch=chatState.epoch;
+    const value=await api("/api/v1/chat/work-catalog");
+    if (!state.logged || epoch!==chatState.epoch) return;
+    const skills=(value.catalog || []).filter(item=>(item.route_intent || item.name)==="run_skill");
+    const box=$("chat-skills-catalog");
+    box.replaceChildren(el("p","流程随工作工具目录提供给 Core，由 Core 选择已授权设备。","hint"),el("pre",JSON.stringify(skills,null,2)));
   });
 }
 

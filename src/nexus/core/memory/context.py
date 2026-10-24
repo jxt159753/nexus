@@ -1,10 +1,11 @@
-"""Explicit per-turn memory snapshots. Saving and sending are separate consents."""
+"""Memory snapshot checks shared by chat, result explanation and references."""
 
 import json
 
 from nexus.contracts.extensions import digest_value
 from nexus.core.security.types import AccessDenied
 from nexus.core.storage.database import one, timestamp, utc_now
+from nexus.core.memory import automatic
 
 
 async def selection(conn, owner_id, project_id, memory_ids) -> dict:
@@ -21,6 +22,7 @@ async def selection(conn, owner_id, project_id, memory_ids) -> dict:
 
 
 async def validate_turn(conn, row) -> None:
+    await automatic.validate_turn(conn, row)
     refs = json.loads(row["memory_refs_json"])
     if not refs:
         return

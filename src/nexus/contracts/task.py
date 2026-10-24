@@ -1,3 +1,4 @@
+from nexus.contracts.file_transfer import FileReceiveArguments
 from nexus.plugins.contracts import PluginNodeArguments
 
 from typing import Annotated, Literal
@@ -10,6 +11,8 @@ from nexus.contracts.images import ImageReadArguments
 from nexus.contracts.base import StrictContract
 from nexus.contracts.basic import FileLinesArguments, FileGlobArguments, FileGrepArguments, FileEditPreviewArguments, FileEditArguments, FileReadArguments, FileSearchArguments, FilePreviewArguments, FileWriteArguments, CommandRunArguments
 
+
+from nexus.contracts.android import AndroidDeviceStatusArguments, AndroidNotificationDigestArguments
 
 TaskStatus = Literal[
     "queued", "awaiting_approval", "ready", "dispatching", "running",
@@ -112,7 +115,22 @@ class PluginNodeRequest(TaskMetadata):
     arguments: PluginNodeArguments
 
 
+class AndroidDeviceStatusRequest(TaskMetadata):
+    intent: Literal["android_device_status"]
+    arguments: AndroidDeviceStatusArguments
+
+
+class AndroidNotificationDigestRequest(TaskMetadata):
+    intent: Literal["android_notification_digest"]
+    arguments: AndroidNotificationDigestArguments
+
+
+class FileReceiveRequest(TaskMetadata):
+    intent: Literal["receive_file"]
+    arguments: FileReceiveArguments
+
+
 TaskRequest = Annotated[
-    SystemInfoRequest | ListDirectoryRequest | FileReadRequest | FileSearchRequest | FilePreviewRequest | FileWriteRequest | CommandRunRequest | FileLinesRequest | FileGlobRequest | FileGrepRequest | FileEditPreviewRequest | FileEditRequest | ObserveRequest | InteractRequest | ImageReadRequest | PluginNodeRequest,
+    SystemInfoRequest | ListDirectoryRequest | FileReadRequest | FileSearchRequest | FilePreviewRequest | FileWriteRequest | CommandRunRequest | FileLinesRequest | FileGlobRequest | FileGrepRequest | FileEditPreviewRequest | FileEditRequest | ObserveRequest | InteractRequest | ImageReadRequest | PluginNodeRequest | AndroidDeviceStatusRequest | AndroidNotificationDigestRequest | FileReceiveRequest,
     Field(discriminator="intent"),
 ]

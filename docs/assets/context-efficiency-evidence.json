@@ -1,0 +1,181 @@
+{
+  "task": "P88",
+  "date": "2026-10-24",
+  "scope": "local_backend_only",
+  "upstream": "https://github.com/cyanwell/dsh-agent-soul/tree/544b0fb01bf6662f888857fffe4cf841a5a4276a",
+  "method": {
+    "baseline": "pre-edit workspace source snapshot at var/soul-adaptation/baseline/src",
+    "script": "var/soul-adaptation/test_comparison.py",
+    "script_sha256": "e384392eef0bfa5334d935ab4f7fd73241719f6b799ae1d4a506b6e50d5ff1ed",
+    "runtime": "Windows, Python 3.13.9, pytest 9.1.1",
+    "samples": "Identical scripted messages, 1/20/100 source checkpoints, 10 mixed memories, eight repeated file reads. Real temporary SQLite and filesystem; scripted provider.",
+    "estimator": "NEXUS estimated_tokens over full build_request/chat_exchanges request bodies; not a provider tokenizer or billing measurement",
+    "provider_calls": 0,
+    "deployed": false
+  },
+  "before": {
+    "variant": "before",
+    "estimator": "NEXUS estimated_tokens; not provider billing",
+    "plain_chat": {
+      "estimated_input_tokens": 879,
+      "request_bytes": 3616
+    },
+    "work_without_retrieval": {
+      "estimated_input_tokens": 2252,
+      "request_bytes": 9204
+    },
+    "checkpoint_1_sources": {
+      "estimated_input_tokens": 2378,
+      "request_bytes": 9739
+    },
+    "checkpoint_20_sources": {
+      "estimated_input_tokens": 2554,
+      "request_bytes": 10442
+    },
+    "checkpoint_100_sources": {
+      "estimated_input_tokens": 3294,
+      "request_bytes": 13402
+    },
+    "memory_relevant": {
+      "estimated_input_tokens": 1718,
+      "request_bytes": 7016,
+      "selected": [
+        "我在研究 SQLite 事务恢复，不能删除日志",
+        "我在研究 SQLite 事务恢复  ",
+        "我在研究 SQLite 事务恢复",
+        "我喜欢种花",
+        "我喜欢听音乐",
+        "我喜欢绘画",
+        "我喜欢攀岩",
+        "我喜欢海边游泳"
+      ],
+      "memory_tokens": 852
+    },
+    "memory_greeting": {
+      "estimated_input_tokens": 1610,
+      "request_bytes": 6580,
+      "selected": [
+        "我喜欢种花",
+        "我喜欢听音乐",
+        "我喜欢绘画",
+        "我喜欢攀岩",
+        "我喜欢海边游泳",
+        "我喜欢骑自行车",
+        "我喜欢简洁自然的中文回答"
+      ],
+      "memory_tokens": 748
+    },
+    "eight_repeated_reads": {
+      "calls": 9,
+      "executed_tasks": 8,
+      "estimated_total_input_tokens": 35277,
+      "total_request_bytes": 143799,
+      "error_code": null
+    }
+  },
+  "after": {
+    "variant": "after",
+    "estimator": "NEXUS estimated_tokens; not provider billing",
+    "plain_chat": {
+      "estimated_input_tokens": 879,
+      "request_bytes": 3616
+    },
+    "work_without_retrieval": {
+      "estimated_input_tokens": 2385,
+      "request_bytes": 9750
+    },
+    "checkpoint_1_sources": {
+      "estimated_input_tokens": 2500,
+      "request_bytes": 10240
+    },
+    "checkpoint_20_sources": {
+      "estimated_input_tokens": 2500,
+      "request_bytes": 10240
+    },
+    "checkpoint_100_sources": {
+      "estimated_input_tokens": 2500,
+      "request_bytes": 10240
+    },
+    "memory_relevant": {
+      "estimated_input_tokens": 1096,
+      "request_bytes": 4519,
+      "selected": [
+        "我在研究 SQLite 事务恢复  ",
+        "我在研究 SQLite 事务恢复，不能删除日志",
+        "我喜欢简洁自然的中文回答"
+      ],
+      "memory_tokens": 230
+    },
+    "memory_greeting": {
+      "estimated_input_tokens": 984,
+      "request_bytes": 4063,
+      "selected": [
+        "我喜欢简洁自然的中文回答"
+      ],
+      "memory_tokens": 121
+    },
+    "eight_repeated_reads": {
+      "calls": 5,
+      "executed_tasks": 3,
+      "estimated_total_input_tokens": 14712,
+      "total_request_bytes": 60281,
+      "error_code": "WORK_STALLED"
+    }
+  },
+  "validation": [
+    {
+      "report": "var/soul-adaptation/baseline-verified.txt",
+      "passed": 104,
+      "failed": 5,
+      "notes": "Four pre-existing summary options failures and one stale stopped assertion."
+    },
+    {
+      "report": "var/soul-adaptation/regression-tests.txt",
+      "passed": 172,
+      "failed": 0,
+      "notes": "Chat, history, compaction, memory, references, work, routing and failure feedback."
+    },
+    {
+      "report": "var/soul-adaptation/venv-boundaries-tests.txt",
+      "passed": 137,
+      "failed": 0,
+      "notes": "Overlaps prior batch. Final memory fields and source-consent bounds, native batches, Core queries, images, web, real Windows workers and native plugins."
+    }
+  ],
+  "initial_failures": [
+    "Restricted Windows asyncio socketpair initialization blocked before business tests; interrupted the three owned test sessions and reran with authorized local execution.",
+    "First implementation run: two new test fixture mistakes, one four-identical-reads fixture now triggering the intended stall policy; corrected fixtures and retained separate stall test.",
+    "Four summary catalog failures matched baseline; removed unused catalog from tool-free requests. Updated old disabled-capability assertion to preserve failure evidence with existing permitted summary behavior.",
+    "System Python injected parent-only dependencies; four Windows child-process cases failed. Same tests passed using project .venv, without environment or dependency changes."
+  ],
+  "limits": [
+    "No paid/real-provider quality or billing measurement; no deployment or user acceptance.",
+    "Reference lookup adds 133 estimated tokens to a work request in the sample; short histories or actual retrieval may cost more.",
+    "Memory relevance is lexical and deduplication conservative; synonyms and very old facts may be missed.",
+    "Stall detection only handles contiguous identical allowlisted read actions; it does not diagnose all loops or prove goal completion."
+  ],
+  "source_sha256": {
+    "src/nexus/contracts/work.py": "a7ca7a1614ad55b51de1b3120f0b9ded0aaadcf60edee3fa49a6455f8b09f37c",
+    "src/nexus/core/cognitive/chat.py": "87d4fb56c11dee45029c0efbaa922a64ad5d4e0ff0fe3db6860c1c43729ffb58",
+    "src/nexus/core/cognitive/chat_compaction.py": "e3f207d57f99f36ed6bfc95bad96beb062f8b6601dfdde36f4e7df70f75b7606",
+    "src/nexus/core/cognitive/chat_work.py": "6f37c326f5af013171bdd495c9690be2dd344de82befc2be4689c11bb2c670e6",
+    "src/nexus/core/cognitive/chat_feedback.py": "991ec403a60a9a2add52848936a191477ff5f940d43a091fd3399a7c6b44473a",
+    "src/nexus/core/cognitive/work_catalog.py": "804aafdfbca158fd33f4141f78213f64b704fdf39f3cf0ad73d4064bacaf2511",
+    "src/nexus/core/cognitive/work_queries.py": "c3b8ebf26d439233f98213c7e3bd20c115faa43558ecb28f9db3a19ad0dfbb0d",
+    "src/nexus/core/cognitive/node_routing.py": "8f0b6b9293a9bc53d82a866d79c56cf3209ebdd7a3e5774890b7e50a5b6ccbdd",
+    "src/nexus/core/cognitive/context_refs.py": "8ff6b9788c9fd85324d10f6f15b9b6a0510300f28424660ceb5325f0e4d20b6f",
+    "src/nexus/core/cognitive/work_progress.py": "59f3aa943c6b30fac666626277e9f82dfb6751df0bf95d989c5ab7852571983d",
+    "src/nexus/core/memory/automatic.py": "35433d61627b49708d6c4d2ebc2d05e87107411d934b9b802df536640f44ea8e"
+  },
+  "baseline_source_sha256": {
+    "src/nexus/contracts/work.py": "cfb32c275cb69e7a84867b66136d708e2ebeeaff9f30d9acfe8d35951b0b9622",
+    "src/nexus/core/cognitive/chat.py": "9eebc059ad4cf4f5dcb1007ce6869da138a24bb41b38ba9ac84bd7344f9d5532",
+    "src/nexus/core/cognitive/chat_compaction.py": "2dcaec60d7c367c25db36136c1d83f51ced32021a601710b9e72f183fb43765c",
+    "src/nexus/core/cognitive/chat_work.py": "81983249eea888134cba2eff4df0aadb2519d6eaf81c99094e09dcf6843f701b",
+    "src/nexus/core/cognitive/chat_feedback.py": "166e52235a0e58a89063d3e8512b7335febd76822bf0e29af872fb3a16ead194",
+    "src/nexus/core/cognitive/work_catalog.py": "a809c4df17651dd3d8d2d8a3febc4bb2eed4a21acb857fbc6342ee2c870d2a33",
+    "src/nexus/core/cognitive/work_queries.py": "421019f505a51495cfdaab9ccb04f004186073ca5244e81362f73f50185eb939",
+    "src/nexus/core/cognitive/node_routing.py": "556f2b893cf2d9c46c2190e35ed804048fe9b294c41a9d4a294234155bf12bc1",
+    "src/nexus/core/memory/automatic.py": "6d4d01c1d9ef3197e62c064cdb9d763d4a69c0134633b9ee281ff111ce7038d6"
+  }
+}

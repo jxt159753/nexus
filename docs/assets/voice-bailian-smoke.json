@@ -1,0 +1,45 @@
+{
+  "schema": "nexus.voice.bailian-smoke.v1",
+  "generated_at": "2026-10-22T23:20:00+08:00",
+  "simulated": true,
+  "simulation_method": "synthetic_tts",
+  "note": "CosyVoice output was fed to Fun-ASR and through a local Core media proxy. This is not a real human microphone recording and is not acceptance evidence.",
+  "models": {
+    "tts": "cosyvoice-v3.5-flash",
+    "asr": "fun-asr-realtime-2026-02-28",
+    "voice_design": true
+  },
+  "tts": {
+    "text": "你好，NEXUS。这是一次声音测试。",
+    "audio_seconds": 3.26,
+    "bytes": 143766,
+    "first_chunk_ms": 908,
+    "total_stream_ms": 2341,
+    "sample_rate": 22050,
+    "format": "pcm_s16le",
+    "rms": 0.2
+  },
+  "asr": {
+    "first_partial_ms": 300,
+    "final_ms": 1485,
+    "final_text": "你好NEXUS，这是一次声音测试。",
+    "partials": [
+      "你好",
+      "你好，NEXus",
+      "你好，nexus，这是一次生",
+      "你好，nexus，这是一次生测试"
+    ]
+  },
+  "core_proxy": {
+    "speak_text": "收到：你好Nexus，这是一次声音测试。",
+    "first_audio_bytes": 8000,
+    "responder": "fake default responder; real Chat model not used",
+    "result": "pass"
+  },
+  "limits": [
+    "No real microphone input",
+    "No local KWS/AEC/barge-in",
+    "No real DeepSeek chat response",
+    "Programmatic timings, not acoustic measurement"
+  ]
+}
