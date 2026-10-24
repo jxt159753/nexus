@@ -68,16 +68,16 @@ cargo test --lib
 安装包由本轮源码构建并静默安装（覆盖原安装位置）：
 
 - 安装包：`apps/windows/src-tauri/target/release/bundle/nsis/NEXUS_0.1.0_x64-setup.exe`
-- SHA-256：`54aff24ef76fa4459ea1307f34bc6be47280af6eb86a554aaca0a1a3cc993c2d`（34,488,829 字节）
+- SHA-256：`5496eedc5b5f31f6857619fa8b70aa4faf5dd62716bf25f5144b840544ea9e55`（34,491,005 字节）
 - 安装后主程序：`E:\NEXUS\var\frontend-check\installed\nexus-windows.exe`（12,325,376 字节）
-- WebView2：`Edg/155.0.4283.62`；Core：本地 P56 后端源码，schema 022，合成 Provider
+- WebView2：`Edg/155.0.4283.62`；Core：本地源码（附件迁移 022，测试库当前 schema 026），合成 Provider
 
 运行：
 
 ```powershell
 $env:NEXUS_TEST_WINDOWS_APP = "E:/NEXUS/var/frontend-check/installed/nexus-windows.exe"
 $env:NEXUS_TEST_NODE = "C:/Program Files/nodejs/node.exe"
-.venv/Scripts/python.exe -B -m pytest -q tests/test_windows_attachments.py --basetemp var/pytest-win-attach-final2 --tb=short
+.venv/Scripts/python.exe -B -m pytest -q tests/test_windows_attachments.py --basetemp var/pytest-win-attach-final --tb=short
 ```
 
 结果：**1 项通过**。实际覆盖：
@@ -99,6 +99,7 @@ $env:NEXUS_TEST_NODE = "C:/Program Files/nodejs/node.exe"
 
 - 模型效果：浏览器与安装版测试使用合成 SSE Provider，只证明请求被准入、附件范围和轮次关联；未验证真实 DeepSeek 对图片/文档的理解质量，未发起付费调用。
 - 429：界面和后端均有真实错误映射，但本轮未在在线环境强制触发 30 秒传输超时或 20/分钟上传速率上限；不宣称已实测。
+- 上限：安装版实测 5,243,201 字节；未逐一验证 16 MiB 精确上限，也未强行触发服务端 30 秒接收超时。
 - 迁移 022：沿用 P56 后端验证；本轮未升级生产数据库，未部署。
 - Android：390px 浏览器截图不等同 Android 真机；未做 Android 浏览器或 App 验证。
 - 旧控制台：已用真实 Edge 完成选择、同意、发送、刷新，但没有重复 Windows 安装版全部错误矩阵。

@@ -2,6 +2,8 @@
 
 import {
   ApiError,
+  api,
+  uuid,
   STATUS_LABELS,
   TASK_TERMINAL,
   TOOL_LABELS,
@@ -12,7 +14,6 @@ import {
   answerPermission,
   consentResult,
   createProject,
-  loadNodes,
   nodeName,
   pendingApprovals,
   pendingPermissions,
@@ -25,6 +26,7 @@ import {
   clearPrefs,
 } from "./api.js";
 
+import { renderChatFiles } from "./chat-files.js";
 import { markdownPreview, renderMarkdown } from "./markdown.js";
 import {
   attachmentBlocksSend,
@@ -54,7 +56,6 @@ export const ui = {
   newConversation: () => {},
   sendFrom: () => {},
   refresh: () => {},
-  updateConnection: () => {},
   scrollToTurn: () => {},
   logout: () => {},
   openTurnDetails: () => {},
@@ -794,21 +795,18 @@ function presentationState(turn, presentation) {
 }
 
 function renderPresentationBody(assistant, turn, presentation) {
+  if(presentation.files?.length) assistant.append(renderChatFiles(presentation.files,api,uuid));
   const status = el("div", "status-line");
-  status.append(presentationBadge(presentation));
-  if (turn.work_status && turn.work_status !== "permission") status.append(el("span", "hint", `工作：${turn.work_status}`));
+  if (presentation.phase !== "completed") status.append(presentationBadge(presentation));
   if (turn.cost_status === "unknown") status.append(el("span", "hint", "部分费用待核对"));
-  else if (turn.cost_microunits !== null && turn.cost_microunits !== undefined) status.append(el("span", "hint", money(turn.cost_microunits)));
-  if (turn.web_call_count) status.append(el("span", "hint", `网页请求 ${turn.web_call_count} 次`));
-  if (turn.context_truncated) status.append(el("span", "hint", "部分历史或工具上下文已裁剪"));
-  assistant.append(status);
+  if (turn.context_truncated) status.append(el("span", "hint", "较早的内容未全部带入本次回复"));
+  if (status.childElementCount) assistant.append(status);
 
   const hint = errorHint(turn.error_code);
   if (hint && !presentation.final_text) assistant.append(el("p", "hint", hint));
 
   if (presentation.final_text !== null && presentation.final_text !== undefined) {
     const final = el("section", "final-answer");
-    final.append(el("p", "final-label", presentation.phase === "completed" ? "最终回答" : "本轮反馈"));
     const prose = el("div", "prose");
     renderProse(prose, presentation.final_text);
     final.append(prose);
@@ -937,8 +935,9 @@ function renderTurn(turn) {
   }
 
   const actions = el("div", "actions");
-  const inspect = button("技术详情", "quiet", () => ui.openTurnDetails(turn));
-  actions.append(inspect);
+  if (turn.error_code || turn.work_steps?.length || turn.cost_status === "unknown") {
+    actions.append(button("技术详情", "quiet", () => ui.openTurnDetails(turn)));
+  }
   if (turn.turn_id === state.activeTurn && turn.status !== "stopped" && turn.status !== "failed") {
     const stop = button("停止回复", "quiet danger", () => ui.stopTurn?.());
     actions.append(stop);
@@ -951,17 +950,12 @@ function renderTurn(turn) {
 
 function chips() {
   const wrap = document.createDocumentFragment();
-  const conversation = state.conversation;
-  const project = conversation?.project_id ? projectName(conversation.project_id) || "已关联项目" : (state.prefs.projectId ? projectName(state.prefs.projectId) || "新会话项目" : "不关联项目");
-  const projectChip = button(`项目 · ${project}`, "chip", () => ui.openScope("project"));
-  const node = state.nodes.find((item) => item.node_id === state.prefs.nodeId);
-  const nodeChip = button(`${nodeName(state.prefs.nodeId)}${node && !node.online ? " · 离线" : ""}`, "chip" + (node && !node.online ? " off" : ""), () => ui.openScope("device"));
-  const toolsChip = button(`工具 · ${state.prefs.tools ? "开" : "关"}`, "chip" + (state.prefs.tools ? " on" : " off"), () => ui.openScope("tools"));
-  const feedbackChip = button(`结果回传 · ${state.prefs.resultFeedback ? "允许" : "询问"}`, "chip" + (state.prefs.resultFeedback ? " on" : ""), () => ui.openScope("tools"));
-  const contextChip = button(`上下文 · ${state.prefs.context ? "开" : "关"}`, "chip" + (state.prefs.context ? " on" : " off"), () => ui.openScope("context"));
+  const projectId = state.conversation?.project_id || state.prefs.projectId;
+  if (projectId) wrap.append(button(projectName(projectId) || "当前项目", "chip", () => ui.openScope("project")));
   const permission = pluginState.conversationPermission;
-  const permissionChip = button(`权限 · ${permission ? modeLabel(permission.effective_mode) : "设置"}`, "chip" + (permission?.effective_mode === "full" ? " on" : ""), () => ui.openConversationPermission());
-  wrap.append(projectChip, nodeChip, toolsChip, feedbackChip, contextChip, permissionChip);
+  wrap.append(button(permission?.effective_mode === "full" ? "完全权限" : "普通权限", "chip", () => ui.openConversationPermission()));
+  if (!state.prefs.tools) wrap.append(button("仅聊天", "chip", () => ui.openScope("tools")));
+  if (!state.prefs.context) wrap.append(button("不带历史", "chip", () => ui.openScope("context")));
   return wrap;
 }
 
@@ -1048,8 +1042,8 @@ export function renderConversations() {
     const item = el("button", "conversation-item" + (conversation.conversation_id === state.conversation?.conversation_id ? " active" : ""));
     item.type = "button";
     item.append(el("strong", "", conversation.title || "新会话"));
-    const project = conversation.project_id ? projectName(conversation.project_id) || "项目会话" : "不关联项目";
-    item.append(el("small", "", `${formatDate(conversation.created_at)} · ${project}${conversation.archived ? " · 已归档" : ""}`));
+    const project = conversation.project_id ? projectName(conversation.project_id) || "项目会话" : "";
+    item.append(el("small", "", `${formatDate(conversation.created_at)}${project ? " · " + project : ""}${conversation.archived ? " · 已归档" : ""}`));
     item.addEventListener("click", () => runAction(async () => {
       if (conversation.conversation_id !== state.conversation?.conversation_id) leaveConversation();
       await selectConversation(conversation.conversation_id);
@@ -1078,12 +1072,13 @@ export function renderChat(force = false) {
   const conversation = state.conversation;
   const parts = [];
   if (conversation?.project_id) parts.push(`项目 ${projectName(conversation.project_id) || "已关联"}`);
-  else parts.push("不关联项目");
+  
   if (conversation?.archived) parts.push("已归档");
   if (state.control?.paused) parts.push("派发已暂停");
   if (state.activeTurn) parts.push("本轮进行中");
-  else if (conversation) parts.push("空闲");
+  
   $("chat-sub").textContent = parts.join(" · ");
+  $("chat-sub").hidden = !parts.length;
 
   const log = $("chat-messages");
   const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 120;
@@ -1107,13 +1102,8 @@ export function renderChat(force = false) {
   const activeTurn = state.activeTurn && state.turns.get(state.activeTurn);
   $("chat-stop").hidden = !activeTurn;
   $("chat-send").disabled = !state.ready || !!activeTurn || attachmentBlocksSend();
-  const node = state.nodes.find((item) => item.node_id === state.prefs.nodeId);
-  const workspaceReady = !!node && node.roots?.includes("workspace")
-    && (node.tools || []).some((tool) => tool.startsWith("filesystem."));
-  const imageCapable = !!node && (node.tools || []).includes("filesystem.read_image@1");
-  // The server catalog decides whether read_image is actually exposed, but a
-  // node-level image capability already means this round must ask again.
-  const needsConsent = state.prefs.tools && workspaceReady && (!state.prefs.resultFeedback || imageCapable);
+  const imageCapable = state.nodes.some((node) => (node.tools || []).includes("filesystem.read_image@1"));
+  const needsConsent = state.prefs.tools && (!state.prefs.resultFeedback || imageCapable);
   $("chat-send").textContent = needsConsent ? "查看并发送" : "发送";
   $("chat-text").disabled = !state.ready;
 }
@@ -1123,177 +1113,39 @@ export function renderSettings() {
   if (!body) return;
   body.replaceChildren();
 
-  const native = window.__NEXUS_NATIVE__ || null;
   const connection = el("section", "settings-section");
   connection.append(el("h2", "", "连接与账户"));
   const core = el("div", "settings-row");
   const coreText = el("div", "grow");
-  coreText.append(el("strong", "", "Core"));
-  const coreLabel = native ? (localStorage.getItem("nexus.coreUrl") || "未设置") : location.origin;
-  coreText.append(el("small", "", `${coreLabel} · 会话有效至 ${state.session?.expires_at ? new Date(state.session.expires_at).toLocaleString() : "未知"}`));
+  coreText.append(el("strong", "", "已连接"));
+  coreText.append(el("small", "", `${window.__NEXUS_NATIVE__ ? localStorage.getItem("nexus.coreUrl") || "已配置服务" : location.origin} · 登录有效至 ${state.session?.expires_at ? new Date(state.session.expires_at).toLocaleString() : "未知"}`));
   core.append(coreText);
   connection.append(core);
   const actions = el("div", "settings-row");
   actions.append(button("退出登录", "quiet", () => ui.logout()));
-  if (!native) actions.append(button("打开原控制台", "quiet", () => { location.href = "/"; }));
+
   connection.append(actions);
   body.append(connection);
 
   const permissionSection = el("section", "settings-section");
-  permissionSection.append(el("h2", "", "权限与原生插件"));
-  permissionSection.append(el("p", "", "全局 normal/full、会话覆盖、插件固定版本、自写插件、目标与提醒都使用 Core 的真实接口。"));
-  permissionSection.append(el("p", "hint", "完全模式只表示当前设备用户权限下免执行确认，不是安全沙箱；模型回复不能修改权限开关。"));
+  permissionSection.append(el("h2", "", "权限与扩展"));
+  permissionSection.append(el("p", "", "管理助手可以执行的操作、扩展功能和提醒。"));
+  permissionSection.append(el("p", "hint", "普通模式会在需要时询问；完全模式按你授权的范围执行。"));
   const permissionActions = el("div", "settings-row");
-  permissionActions.append(button("打开权限与插件页", "primary", () => ui.openPlugins("permissions")));
+  permissionActions.append(button("管理权限与扩展", "primary", () => ui.openPlugins("permissions")));
+
   if (state.conversation) permissionActions.append(button("本会话权限", "quiet", () => ui.openConversationPermission()));
   permissionSection.append(permissionActions);
   body.append(permissionSection);
 
   const devices = el("section", "settings-section");
-  devices.append(el("h2", "", "设备"));
-  if (!state.nodes.length) devices.append(el("p", "", "Core 尚未配置 Node。"));
-  for (const node of state.nodes) {
-    const row = el("div", "settings-row");
-    const text = el("div", "grow");
-    text.append(el("strong", "", nodeName(node.node_id)));
-    text.append(el("small", "", `${node.online ? "在线" : "离线"} · ${node.online ? `${node.tools?.length || 0} 项工具` : "工具状态需连接后确认"}${node.roots?.length ? " · " + node.roots.join(", ") : ""}`));
-    row.append(text);
-    const choose = button(node.node_id === state.prefs.nodeId ? "当前目标" : "设为目标", "quiet", () => {
-      setPref("nodeId", node.node_id);
-      renderDock();
-      renderChat(true);
-      renderSettings();
-    });
-    choose.disabled = node.node_id === state.prefs.nodeId;
-    row.append(choose);
-    devices.append(row);
-  }
+  devices.id = "settings-devices";
   body.append(devices);
+  renderDevices();
 
-  if (native) {
-    const nodeSection = el("section", "settings-section");
-    nodeSection.append(el("h2", "", "本机 Node"));
-    nodeSection.append(el("p", "hint", "Node 作为独立进程随 App 运行；保存配置后，App 启动会自动启动 Node，无需手动。权限、任务与结果仍由 Core 决定。令牌保存在 Windows 凭据管理器。"));
-    nodeSection.append(el("p", "hint", "随包 Node 包含固定 Pillow 13.0.0 图片解码器。图片工具仍须在 Core 与 Node 配置中允许 filesystem.read_image@1、由 owner/Node 授权，并由管理员开启模型图片；未安装、未配置或未授权时，图片读取能力不会出现在服务器返回的目录中。"));
-    const stored = (() => {
-      try { return JSON.parse(localStorage.getItem("nexus.nodeConfig") || "{}"); } catch { return {}; }
-    })();
-    const field = (label, input) => {
-      const wrap = el("div", "field");
-      const text = el("label", "", label);
-      text.htmlFor = input.id;
-      wrap.append(text, input);
-      return wrap;
-    };
-    const ws = el("input");
-    ws.id = "node-ws";
-    ws.placeholder = "wss://core.example.com/ws/v1/node";
-    ws.value = stored.core_ws_url || "";
-    ws.autocomplete = "off";
-    const nodeId = el("input");
-    nodeId.id = "node-id";
-    nodeId.placeholder = "Core 中登记的 Node UUID";
-    nodeId.value = stored.node_id || "";
-    nodeId.autocomplete = "off";
-    const token = el("input");
-    token.id = "node-token";
-    token.type = "password";
-    token.placeholder = "Node 令牌（保存在 Windows 凭据管理器）";
-    token.autocomplete = "off";
-    const root = el("input");
-    root.id = "node-root";
-    root.placeholder = "C:\\Users\\<you>\\NEXUS\\workspace";
-    root.value = stored.workspace_root || "";
-    root.autocomplete = "off";
-    const allowPluginsLabel = el("label", "switch");
-    const allowPlugins = document.createElement("input");
-    allowPlugins.type = "checkbox";
-    allowPlugins.id = "node-allow-plugins";
-    allowPlugins.checked = false;
-    allowPluginsLabel.append(allowPlugins, document.createTextNode("允许本机宿主插件执行（plugin.call@1；只修改本地 Node 配置，不自动获得 Core 信任）"));
-    nodeSection.append(field("Core WebSocket 地址", ws));
-    nodeSection.append(field("Node ID", nodeId));
-    nodeSection.append(field("Node 令牌", token));
-    nodeSection.append(field("Workspace 根目录", root));
-    nodeSection.append(allowPluginsLabel);
-    const status = el("p", "hint", "状态：未检查");
-    const policy = el("p", "hint", "");
-    nodeSection.append(status, policy);
-    const showStatus = (value) => {
-      if (!value) { status.textContent = "状态：未知"; policy.textContent = ""; return; }
-      status.textContent = value.running
-        ? `状态：运行中${value.pid ? ` · PID ${value.pid}` : ""}`
-        : `状态：未启动${value.error ? ` · ${value.error}` : ""}`;
-      if (value.config_error) {
-        policy.textContent = `本地配置：${value.config_error}`;
-        return;
-      }
-      const tools = Array.isArray(value.allowed_tools) ? value.allowed_tools : [];
-      policy.textContent = `本地插件策略：${value.plugins_enabled ? "已启用" : "未启用"} · plugin.call@1 ${value.plugin_call_allowed ? "已列入" : "未列入"} · ${tools.length} 项静态工具。${value.plugin_policy_configured ? "本机配置具备宿主插件执行条件；仍需 owner 在 Core 同步信任新的 plugin_digest 与静态能力。" : "本机 Node 未接管插件执行，不能显示成新插件执行端。"}`;
-      if (value.plugin_call_allowed) allowPlugins.checked = true;
-    };
-    const refresh = () => runAction(async () => {
-      showStatus(await native.nodeStatus());
-    });
-    const start = button("启动本机 Node", "quiet", () => runAction(async () => {
-      const config = {
-        core_ws_url: ws.value.trim(),
-        node_id: nodeId.value.trim(),
-        node_token: token.value,
-        workspace_root: root.value.trim(),
-        allow_plugin_call: allowPlugins.checked,
-      };
-      if (!config.node_token) throw new Error("请输入 Node 令牌");
-      if (state.nodes.some((node) => node.node_id === config.node_id && node.online)) {
-        throw new Error("同一 Node 身份已在线（可能是独立启动器）；App 不会重复启动。请先确认旧执行端已停止");
-      }
-      localStorage.setItem("nexus.nodeConfig", JSON.stringify({
-        core_ws_url: config.core_ws_url, node_id: config.node_id, workspace_root: config.workspace_root,
-      }));
-      await native.rememberNode({
-        core_ws_url: config.core_ws_url,
-        node_id: config.node_id,
-        token: config.node_token,
-        workspace_root: config.workspace_root,
-        allow_plugin_call: config.allow_plugin_call,
-      }).catch(() => {});
-      const value = await native.nodeStart(config);
-      showStatus(value);
-      notify(value.running ? "本机 Node 已启动" : "本机 Node 未能启动", !value.running);
-      if (value.running) {
-        for (let attempt = 0; attempt < 4; attempt += 1) {
-          await new Promise((resolve) => setTimeout(resolve, 800));
-          try {
-            await loadNodes();
-          } catch {
-            /* Core status will refresh on the next poll. */
-          }
-          if (state.nodes.some((node) => node.online)) break;
-        }
-        ui.updateConnection();
-        renderSettings();
-      }
-    }, start));
-    const stop = button("停止", "quiet", () => runAction(async () => {
-      showStatus(await native.nodeStop());
-      notify("本机 Node 已停止");
-    }, stop));
-    const buttons = el("div", "settings-row");
-    buttons.append(start, stop, button("刷新状态", "quiet", refresh));
-    nodeSection.append(buttons);
-    body.append(nodeSection);
-    refresh();
-    native.loadNode().then((saved) => {
-      if (!saved || !nodeSection.isConnected) return;
-      ws.value = saved.core_ws_url || ws.value;
-      nodeId.value = saved.node_id || nodeId.value;
-      token.value = saved.token || "";
-      root.value = saved.workspace_root || root.value;
-    }).catch(() => {});
-  }
 
-  const projects = el("section", "settings-section");
-  projects.append(el("h2", "", "项目"));
+  const projects = el("details", "settings-section settings-disclosure");
+  projects.append(el("summary", "", "项目"));
   for (const project of state.projects) {
     const row = el("div", "settings-row");
     const text = el("div", "grow");
@@ -1335,51 +1187,22 @@ export function renderSettings() {
   projects.append(form);
   body.append(projects);
 
-  const imageNode = state.nodes.find((node) => (node.tools || []).includes("filesystem.read_image@1"));
-  const imageSection = el("section", "settings-section");
-  imageSection.append(el("h2", "", "图片读取"));
-  if (imageNode) {
-    imageSection.append(el("p", "", `服务器返回了 ${nodeName(imageNode.node_id)} 的图片工具能力。只有在工作工具开启、本轮同意结果外发，并且 Core 开启模型图片时才会使用。`));
-    imageSection.append(el("p", "hint", "快照最多 1024px / 8 KiB，可能继续缩小或使用有损 JPEG；GIF/WebP 只取首帧，透明区域显示白底。每轮都会重新确认图片快照外发，历史选择不代替本轮同意。"));
-    imageSection.append(el("p", "hint", "这一项是设备在工作区内读取图片；它与下方“会话附件”的上传是两条独立路径，互不自动授权。"));
-  } else {
-    imageSection.append(el("p", "", "服务器当前未返回可用的工作区图片读取能力。"));
-    imageSection.append(el("p", "hint", "可能未在 Core/Node 配置 filesystem.read_image@1、Node 未安装固定 Pillow 13.0.0，或模型图片开关未开启。这不影响从聊天输入框上传会话附件。"));
-  }
-  body.append(imageSection);
-
-  const attachments = el("section", "settings-section");
-  attachments.append(el("h2", "", "会话附件"));
-  if (attachmentState.supported === false) {
-    attachments.append(el("p", "", attachmentState.notice || "当前 Core 不支持会话附件接口。"));
-    attachments.append(el("p", "hint", "旧 Core 没有附件上传、预览和 model-preview 接口；页面不会上传文件，也不会把附件字段混入普通消息。"));
-  } else {
-    const caps = attachmentState.capabilities || {};
-    attachments.append(el("p", "", "在聊天输入框用“添加附件”、拖入文件或粘贴图片。原件保存在 Core，不写入 Node 工作区，不执行、解压或导入。"));
-    attachments.append(el("p", "hint", `单个最多 ${caps.max_file_bytes ? `${(caps.max_file_bytes / (1024 * 1024)).toFixed(0)} MiB` : "服务器上限"} · 本轮最多 ${caps.max_files_per_turn || 4} 个 · 合计容量、数量与速率由服务器检查。`));
-    attachments.append(el("p", "hint", "上传不等于发给模型。发送前会调用 model-preview 展示实际 text/image/metadata 范围、截断与图片开关，并单独征求本次同意。"));
-    attachments.append(el("p", "hint", "Windows 下 Cookie 只保存在 Rust 桥，附件上传和原件下载通过带长度的 Base64 传输，不经过 WebView 的 fetch，也不写入任意目录。"));
-    attachments.append(el("p", "hint", "图片输入默认受服务器配置控制；未启用时只发送文件信息。PDF、Word、压缩包、程序和音视频显示“已上传，尚未解析”，不能声称模型读过正文。"));
-    attachments.append(el("p", "hint", "刷新后历史附件按轮次清单恢复，不会重新上传或发消息；需要下一轮阅读时重新选择并确认。"));
-  }
-  body.append(attachments);
-
-  const usage = el("section", "settings-section");
-  usage.append(el("h2", "", "模型与网页"));
+  const usage = el("details", "settings-section settings-disclosure");
+  usage.append(el("summary", "", "用量与费用"));
   const value = state.usage;
   if (!value) usage.append(el("p", "", "正在读取用量…"));
   else {
-    usage.append(el("p", "", `${value.enabled ? "已启用" : "未启用"} · ${value.calls} 次 API 调用（含网页）`));
+    usage.append(el("p", "", `${value.enabled ? "已启用" : "未启用"} · ${value.calls} 次调用（含网页）`));
     usage.append(el("p", "", value.cost_microunits === null
       ? "费用未知；未知费用保留预留额度。"
-      : `${money(value.cost_microunits)} · 公开峰值单价上界`));
+      : `${money(value.cost_microunits)} · 估算费用上界`));
     if (value.unknown_cost_calls) usage.append(el("p", "", `${value.unknown_cost_calls} 次调用费用未知`));
   }
   body.append(usage);
 
-  const privacy = el("section", "settings-section");
-  privacy.append(el("h2", "", "本地数据"));
-  privacy.append(el("p", "", "App 不保存模型密钥、Node 令牌或 owner 入学凭证；这里只保留显示偏好与最后会话。"));
+  const privacy = el("details", "settings-section settings-disclosure");
+  privacy.append(el("summary", "", "隐私与高级设置"));
+  privacy.append(el("p", "", "聊天发送前会说明实际分享范围。清除显示偏好不会删除聊天记录，也不会撤销已发送的内容。"));
   privacy.append(button("清除本地显示偏好", "quiet", () => {
     clearPrefs();
     renderDock();
@@ -1387,12 +1210,13 @@ export function renderSettings() {
     renderSettings();
     notify("已清除本地显示偏好");
   }));
+  if (!window.__NEXUS_NATIVE__) privacy.append(button("打开管理控制台", "quiet", () => { location.href = "/"; }));
   body.append(privacy);
 
   const about = el("section", "settings-section");
   about.append(el("h2", "", "关于"));
-  about.append(el("p", "", "NEXUS 对话界面 · 可视化占位版本"));
-  about.append(el("p", "", "过程视图、能力与记忆管理将在后续页面接入。"));
+  about.append(el("p", "", "NEXUS · 一个助手，连接你的设备"));
+
   body.append(about);
 }
 
@@ -1415,4 +1239,19 @@ export function closeSheet() {
   $("sheet").hidden = true;
   $("sheet-body").replaceChildren();
   $("sheet-actions").replaceChildren();
+}
+
+export function renderDevices() {
+  const box = $("settings-devices");
+  if (!box) return;
+  box.replaceChildren(el("h2", "", "我的设备"));
+  if (!state.nodes.length) box.append(el("p", "", "还没有连接的设备。"));
+  for (const node of state.nodes) {
+    const row = el("div", "settings-row");
+    const text = el("div", "grow");
+    text.append(el("strong", "", nodeName(node.node_id)));
+    text.append(el("small", "", state.nodesFresh ? (node.online ? "在线" : "离线") : "状态同步中"));
+    row.append(text, button("改名", "quiet", () => ui.renameDevice(node)));
+    box.append(row);
+  }
 }

@@ -1,0 +1,70 @@
+"use strict";
+const {chromium}=require(process.env.NEXUS_PLAYWRIGHT || '../var/attachment-browser/node_modules/playwright-core');
+const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');
+const repo=path.resolve(__dirname,'..'),release=process.env.NEXUS_UI_RELEASE && path.resolve(process.env.NEXUS_UI_RELEASE);
+const output=release || path.join(repo,'var/ui-refresh-release');
+const conversation={conversation_id:'10000000-0000-4000-8000-000000000001',revision:1,title:'一起完成今天的工作',archived:false};
+const nodes=[{node_id:'20000000-0000-4000-8000-000000000001',label:'书房电脑',online:true,tools:['system.info@1'],roots:['workspace']},
+ {node_id:'20000000-0000-4000-8000-000000000002',label:'随身手机',online:false,tools:['android.device_status@1'],roots:[]}];
+const turn={turn_id:'30000000-0000-4000-8000-000000000001',revision:1,text:'帮我整理资料，并把结果给我。',status:'completed',work_status:'',response_text:'## 已整理好\n\n这里是你的工作结果。\n\n- 重点清楚，过程可以展开\n- 文件直接预览或打开',work_steps:[],presentation:{version:1,label:'已完成',phase:'completed',final_text:'## 已整理好\n\n这里是你的工作结果。\n\n- 重点清楚，过程可以展开\n- 文件直接预览或打开',live_text:'',process:[],files:[],can_collapse:true}};
+let surface='web',writes=[];
+const server=http.createServer(async(req,res)=>{
+ const url=new URL(req.url,'http://localhost');let body='';for await(const part of req)body+=part;
+ if(req.method!=='GET')writes.push({url:url.pathname,body});
+ if(url.pathname.startsWith('/api/')) {
+  let data={requests:[],versions:[],runs:[],nodes:[],enabled:false};
+  if(url.pathname==='/api/v1/session')data={csrf_token:'fixture-only',expires_at:'2099-01-01T00:00:00Z'};
+  else if(url.pathname==='/api/v1/nodes')data={nodes};
+  else if(url.pathname==='/api/v1/chat/work-catalog')data={work_digest:'a'.repeat(64),nodes,catalog:[{name:'device1__get_system_info',route_intent:'get_system_info'}]};
+  else if(url.pathname==='/api/v1/chat/conversations')data={conversations:[conversation]};
+  else if(url.pathname.endsWith('/turns'))data={conversation,turns:[turn],active_turn_id:null};
+  else if(url.pathname==='/api/v1/client/snapshot')data={tasks:[],control:{paused:false,revision:1}};
+  else if(url.pathname.includes('/permission'))data={effective_mode:'normal',source:'global',revision:1};
+  else if(url.pathname==='/api/v1/records/projects')data={projects:[]};
+  else if(url.pathname==='/api/v1/control')data={paused:false,revision:1};
+  else if(url.pathname==='/api/v1/models/usage')data={calls:0,enabled:true,chat_enabled:true,cost_microunits:0};
+  else if(url.pathname==='/api/v1/extensions')data={extension:{enabled:false}};
+  else if(url.pathname.includes('/attachments')){res.statusCode=404;data={detail:'NOT_FOUND'};}
+  res.setHeader('Content-Type','application/json');return res.end(JSON.stringify(data));
+ }
+ const base=release?path.join(release,surface==='web'?'site/nexus/web':'windows-src/ui'):path.join(repo,surface==='web'?'src/nexus/web':'apps/windows/ui');
+ const relative=url.pathname==='/app'?'app/app.html':url.pathname==='/app.html'?'app.html':url.pathname.replace(/^\/static\//,'').replace(/^\//,'');
+ const file=path.resolve(base,relative);
+ if(!file.startsWith(base+path.sep)||!fs.existsSync(file)){res.statusCode=404;return res.end();}
+ res.setHeader('Content-Type',/\.m?js$/.test(file)?'text/javascript':file.endsWith('.css')?'text/css':file.endsWith('.svg')?'image/svg+xml':'text/html');res.end(fs.readFileSync(file));
+});
+(async()=>{
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin=`http://127.0.0.1:${server.address().port}`;
+ const browser=await chromium.launch({headless:true,channel:'msedge'}),evidence=[];
+ try {
+  for(surface of ['web','windows']) {
+   for(const width of [1280,1920,600,390]) {
+    const page=await browser.newPage({viewport:{width,height:860}}),errors=[];
+    page.on('pageerror',e=>errors.push(e.message));
+    await page.goto(origin+(surface==='web'?'/app':'/app.html'));
+    await page.waitForFunction(()=>document.querySelector('#connection')?.textContent.includes('1 台设备在线'));
+    await page.locator('#visual-canvas canvas').waitFor();
+    assert.equal(await page.locator('#dock-chips .chip').count(),1);
+    assert.equal(await page.locator('#dock-wake').count(),0);
+    await page.screenshot({path:path.join(output,`${surface}-${width}-home.png`)});
+    await page.click('#settings-button');await page.locator('#settings-devices').getByText('书房电脑').waitFor();
+    const settings=await page.locator('#settings-body').innerText();
+    assert(!settings.includes('文件传输'));assert(!settings.includes('Pillow'));assert(!settings.includes('normal/full'));assert(!settings.includes('占位'));
+    assert.equal(await page.locator('.settings-disclosure[open]').count(),0);
+    await page.screenshot({path:path.join(output,`${surface}-${width}-settings.png`)});
+    await page.click('#settings-close');await page.click('#dock-expand');
+    await page.getByRole('heading',{name:'已整理好'}).waitFor();await page.locator('#chat-text').fill('保留这份草稿');
+    await page.locator('#chat-scope').click();await page.locator('#sheet').waitFor({state:'visible'});
+    assert((await page.locator('#sheet-body').innerText()).includes('上下文') || (await page.locator('#sheet-body').innerText()).includes('对话'));
+    await page.click('#sheet-close');assert.equal(await page.locator('#chat-text').inputValue(),'保留这份草稿');
+    const bounds=await page.locator('#chat-send').boundingBox();assert(bounds.x>=0 && bounds.x+bounds.width<=width+1 && bounds.y+bounds.height<=860);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    await page.screenshot({path:path.join(output,`${surface}-${width}-chat.png`)});
+    await page.getByRole('button',{name:'对话选项',exact:true}).click();await page.locator('#sheet-close').focus();await page.keyboard.press('Enter');
+    assert.deepEqual(errors,[]);evidence.push({surface,width,webgl:true,compact_controls:true,settings_disclosures:true,composer_visible:true,keyboard:true});await page.close();
+   }
+  }
+  assert.equal(writes.length,0,'Viewing and layout changes must not send user actions');
+  fs.writeFileSync(path.join(output,'ui-browser-evidence.json'),JSON.stringify(evidence,null,2));console.log(JSON.stringify({passed:true,cases:evidence.length}));
+ } finally {await browser.close();server.closeAllConnections();server.close();}
+})().catch(e=>{console.error(e);server.closeAllConnections();server.close();process.exitCode=1;});

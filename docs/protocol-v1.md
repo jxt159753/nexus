@@ -6,6 +6,10 @@
 
 ## 信封和入口
 
+Android 扩展（P80）继续使用本协议，新增 `android.device_status@1` / `android.notification_digest@1` 及资源 `android:device` / `android:notifications`。`NodeHello.tools` 上限 20、roots 上限 3，拒绝重复值。参数和结果以 [Android 契约](../src/nexus/contracts/android.py) 为准；具体资源授权不能由 workspace 推导。设备状态自动只读预授权，通知内容仍需任务审批。手机端对照 Python 固定向量验证命令摘要，断线只回传已保存状态，重启 unknown 不重做。
+
+语音使用独立的 Voice 控制/媒体通道，不混入此执行信封；Android 与 Windows 共用 [Voice 契约](../src/nexus/contracts/voice.py) 和 NXV2 PCM generation/end 帧，详见 [ADR 0040](decisions/0040-android-app-node.md)。
+
 所有消息包含以下字段；信封、payload 和嵌套对象都拒绝未知字段。
 
 | 字段 | 约束 |

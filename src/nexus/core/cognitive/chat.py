@@ -89,6 +89,8 @@ class ChatService:
         self.plugins = PluginService(self)
 
     async def snapshot(self, conn, row: sqlite3.Row, *, detail: bool = False) -> dict:
+        from nexus.core.storage.archive import hydrate
+        row = await hydrate(conn, 'chat_turns', row)
         value = public_turn(row, detail=detail)
         value["work_steps"] = await self.work.steps(conn, value["turn_id"])
         value["presentation"] = await chat_presentation.presentation(conn, value)
@@ -110,7 +112,7 @@ class ChatService:
                     raise Conflict("IDEMPOTENCY_CONFLICT")
                 return dict(old)
             await project_owned(conn, value.project_id, principal.identity_id)
-            if (await one(conn, "SELECT count(*) FROM conversations"))[0] >= 100:
+            if (await one(conn, "SELECT count(*) FROM conversations WHERE cold_archived=0"))[0] >= 100:
                 raise Conflict("BUSY")
             identifier, now = str(uuid4()), utc_now()
             await conn.execute("INSERT INTO conversations(conversation_id,owner_id,request_id,title,created_at,auto_title) VALUES(?,?,?,'新会话',?,1)", (identifier, str(principal.identity_id), str(value.request_id), timestamp(now)))
@@ -138,6 +140,9 @@ class ChatService:
     async def update(self, principal: Principal, conversation_id: UUID | str, value: ConversationUpdate) -> dict:
         async with self.database.transaction() as conn:
             row = await self.conversation(conn, principal, conversation_id)
+            if value.archived is False and row['cold_archived']:
+                from nexus.core.storage.archive import restore
+                await restore(conn, row)
             await conn.execute("UPDATE conversations SET title=?,archived=?,revision=revision+1 WHERE conversation_id=?", (
                 value.title.strip() if value.title is not None else row["title"], int(value.archived) if value.archived is not None else row["archived"], str(conversation_id)))
             if value.title is not None:
@@ -221,7 +226,7 @@ class ChatService:
                 raise AccessDenied("BUDGET_EXCEEDED")
             if self.failed or self.harness.failed:
                 raise AccessDenied("BUSY")
-            if value.allow_tools:
+            if value.allow_tools and not value.all_nodes:
                 self.harness.scope(value.node_id)
                 if not await one(conn,"SELECT 1 FROM identities WHERE identity_id=? AND role='node' AND revoked_at IS NULL",(str(value.node_id),)):
                     raise AccessDenied("POLICY_DENIED")
@@ -243,7 +248,8 @@ class ChatService:
             recent = await one(conn, "SELECT count(*) FROM chat_turns WHERE owner_id=? AND created_at>?", (str(principal.identity_id), timestamp(now-timedelta(minutes=1))))
             total = await one(conn, "SELECT count(*),coalesce(sum(length(CAST(context_json AS BLOB))+length(CAST(response_text AS BLOB))+length(CAST(request_json AS BLOB))+coalesce(length(CAST(result_preview_json AS BLOB)),0)+coalesce(length(CAST(initial_response_text AS BLOB)),0)+coalesce(length(CAST(auto_result_json AS BLOB)),0)+length(CAST(skill_catalog_json AS BLOB))+coalesce(length(CAST(skill_plan_json AS BLOB)),0)),0) FROM chat_turns")
             count = (await one(conn, "SELECT count(*) FROM chat_turns WHERE conversation_id=?", (str(conversation_id),)))[0]
-            if recent[0] >= 10 or total[0] >= 10000 or total[1] + 2*CHAT_MAX_TEXT_BYTES >= 268000000 or count >= 200:
+            hot_count=(await one(conn,'SELECT count(*) FROM chat_turns t JOIN conversations c USING(conversation_id) WHERE c.cold_archived=0'))[0]
+            if recent[0] >= 10 or hot_count >= 10000 or total[1] + 2*CHAT_MAX_TEXT_BYTES >= 268000000 or count >= 200:
                 raise Conflict("BUSY")
             messages = [{"role": "user", "content": value.text}]
             attachments = None
@@ -280,7 +286,7 @@ class ChatService:
             if auto_revision and not value.compact_only:
                 options["auto_memory"] = True
             if work_grant_id:
-                options.update(work_catalog=work_catalog, work_limit=4)
+                options.update(work_catalog=work_catalog, work_limit=self.config.work_actions_remaining())
             elif skills:
                 options["skill_catalog"] = skills
             if value.include_context and not value.allow_compaction:
@@ -502,8 +508,7 @@ class ChatService:
             if cursor.rowcount != 1:
                 raise asyncio.CancelledError()
 
-    @staticmethod
-    def model_options(row, work_limit):
+    def model_options(self, row, work_limit):
         row = dict(row)
         request = json.loads(row["request_json"])
         summary = row["phase"] == "summary"
@@ -516,7 +521,7 @@ class ChatService:
         if summary:
             options["final_result"] = True
         if row["work_grant_id"]:
-            allow_tools = not summary and row["work_round"] < 4 and work_limit > 0
+            allow_tools = not summary and (not self.config.call_limits_enabled or row["work_round"] < self.config.chat_work_max_actions) and work_limit > 0
             options.update({"generate_title": not summary and row["work_round"] == 0 and bool(row.get("generate_title",False)),
                             "allow_tools": allow_tools, "work_catalog": json.loads(row["work_catalog_json"]) if allow_tools else [], "work_limit": work_limit})
         return options
@@ -561,7 +566,7 @@ class ChatService:
                     error = exc.code
                 if summary:
                     calls = await conn.execute_fetchall("SELECT * FROM model_calls WHERE chat_turn_id=?", (row["turn_id"],))
-                    if len(calls) != 1 or calls[0]["cost_status"] != "calculated" or calls[0]["outcome"] != "completed":
+                    if len(calls) != 1 or (self.config.cost_limits_enabled and calls[0]["cost_status"] != "calculated") or calls[0]["outcome"] != "completed":
                         error = "BUDGET_EXCEEDED"
                     else:
                         if self.config.cost_limits_enabled:
@@ -575,7 +580,7 @@ class ChatService:
                         error = exc.code if isinstance(exc, AccessDenied) else "IDEMPOTENCY_CONFLICT" if isinstance(exc, Conflict) else "RESULT_UNAVAILABLE"
                     if (await one(conn, "SELECT archived FROM conversations WHERE conversation_id=?", (row["conversation_id"],)))[0]:
                         error = "APPROVAL_EXPIRED"
-                work_limit=4-(await one(conn,"SELECT count(*) FROM chat_work_steps WHERE turn_id=?",(row["turn_id"],)))[0] if row["work_grant_id"] else 0
+                work_limit=self.config.work_actions_remaining((await one(conn,"SELECT count(*) FROM chat_work_steps WHERE turn_id=?",(row["turn_id"],)))[0]) if row["work_grant_id"] else 0
                 options = self.model_options(row,work_limit)
                 options["output_budget_microunits"] = reservation
                 if self.config.chat_output_limit(reservation) < 32:

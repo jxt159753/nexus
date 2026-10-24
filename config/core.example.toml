@@ -10,22 +10,24 @@ origins = ['http://127.0.0.1:8000', 'https://tauri.localhost']
 
 # Optional M2. Keep disabled until DEEPSEEK_API_KEY is safely set on Core.
 [models]
-cost_limits_enabled = true # owner can explicitly disable USD caps; usage audit and call/time limits remain
+cost_limits_enabled = false # no per-task/daily amount quota; usage and unknown billing remain audited
+call_limits_enabled = false # no daily, work-turn, grant-operation, goal-round or voice-call quota
 chat_enabled = false # M3: explicitly enable after configuring Core's existing DeepSeek key
-chat_max_output_tokens = 256000 # DSH provider ceiling; actual request also fits its remaining USD budget
+chat_max_output_tokens = 256000 # provider/request ceiling; amount fitting applies only when cost_limits_enabled=true
 chat_images_enabled = false # Enable only after the UI discloses image result transmission
-chat_input_bytes = 32768 # complete serialized request
+chat_input_bytes = 32768 # complete serialized request; owner may configure up to 65536
+chat_work_max_actions = 4 # used only when call_limits_enabled=true; transport batches remain bounded
 chat_context_window_tokens = 1000000
 chat_input_tokens = 32768
 chat_compaction_threshold_percent = 80
 chat_compaction_retain_percent = 16
 chat_compaction_headroom_tokens = 512
-web_enabled = false # DeepSeek Search/Fetch; reuse Core key and the shared daily/request budget
+web_enabled = false # DeepSeek Search/Fetch; reuse Core key and shared usage audit
 web_request_cost_microunits = 750 # USD 0.00075 per billable request; review with price_valid_until
 enabled = false
-daily_cost_microunits = 1000000 # USD 1/day, UTC; outstanding unknowns remain charged
-task_cost_microunits = 50000   # USD 0.05/request; reserved before sending
-daily_calls = 100
+daily_cost_microunits = 1000000 # legacy quota, applied only when cost_limits_enabled=true
+task_cost_microunits = 50000   # legacy quota, applied only when cost_limits_enabled=true
+daily_calls = 100 # legacy quota, applied only when call_limits_enabled=true
 max_output_tokens = 512
 timeout_seconds = 30
 # Peak cache-miss USD microunits per 1M tokens, reviewed 2026-10-18.

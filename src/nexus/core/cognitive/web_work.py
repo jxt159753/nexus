@@ -68,7 +68,7 @@ class WebWork:
             from nexus.core.cognitive.chat_compaction import root_calls
             calls = await root_calls(conn,step["turn_id"])
             charge = chat.config.web_request_cost_microunits
-            spent = accounted_cost(calls)
+            spent = accounted_cost(calls, require_known=chat.config.cost_limits_enabled)
             if chat.config.cost_limits_enabled and spent+charge>chat.config.task_cost_microunits:
                 raise AccessDenied("BUDGET_EXCEEDED")
             if chat.plugins.config.enabled:

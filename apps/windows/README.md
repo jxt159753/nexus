@@ -1,6 +1,12 @@
 # NEXUS Windows App（B 方案首版）
 
+文件发送及接收见[向设备发送文件](../../docs/file-transfers.md)。直接在聊天中描述发送需求，文件卡片提供预览和下载；独立传输面板与卡片转发按钮已移除。本机启动配置保留独立接收开关，文件保存到原 workspace 下的 NEXUS-Inbox。
+
+对话保留常用操作，权限入口明确可见；设置中的项目、用量和高级选项按需展开，普通回复省去重复状态标签。配合 Core 的聊天 `send_file`，可将电脑工作区原件发送到手机；使用已有 `builtin.present` 导出。当前版本及待验收项见 [P86](../../docs/ROADMAP.md#p86-ui-refresh)。下文旧版本验证保留为对应交付时点。
+
 Tauri 2 + WebView2 的 Windows 外壳，主窗口与启动动画统一为 1280×720，复用现有 `/app` 页面，并把现有 `nexus.node` 构建成随包分发的 `nexus-node.exe`。Core 仍是任务、权限、记忆和费用的唯一权威；Node 是独立进程，App 只负责其启动、停止和本地配置。
+
+0.1.5 修复可视化：脉冲完整抵达设备，工具结束后保留余辉再淡出，相机围绕实际焦点旋转。保留 0.1.4 的统一自动选设备与在线状态同步。覆盖安装前从托盘退出旧版，已有登录、Node 配置和回执保留。语音与 Node 二进制沿用 0.1.3 固定版本。当前交付和测试证据见 [P82](../../docs/ROADMAP.md#p82-visualization)。
 
 ## 目录
 
@@ -55,7 +61,7 @@ npm run tauri build -- --bundles nsis
 产物：
 
 ```text
-apps/windows/src-tauri/target/release/bundle/nsis/NEXUS_0.1.3_x64-setup.exe
+apps/windows/src-tauri/target/release/bundle/nsis/NEXUS_0.1.5_x64-setup.exe
 ```
 
 ### 语音更新（0.1.1起）

@@ -46,6 +46,7 @@ class NodeLink:
         self.router = APIRouter()
         self.router.add_api_websocket_route("/ws/v1/node", self.endpoint)
         self.router.add_api_route("/api/v1/nodes", self.list_nodes, methods=["GET"])
+        self.router.add_api_route("/api/v1/nodes/{node_id}/name", self.rename_node, methods=["PATCH"])
 
     async def _audit(self, connection: NodeConnection, kind: str) -> None:
         async with self.guards.service.database.transaction() as conn:
@@ -132,10 +133,14 @@ class NodeLink:
 
     async def list_nodes(self, request: Request) -> dict:
         await self.guards.owner_http(request)
+        from nexus.core.cognitive.node_routing import names
+        async with self.guards.service.database.transaction(write=False) as conn:
+            labels = await names(conn, self.config)
         result = []
         for node_id in self.config.nodes:
             connection = self.connections.get(node_id)
             value = dict(node_id=str(node_id), online=False, tools=[], roots=[], command_digests={}, interaction_digests={}, session_id=None, boot_id=None)
+            value['label'] = labels[str(node_id)]
             if connection is not None:
                 try:
                     scope = await self._scope(connection)
@@ -144,10 +149,35 @@ class NodeLink:
                                  tools=sorted(scope.tools), roots=sorted(scope.roots),
                                  command_digests=scope.command_digests, interaction_digests=scope.interaction_digests,
                                  session_id=str(connection.session_id), boot_id=str(connection.hello.boot_id))
+                    value['plugins'] = self.plugin_observation(connection, scope)
                 except (AccessDenied, ProtocolError):
                     pass
             result.append(value)
         return {"nodes": result}
+
+    @staticmethod
+    def plugin_observation(connection, scope):
+        return {
+            'status': 'executor_not_enabled' if 'plugin.call@1' not in scope.tools & scope.local_tools else 'policy_digest_mismatch' if scope.plugin_digest is None else 'configured',
+            'configured_tools': connection.hello.plugin_tools,
+            'digest': scope.plugin_digest,
+        }
+
+    async def rename_node(self, node_id: UUID, request: Request):
+        from nexus.core.cognitive.node_routing import NodeName, names
+        from nexus.core.harness.http import body
+        from nexus.core.storage.tasks import Conflict
+        principal = await self.guards.owner_http(request)
+        if node_id not in self.config.nodes:
+            raise LookupError('node not found')
+        value = await body(request, NodeName)
+        async with self.guards.service.database.transaction() as conn:
+            labels = await names(conn, self.config)
+            if any(key != str(node_id) and label.casefold() == value.name.casefold() for key,label in labels.items()):
+                raise Conflict('DEVICE_NAME_IN_USE')
+            await conn.execute('INSERT INTO node_names(node_id,name) VALUES(?,?) ON CONFLICT(node_id) DO UPDATE SET name=excluded.name', (str(node_id),value.name))
+            await audit(conn,str(principal.identity_id),None,'node.renamed',utc_now())
+        return {'node_id':str(node_id),'label':value.name}
 
     async def node_status(self, node_id: UUID) -> dict:
         """Control-plane observation; offline nodes need no execution RPC."""
@@ -162,6 +192,7 @@ class NodeLink:
                 age = max(0,round(time.monotonic()-connection.last_heartbeat,1))
                 online = age < self.config.heartbeat_timeout_seconds
                 value.update(online=online,busy=bool(connection.active_attempt_id) if online else None,heartbeat_age_seconds=age,tools=sorted(scope.tools & scope.local_tools),roots=sorted(scope.roots & scope.local_roots))
+                value['plugins'] = self.plugin_observation(connection, scope)
             except (AccessDenied,ProtocolError):
                 pass
         return value

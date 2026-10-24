@@ -208,7 +208,7 @@ async function stopProcess(turn, step, target, control) {
     if (!version?.digest) throw new ApiError(403, "PLUGIN_VERSION_UNAVAILABLE");
     const conversationId = state.conversation?.conversation_id;
     if (!conversationId) throw new ApiError(400, "NO_CONVERSATION");
-    const nodeId = turn.node_id || state.prefs.nodeId;
+    const nodeId = step.node_id || turn.node_id;
     if (!nodeId) throw new ApiError(400, "NO_NODE");
     const request = {
       request_id: uuid(),

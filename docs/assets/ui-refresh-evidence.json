@@ -1,0 +1,180 @@
+{
+  "task": "P86",
+  "published_at": "2026-10-24T15:28:12+08:00",
+  "release": "/opt/nexus/releases/ui-refresh-20261024-2265712a",
+  "wheel_sha256": "2265712a7e5cf8f5fff35e600b947f7019aa158954b6abbb5ae484e6657bf7c8",
+  "backend_unchanged": true,
+  "changed_resources": [
+    "nexus/web/app/api.js",
+    "nexus/web/app/app.css",
+    "nexus/web/app/app.html",
+    "nexus/web/app/image.js",
+    "nexus/web/app/main.js",
+    "nexus/web/app/render.js",
+    "nexus/web/app/visualization.js",
+    "nexus/web/app/voice.js",
+    "nexus/web/app/chat-files.js",
+    "nexus/web/app/attachments.js",
+    "nexus/web/app/plugin-page.js",
+    "nexus/web/app/plugin-view.js",
+    "nexus/web/app/plugins.js",
+    "nexus/web/app/splash.html"
+  ],
+  "removed_resources": [
+    "nexus/web/app/file-transfer-upload.js",
+    "nexus/web/app/file-transfers.js"
+  ],
+  "runtime_resources_verified": 269,
+  "database_schema": 35,
+  "backup": "/var/backups/nexus/before-ui-refresh-20261024T072812Z",
+  "backup_sha256": "3d64fc1213e0ee29597bd1ebee73101cd41e555b2cf11a421c94e61e0b762b11",
+  "history_tables_preserved": 37,
+  "historical_records_preserved": true,
+  "activation_pid": 1178518,
+  "models_calls_before_and_after": 253,
+  "new_grants": 0,
+  "downloads": [
+    {
+      "filename": "NEXUS_0.1.10_x64-setup.exe",
+      "sha256": "40877adc9a85f09a3220152a5a5e0f189c6690275b4a8df8f8ca8144c6d62f32",
+      "bytes": 104082824,
+      "https_download_verified": true
+    },
+    {
+      "filename": "NEXUS-Android-0.1.5-debug.apk",
+      "sha256": "115d2f59b22333fa8db2fa8f23595018af041358663bfddae370006573c78b4c",
+      "bytes": 12327277,
+      "https_download_verified": true
+    }
+  ],
+  "https_resources_verified": 14,
+  "validation": {
+    "server_candidate": {
+      "passed": 95,
+      "skipped": 5
+    },
+    "source_browser_regression": {
+      "passed": 12
+    },
+    "source_frontend_regression": {
+      "passed": 10
+    },
+    "fixed_browser_cases": [
+      {
+        "surface": "web",
+        "width": 1280,
+        "webgl": true,
+        "compact_controls": true,
+        "settings_disclosures": true,
+        "composer_visible": true,
+        "keyboard": true
+      },
+      {
+        "surface": "web",
+        "width": 1920,
+        "webgl": true,
+        "compact_controls": true,
+        "settings_disclosures": true,
+        "composer_visible": true,
+        "keyboard": true
+      },
+      {
+        "surface": "web",
+        "width": 600,
+        "webgl": true,
+        "compact_controls": true,
+        "settings_disclosures": true,
+        "composer_visible": true,
+        "keyboard": true
+      },
+      {
+        "surface": "web",
+        "width": 390,
+        "webgl": true,
+        "compact_controls": true,
+        "settings_disclosures": true,
+        "composer_visible": true,
+        "keyboard": true
+      },
+      {
+        "surface": "windows",
+        "width": 1280,
+        "webgl": true,
+        "compact_controls": true,
+        "settings_disclosures": true,
+        "composer_visible": true,
+        "keyboard": true
+      },
+      {
+        "surface": "windows",
+        "width": 1920,
+        "webgl": true,
+        "compact_controls": true,
+        "settings_disclosures": true,
+        "composer_visible": true,
+        "keyboard": true
+      },
+      {
+        "surface": "windows",
+        "width": 600,
+        "webgl": true,
+        "compact_controls": true,
+        "settings_disclosures": true,
+        "composer_visible": true,
+        "keyboard": true
+      },
+      {
+        "surface": "windows",
+        "width": 390,
+        "webgl": true,
+        "compact_controls": true,
+        "settings_disclosures": true,
+        "composer_visible": true,
+        "keyboard": true
+      }
+    ],
+    "windows_webview2": [
+      {
+        "surface": "native",
+        "width": 1280,
+        "webgl": true,
+        "compact_controls": true,
+        "settings_disclosures": true,
+        "composer_visible": true,
+        "keyboard": true
+      }
+    ],
+    "android": {
+      "version": "0.1.5",
+      "version_code": 6,
+      "build": true,
+      "jvm_tests": true,
+      "lint": {
+        "Error": 0,
+        "Warning": 15,
+        "Hint": 1
+      },
+      "shared_scene_bytes_verified": true,
+      "emulator_cases": [
+        "phone 411dp",
+        "tablet portrait 800dp",
+        "tablet landscape 1280dp",
+        "split-width 600dp"
+      ],
+      "checks": [
+        "WebGL draws frames",
+        "hidden scene stops drawing",
+        "draft retained",
+        "keyboard composer visible",
+        "rotation draft retained"
+      ],
+      "markdown_and_real_core_file_cases": 2
+    }
+  },
+  "not_verified": [
+    "physical phone/tablet GPU and vendor keyboards",
+    "user installation upgrade",
+    "production rollback execution"
+  ],
+  "scope": "UI only; no DSH, user client installation, paid model calls or schema migration. Fixed web uses stable Windows browser fallback; unrelated workspace changes excluded."
+}

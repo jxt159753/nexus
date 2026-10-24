@@ -19,6 +19,7 @@ from nexus.contracts.extensions import (
     CAPABILITY_ID,
     RESULT_FIELDS,
     SKILL_PROFILE,
+    NATIVE_SKILL_PROFILE,
     TOOL_PROFILE,
     ExtensionGenerateConsent,
     ExtensionRequestCreate,
@@ -156,6 +157,11 @@ class ExtensionService:
 
     def outbound(self, value: ExtensionRequestCreate, parent, tools: list[dict]) -> dict:
         catalog = PUBLIC_TOOLS + "\nEnabled Tool versions (untrusted metadata):\n" + canonical(tools)
+        if self.harness.link.config.plugins.enabled and value.kind=='skill':
+            from nexus.plugins.catalog import RELEASES
+            catalog+='\nNative Skill plugins (fixed digest, Node current-user execution):\n'+canonical([
+                {'plugin_id':key,'plugin_digest':RELEASES[key].digest(),'tools':[item.model_dump(mode='json') for item in RELEASES[key].manifest.tools
+                    if key=='builtin.shell' or item.name not in {'mcp_list','mcp_remove'}]} for key in ('builtin.shell','builtin.mcp')])
         parent_plan = None if parent is None else {
             "version_id": parent["version_id"], "manifest": json.loads(parent["manifest_json"]),
             "steps": json.loads(parent["steps_json"]) if parent["steps_json"] else None,
@@ -171,7 +177,15 @@ class ExtensionService:
                 "parent_plan": parent_plan,
             }
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": SYSTEM_PROMPT+(
+                '\nNative Skill override when native plugins are listed: verification_profile=skill_native_steps_v1. '
+                'Steps use {id,tool:"plugin.call",tool_version:1,plugin_id,plugin_tool,plugin_digest,arguments}. '
+                'Only listed builtin.shell/MCP versions. Shell must finish: no persistent or background jobs. '
+                'Input schema retains the strict legacy subset; output_schema may use bounded object schemas with additionalProperties:true '
+                'for each step, whose actual result is {root_id,release_digest,tool,data,verification}. '
+                'Contract tests use stand-ins only; never claim the Shell or installation was tested. '
+                'The 1-3 step limit, no loops, approved versions, and normal/full session authority still apply.'
+                if self.harness.link.config.plugins.enabled and value.kind=='skill' else '')},
             {"role": "user", "content": (
                 f"Requested kind: {value.kind}\n"
                 f"Parent version: {value.parent_version_id or 'none'}\n"
@@ -368,7 +382,19 @@ class ExtensionService:
         seen: dict[str, dict] = {}
         for step in generation.steps:
             value = step.model_dump(mode="json")
-            if step.tool_version_id is not None:
+            if step.tool=='plugin.call':
+                from nexus.core.extensions.native_steps import dependency
+                contract=await dependency(conn,owner_id,value)
+                properties=contract.input_schema.get('properties',{})
+                if set(step.arguments)-set(properties) or not set(contract.input_schema.get('required',[]))<=set(step.arguments):
+                    raise ValueError('native Skill arguments do not match the plugin contract')
+                from nexus.plugins.schema import checked
+                for key,item in step.arguments.items():
+                    if not isinstance(item,dict) or not set(item)&{'$ref','$input'}: checked(properties[key],item)
+                for reference in step.references():
+                    if reference.field not in seen[reference.step]['fields']: raise ValueError('reference field unavailable')
+                schema=None
+            elif step.tool_version_id is not None:
                 tool = await one(conn, "SELECT * FROM extension_versions WHERE version_id=? AND owner_id=? AND kind='tool'", (str(step.tool_version_id), owner_id))
                 if tool is None:
                     raise ValueError("referenced Tool version not found")
@@ -406,6 +432,8 @@ class ExtensionService:
                 fields = set(RESULT_FIELDS["system.info"])
             elif step.tool == "filesystem.list":
                 fields = set(RESULT_FIELDS["filesystem.list"])
+            elif step.tool=='plugin.call':
+                fields=set(RESULT_FIELDS['plugin.call'])
             elif schema is not None:
                 fields = set(schema.get("properties", {}))
             seen[step.id] = {"fields": fields, "tool": step.tool}
@@ -455,7 +483,7 @@ class ExtensionService:
                     validate_instance(generation.manifest.output_schema, case.expect_output)
             environment = self.sandbox_environment(UUID(request["node_id"]) if request["node_id"] else None)
         else:
-            if generation.manifest.verification_profile != SKILL_PROFILE:
+            if generation.manifest.verification_profile not in {SKILL_PROFILE,NATIVE_SKILL_PROFILE}:
                 raise ValueError("unsupported Skill verifier binding")
             await self._resolve_steps(conn, request["owner_id"], generation)
             for case in generation.tests:
@@ -711,6 +739,9 @@ class ExtensionService:
             return
         steps = json.loads(version["steps_json"])
         for step in steps:
+            if step.get('tool')=='plugin.call':
+                from nexus.core.extensions.native_steps import dependency
+                await dependency(conn,version['owner_id'],step)
             if not step.get("tool_version_id"):
                 continue
             tool = await one(conn, "SELECT * FROM extension_versions WHERE version_id=? AND kind='tool'", (step["tool_version_id"],))

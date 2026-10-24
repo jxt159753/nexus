@@ -27,10 +27,12 @@ MAX_CASES = 20
 
 TOOL_PROFILE = "directory_entry_stats_v1"
 SKILL_PROFILE = "skill_steps_v1"
+NATIVE_SKILL_PROFILE = "skill_native_steps_v1"
 BUILTIN_TOOLS = {"system.info", "filesystem.list"}
 RESULT_FIELDS = {
     "system.info": frozenset({"os_name", "os_version", "architecture", "python_version"}),
     "filesystem.list": frozenset({"root_id", "entries", "truncated"}),
+    "plugin.call": frozenset({'root_id','release_digest','tool','data','verification'}),
 }
 
 _SCHEMA_KEYS = {
@@ -274,7 +276,7 @@ class ExtensionGenerateConsent(StrictContract):
 
 class StepReference(StrictContract):
     step: StrictStr = Field(pattern=r"^[a-z][a-z0-9_]{0,31}$")
-    field: Literal["entries", "truncated", "root_id", "os_name", "os_version", "architecture", "python_version"]
+    field: Literal["entries", "truncated", "root_id", "os_name", "os_version", "architecture", "python_version", "data", "release_digest", "tool", "verification"]
 
 
 class InputReference(StrictContract):
@@ -283,13 +285,30 @@ class InputReference(StrictContract):
 
 class SkillStep(StrictContract):
     id: StrictStr = Field(pattern=r"^[a-z][a-z0-9_]{0,31}$")
-    tool: Literal["system.info", "filesystem.list"] | None = None
+    tool: Literal["system.info", "filesystem.list", "plugin.call"] | None = None
     tool_version: Literal[1] | None = None
     tool_version_id: UUID | None = None
     arguments: dict[str, Any] = Field(default_factory=dict)
+    plugin_id: Literal['builtin.shell','builtin.mcp'] | None = None
+    plugin_tool: StrictStr | None = Field(default=None,pattern=r'^[a-z][a-z0-9_]{0,63}$')
+    plugin_digest: StrictStr | None = Field(default=None,pattern=DIGEST)
 
     @model_validator(mode="after")
     def check_shape(self):
+        native=self.tool=='plugin.call'
+        if native:
+            if self.plugin_id is None or self.plugin_tool is None or self.plugin_digest is None:
+                raise ValueError('native Skill steps require a pinned plugin, tool and digest')
+            from nexus.plugins.catalog import definition, RELEASES
+            try: definition(self.plugin_id,self.plugin_tool)
+            except StopIteration: raise ValueError('unknown plugin tool') from None
+            if self.plugin_id=='builtin.mcp' and self.plugin_tool in {'mcp_list','mcp_remove'}:
+                raise ValueError('Skill supports MCP registration/discovery/call and resource operations')
+            if self.plugin_digest!=RELEASES[self.plugin_id].digest(): raise ValueError('plugin digest is not current')
+            if self.arguments.get('persistent') or self.arguments.get('run_in_background'):
+                raise ValueError('Skill Shell steps must finish before advancing')
+        elif any(value is not None for value in (self.plugin_id,self.plugin_tool,self.plugin_digest)):
+            raise ValueError('plugin fields require plugin.call')
         if (self.tool is None) != (self.tool_version is None):
             raise ValueError("tool and tool_version must be supplied together")
         if (self.tool is None) == (self.tool_version_id is None):
@@ -305,7 +324,7 @@ class SkillStep(StrictContract):
                     StepReference.model_validate(value["$ref"])
                 elif set(value) == {"$input"}:
                     InputReference.model_validate(value["$input"])
-                else:
+                elif not native:
                     raise ValueError("only explicit $ref objects are accepted as structured arguments")
         return self
 
@@ -323,20 +342,25 @@ class ExtensionManifest(StrictContract):
     description: StrictStr = Field(min_length=10, max_length=1000)
     input_schema: dict[str, Any]
     output_schema: dict[str, Any]
-    verification_profile: Literal["directory_entry_stats_v1", "skill_steps_v1"]
+    verification_profile: Literal["directory_entry_stats_v1", "skill_steps_v1", "skill_native_steps_v1"]
     dependencies: list[Literal["python-stdlib"]] = Field(default_factory=list, max_length=1)
 
     @model_validator(mode="after")
     def check_identity(self):
         if not CAPABILITY_ID.fullmatch(self.capability_id):
             raise ValueError("capability identity must use the user namespace")
-        validate_schema(self.input_schema, where="input_schema")
-        validate_schema(self.output_schema, where="output_schema")
+        if self.verification_profile==NATIVE_SKILL_PROFILE:
+            from nexus.plugins.schema import schema
+            validate_schema(self.input_schema, where='input_schema')
+            schema(self.output_schema)
+        else:
+            validate_schema(self.input_schema, where="input_schema")
+            validate_schema(self.output_schema, where="output_schema")
         if self.input_schema["type"] != "object" or self.output_schema["type"] != "object":
             raise ValueError("tool/skill input and output must be JSON objects")
         if self.kind == "tool" and self.verification_profile != TOOL_PROFILE:
             raise ValueError("unsupported tool verification profile")
-        if self.kind == "skill" and self.verification_profile != SKILL_PROFILE:
+        if self.kind == "skill" and self.verification_profile not in {SKILL_PROFILE,NATIVE_SKILL_PROFILE}:
             raise ValueError("unsupported skill verification profile")
         return self
 
@@ -387,6 +411,8 @@ class SkillGeneration(StrictContract):
     def check_plan(self):
         if self.manifest.kind != "skill":
             raise ValueError("manifest kind mismatch")
+        if any(step.tool=='plugin.call' for step in self.steps) and self.manifest.verification_profile!=NATIVE_SKILL_PROFILE:
+            raise ValueError('native steps require skill_native_steps_v1; legacy Skill authority is unchanged')
         if len(self.markdown.encode("utf-8")) > MAX_MARKDOWN_BYTES:
             raise ValueError("markdown exceeds its text budget")
         ids = [step.id for step in self.steps]
@@ -406,6 +432,14 @@ class SkillGeneration(StrictContract):
 
 ExtensionGeneration = Annotated[ToolGeneration | SkillGeneration, Field(discriminator="kind")]
 GENERATION = TypeAdapter(ExtensionGeneration)
+
+
+def validate_skill_result(manifest, value):
+    if manifest['verification_profile']==NATIVE_SKILL_PROFILE:
+        from nexus.plugins.schema import checked
+        checked(manifest['output_schema'],value)
+    else:
+        validate_instance(manifest['output_schema'],value)
 
 
 class SandboxToolInput(StrictContract):

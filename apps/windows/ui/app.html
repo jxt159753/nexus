@@ -6,27 +6,27 @@
   <meta name="color-scheme" content="dark">
   <title>NEXUS · 对话</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./app.css?v=20261022c">
+  <link rel="stylesheet" href="./app.css?v=20261024-ui">
   <script src="./native-bridge.js"></script>
   <script type="importmap">
     {"imports": {"three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/"}}
   </script>
-  <script type="module" src="./main.js?v=20261022c"></script>
+  <script type="module" src="./main.js?v=20261024-ui"></script>
 </head>
 <body>
   <div id="login" class="login" hidden>
     <section class="login-card" aria-labelledby="login-title">
       <div class="brand-mark" aria-hidden="true">N</div>
-      <p class="eyebrow">NEXUS · PERSONAL CONTROL</p>
-      <h1 id="login-title">连接你的 Core</h1>
-      <p class="muted">聊天、执行与记录来自同一个 Core。</p>
+      <p class="eyebrow">NEXUS · 你的智能助手</p>
+      <h1 id="login-title">连接你的 NEXUS</h1>
+      <p class="muted">从一句话开始，让设备协作起来。</p>
       <form id="login-form">
         <div id="core-field" hidden>
           <label for="core-url">Core 地址</label>
           <input id="core-url" type="url" required autocomplete="url" placeholder="https://core.example.com">
         </div>
-        <label for="token">Owner 凭证</label>
-        <input id="token" type="password" required minlength="43" maxlength="128" autocomplete="off" placeholder="输入本地登记的 Owner 令牌">
+        <label for="token">登录凭证</label>
+        <input id="token" type="password" required minlength="43" maxlength="128" autocomplete="off" placeholder="输入登录凭证">
         <label id="remember-field" class="remember" hidden>
           <input id="remember" type="checkbox" checked> 记住此设备
         </label>
@@ -48,18 +48,18 @@
       <button id="pending-button" class="pending" type="button" hidden>
         待处理 <span id="pending-count">0</span>
       </button>
-      <button id="plugins-button" class="icon-button" type="button" aria-label="权限与插件">▣</button>
+      <button id="plugins-button" hidden class="icon-button" type="button" aria-label="权限与插件">▣</button>
       <button id="settings-button" class="icon-button" type="button" aria-label="设置">⚙</button>
     </header>
 
     <main id="home-view" class="home">
-      <section id="visual-placeholder" class="visual" aria-label="Core 与 Node 三维视图">
+      <section id="visual-placeholder" class="visual" aria-label="助手与设备动态">
         <div id="visual-canvas" class="visual-canvas"></div>
         <div class="viz-legend" aria-hidden="true">
-          <span><i class="viz-dot core"></i>Core</span>
-          <span><i class="viz-dot online"></i>Node</span>
+          <span><i class="viz-dot core"></i>助手</span>
+          <span><i class="viz-dot online"></i>设备</span>
           <span><i class="viz-dot active"></i>执行</span>
-          <span><i class="viz-dot awaiting"></i>审批</span>
+          <span><i class="viz-dot awaiting"></i>待确认</span>
           <span><i class="viz-dot error"></i>异常</span>
         </div>
         <p class="viz-hint">拖动旋转 · 滚轮缩放 · 点击查看</p>
@@ -82,7 +82,7 @@
           <textarea id="dock-text" rows="1" maxlength="2000" placeholder="对 NEXUS 说点什么…"></textarea>
           <div class="composer-actions">
             <button id="dock-attach" type="button" class="quiet attach-button" aria-label="添加附件" title="添加文件或粘贴图片">＋</button>
-            <button id="dock-scope" type="button" class="quiet">本次范围</button>
+            <button id="dock-scope" type="button" class="quiet">对话选项</button>
             <button id="dock-stop" type="button" class="quiet danger" hidden>停止回复</button>
             <button id="dock-new" type="button" class="quiet">新会话</button>
             <button id="dock-expand" type="button" class="quiet">完整对话</button>
@@ -123,7 +123,7 @@
           <textarea id="chat-text" rows="2" maxlength="2000" placeholder="输入消息…"></textarea>
           <div class="composer-actions">
             <button id="chat-attach" type="button" class="quiet attach-button" aria-label="添加附件" title="添加文件、拖入或粘贴图片">＋ 附件</button>
-            <button id="chat-scope" type="button" class="quiet">本次范围</button>
+            <button id="chat-scope" type="button" class="quiet">对话选项</button>
             <button id="chat-stop" type="button" class="quiet danger" hidden>停止回复</button>
             <button id="chat-send" type="submit" class="primary">发送</button>
           </div>
@@ -139,11 +139,11 @@
       <div id="settings-body" class="settings-body"></div>
     </aside>
 
-    <aside id="plugin-view" class="plugin-view" hidden aria-label="权限与原生插件">
+    <aside id="plugin-view" class="plugin-view" hidden aria-label="权限与扩展">
       <header class="plugin-view-head">
         <div>
-          <p class="eyebrow">OWNER CONTROL</p>
-          <strong>权限与原生插件</strong>
+          <p class="eyebrow">NEXUS</p>
+          <strong>权限与扩展</strong>
         </div>
         <button id="plugin-close" class="icon-button" type="button" aria-label="关闭权限与插件页">×</button>
       </header>

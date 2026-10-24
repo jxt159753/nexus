@@ -67,11 +67,12 @@ def test_voice_reads_existing_natural_failure_explanation(world, phase):
 @pytest.mark.parametrize("scope", ["workspace", "explicit"])
 def test_voice_tools_use_real_chat_work_and_verified_result(world, monkeypatch, scope):
     from test_chat import app_for
-    from test_chat_work import WorkProvider, basic
+    from test_chat_work import basic
+    from test_node_routing import RoutedProvider
     from nexus.contracts.work import WorkGrantCreate
     app = app_for(world, monkeypatch)
     chat = app.state.chat
-    chat.provider = WorkProvider([{"intent": "get_node_status", "arguments": {}}])
+    chat.provider = RoutedProvider([(world.node_id,"get_node_status")])
     bridge = ChatVoiceBridge(chat, world.owner_id)
     session = VoiceSession(voice_session_id=uuid4(), request_id=uuid4(), owner_id=world.owner_id,
         node_id=world.node_id, trigger="button", utterance_id=uuid4(),

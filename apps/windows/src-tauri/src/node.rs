@@ -40,6 +40,7 @@ pub struct NodeStartConfig {
     workspace_root: String,
     /// Owner-controlled local policy. `None` preserves the existing list.
     allow_plugin_call: Option<bool>,
+    allow_file_receive: Option<bool>,
 }
 
 #[derive(Serialize, Clone)]
@@ -263,6 +264,7 @@ fn merged_config(
     local_http: bool,
     workspace: &Path,
     allow_plugin_call: Option<bool>,
+    allow_file_receive: Option<bool>,
 ) -> Result<String, String> {
     let mut root: toml::Table = match existing {
         Some(text) => toml::from_str(text).map_err(|error| format!("现有 Node 配置无法解析，未覆盖：{error}"))?,
@@ -288,10 +290,17 @@ fn merged_config(
         })
         .unwrap_or_else(|| DEFAULT_TOOLS.iter().map(|value| value.to_string()).collect());
     if let Some(allow) = allow_plugin_call {
+        if allow && root.get("plugins").and_then(|v| v.get("enabled")).and_then(toml::Value::as_bool) != Some(true) {
+            return Err("尚未配置宿主插件策略：请先完成本机 plugins 配置并在 Core 同步信任，再启用 plugin.call。现有配置未覆盖。".to_string());
+        }
         tools.retain(|value| value != PLUGIN_CALL);
         if allow {
             tools.push(PLUGIN_CALL.to_string());
         }
+    }
+    if let Some(allow) = allow_file_receive {
+        tools.retain(|value| value != "filesystem.receive@1");
+        if allow { tools.push("filesystem.receive@1".to_string()); }
     }
     root.insert(
         "allowed_tools".into(),
@@ -357,6 +366,7 @@ pub fn node_start(
         local_http,
         &workspace,
         config.allow_plugin_call,
+        config.allow_file_receive,
     )?;
 
     let mut inner = state.inner.lock().map_err(|_| "Node 状态不可用")?;
@@ -444,6 +454,7 @@ workspace = 'C:\old\workspace'
             false,
             Path::new("C:\\new-workspace"),
             Some(true),
+            Some(true),
         )
         .expect("merge");
         let value: toml::Table = toml::from_str(&merged).expect("parse");
@@ -475,6 +486,7 @@ workspace = 'C:\old\workspace'
             false,
             Path::new("C:\\new-workspace"),
             None,
+            Some(true),
         )
         .expect_err("invalid TOML must be rejected");
         assert!(error.contains("未覆盖"));
@@ -496,6 +508,7 @@ workspace = 'C:\old'
             true,
             Path::new("C:\\new"),
             Some(false),
+            Some(true),
         )
         .expect("merge");
         let value: toml::Table = toml::from_str(&merged).expect("parse");

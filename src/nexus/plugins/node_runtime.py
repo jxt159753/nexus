@@ -234,11 +234,13 @@ class PluginRuntime:
         self.invocation.capabilities=args.capability_digests
         self.invocation.max_subcalls=args.max_subcalls
         self.invocation.identifier=str(args.invocation_id)
+        self.invocation.mcp_binding=args.mcp_binding
         try:
             data=self.call(args.plugin_id,args.tool,args.input,str(args.context_id),deadline,cancel,release)
         finally:
             self.invocation.capabilities={}
             self.invocation.identifier=None
+            self.invocation.mcp_binding=None
         checked(contract.output_schema,data)
         result=PluginNodeResult(release_digest=args.release_digest,tool=args.tool,data=data)
         with self.db() as conn: conn.execute('UPDATE calls SET result=? WHERE invocation_id=?',(result.model_dump_json(),str(args.invocation_id)))
@@ -292,8 +294,6 @@ class PluginRuntime:
                 if cancel.is_set(): raise ExecutionStopped('cancelled')
                 if time.monotonic()>=wait_until: raise ExecutionStopped('timeout')
                 time.sleep(.01)
-            result={'job_id':process.identifier,'cwd':str(cwd),**process.output()}
-            return result
         finally:
             with self.lock:
                 process.stop()
@@ -301,6 +301,9 @@ class PluginRuntime:
                 with self.db() as conn:
                     result=process.output(8192,consume=False)
                     conn.execute('UPDATE processes SET state=?,result=? WHERE id=?',(result['status'],canonical(result),process.identifier))
+        # Capture foreground evidence after tree cleanup and output draining;
+        # an earlier snapshot can report exit=0 while the Job is still active.
+        return {'job_id':process.identifier,'cwd':str(cwd),**result}
 
     def json_process(self,argv,payload,context,deadline,cancel):
         with self.lock: process=self.start(context,'worker',argv,self.cwd(context))

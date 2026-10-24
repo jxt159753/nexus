@@ -707,8 +707,8 @@ async function openPluginDetail(versionId) {
 
 /* ------------------------------------------------------------- self-authored */
 
-function generationText(goal, nodeId) {
-  const device = nodeId ? nodeName(nodeId) : "当前设备";
+function generationText(goal) {
+  const device = "由 Core 根据目标自动选择已授权设备";
   return `请为 NEXUS 编写并提交一个自写原生插件。目标：${goal}。目标设备：${device}。要求：使用 user. 命名空间和固定版本；提供 handle(tool,input,context) 源码，并用标准库或 nexus_plugin SDK；为每个工具提供至少一个输入/预期输出契约测试；不要修改 Core 权限、预算或执行模式。提交后由 Core 在独立沙箱测试，测试结果不是业务正确性的证明。`;
 }
 
@@ -719,29 +719,22 @@ function renderAuthorTab(body) {
   ));
   const wrap = el("section", "settings-section plugin-section");
   const conversation = conversationSelect(() => {});
-  const nodeSelect = el("select");
-  nodeSelect.id = "author-node";
-  if (!state.nodes.length) nodeSelect.append(new Option("没有可用设备", ""));
-  for (const node of state.nodes) nodeSelect.append(new Option(`${nodeName(node.node_id)}${node.online ? "" : " · 离线"}`, node.node_id));
-  if (state.prefs.nodeId && state.nodes.some((node) => node.node_id === state.prefs.nodeId)) nodeSelect.value = state.prefs.nodeId;
   const goal = el("textarea");
   goal.id = "author-goal";
   goal.rows = 4;
   goal.maxLength = 1200;
   goal.placeholder = "例如：提供一个把两个整数相加并返回 sum 的插件，输入/输出都有边界检查。";
-  wrap.append(field("目标会话", conversation), field("目标设备", nodeSelect), field("插件目标", goal));
+  wrap.append(field("目标会话", conversation), field("插件目标", goal));
   const preview = el("div", "plugin-preview");
   const submit = button("预览实际外发内容", "primary", () => run(submit, async () => {
     const text = goal.value.trim();
     if (!text) throw new ApiError(400, "EMPTY_MESSAGE");
-    const nodeId = nodeSelect.value;
-    if (!nodeId) throw new ApiError(400, "NO_NODE");
     if (!pluginConversationId) throw new ApiError(400, "NO_CONVERSATION");
-    const catalog = await api(`/api/v1/chat/work-catalog?node_id=${nodeId}`);
+    const catalog = await api("/api/v1/chat/work-catalog");
     const entries = catalog.catalog || [];
-    const canInstall = entries.some((item) => item.name === "plugin_install");
-    const textValue = generationText(text, nodeId);
-    pluginState.generationPreview = { text: textValue, nodeId, conversationId: pluginConversationId, canInstall, catalog };
+    const canInstall = entries.some((item) => (item.route_intent || item.name) === "plugin_install");
+    const textValue = generationText(text);
+    pluginState.generationPreview = { text: textValue, conversationId: pluginConversationId, canInstall, catalog };
     preview.replaceChildren();
     preview.append(el("p", "scope-label", "将发送给 DeepSeek 的内容"));
     const pre = el("pre");
@@ -749,7 +742,7 @@ function renderAuthorTab(body) {
     preview.append(pre);
     preview.append(el("p", "scope-label", "目标与范围"));
     const list = el("ul");
-    list.append(el("li", "", `会话：${pluginConversationId} · 设备：${nodeName(nodeId)}`));
+    list.append(el("li", "", `会话：${pluginConversationId} · 设备：Core 自动选择`));
     list.append(el("li", "", "本轮输入和本次工作目录摘要；不包含历史记忆、凭证或其他会话。"));
     list.append(el("li", "", "模型生成候选后，Core 自动进行契约检查和独立 runsc 测试；不会在宿主执行未测试代码。"));
     list.append(el("li", "", "费用范围：本轮最多 1 次生成调用的预算边界，仍受每轮 USD 0.05、每日 USD 1 和共享账本约束；实际费用以 Core 账本为准，未知费用不会按 0 计算。"));
@@ -765,8 +758,8 @@ function renderAuthorTab(body) {
       errorLine.hidden = true;
       if (!canInstall) throw new ApiError(403, "PLUGIN_GENERATE_UNAVAILABLE");
       try {
-        const submitted = await submitPluginGeneration({ conversationId: pluginConversationId, nodeId, text: textValue });
-        generationRequest = { ...submitted, conversationId: pluginConversationId, nodeId };
+        const submitted = await submitPluginGeneration({ conversationId: pluginConversationId, text: textValue });
+        generationRequest = { ...submitted, conversationId: pluginConversationId };
         notify("生成请求已提交；等待真实工作轮次和插件注册表状态");
         drawGenerationStatus();
         startGenerationPoll();

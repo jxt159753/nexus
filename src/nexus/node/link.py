@@ -40,6 +40,8 @@ class NodeClient:
         if config.node_id != runtime.config.node_id:
             raise ValueError("runtime identity differs")
         self.runtime, self._token = runtime, token
+        from nexus.node.file_transfer import downloader
+        runtime.file_downloader = downloader(config, token)
         if runtime.plugins:
             from nexus.plugins.transfer import uploader
             runtime.plugins.uploader=uploader(config,token)

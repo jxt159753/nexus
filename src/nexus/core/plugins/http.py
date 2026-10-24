@@ -177,7 +177,7 @@ class PluginHTTP:
                 row=await one(conn,'SELECT * FROM plugin_goals WHERE goal_id=? AND conversation_id=? AND owner_id=?',(str(record_id),str(conversation_id),str(principal.identity_id)))
                 if row is None: raise LookupError('goal not found')
                 if set(value.changes)!={'status'} or value.changes['status'] not in {'paused','active'}: raise ValueError('goal control requires active/paused status')
-                if row['status']=='complete' or row['expires_at']<=timestamp(now) or row['rounds']>=row['max_rounds']: raise Conflict('goal has ended')
+                if row['status']=='complete' or row['expires_at']<=timestamp(now) or (self.service.chat.config.call_limits_enabled and row['rounds']>=row['max_rounds']): raise Conflict('goal has ended')
                 await conn.execute('UPDATE plugin_goals SET status=? WHERE goal_id=?',(value.changes['status'],str(record_id)))
                 resume=value.changes['status']=='active'
                 result={'goal_id':str(record_id),'status':value.changes['status']}

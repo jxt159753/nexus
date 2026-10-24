@@ -8,6 +8,7 @@
 
 | 文档 | 能解决什么问题 |
 | --- | --- |
+| [向设备发送文件](file-transfers.md) | 文件上传、选择 Node、收件箱、送达校验、权限和恢复 |
 | [聊天使用说明](m3-chat.md) | 多轮聊天、停止回复、工具确认、结果回传、历史和费用 |
 | [聊天中的多步流程](m5-chat-skills.md) | 可用流程目录、参数与计划确认、步骤审批/取消及结果解读 |
 | [项目、可控记忆与基础工具](m6-projects-tools.md) | 项目会话与待办、记忆保存/逐轮外发、受限文件读写/查找和固定命令 |
@@ -16,12 +17,14 @@
 | [DSH 图片与查询工具](dsh-builtin-tools.md) | 图片读取配置、时间和任务查询、Skill 说明及有界结果 |
 | [聊天附件](chat-attachments.md) | 任意文件上传、图片/文本预览、原件下载和逐轮外发同意 |
 | [原生插件与权限](plugins.md) | 普通/完全模式、会话覆盖、宿主终端、自写插件测试/启用与接口 |
+| [目标验收与持续运行](autonomy.md) | 依赖计划、证据、事件订阅、独立业务测试、归档健康接口及 DSH 工作单 |
 | [Skill Shell 与受控 MCP](skill-mcp.md) | 原生步骤、MCP 登记/发现/重载/调用、权限与兼容限制 |
 | [聊天工作与网页工具](chat-work.md) | 工作区默认读写、有限工具循环、DeepSeek 搜索/抓取、来源及费用 |
 | [任务、记忆与项目页面](s6-browser-records.md) | 提交只读任务、审批、暂停、保存或撤销记忆、关联项目 |
 | [单条自然语言任务](m2-language.md) | 把一句操作请求解释为已有工具，确认后执行 |
 | [自定义工具与流程](m4-usage.md) | 创建、测试、批准、启用、使用和停用能力；使用前先核对路线图中的限制 |
 | [部署、远程连接与恢复](s7-deployment.md) | 首次配置、可信加密连接、升级、备份及恢复 |
+| [Android App / Node 接入](../apps/android/README.md) | 构建、身份与资源配置、通知范围、Core 实时语音及联调方式 |
 
 旧使用文档保留 S6、S7 等文件名，避免破坏已有链接。S 表示当时的开发子阶段，不是软件版本号；其中 M1 的零模型、单步、两个只读工具和逐次目录审批只适用于相应历史入口。当前工作区默认权限和有界工具循环先看[聊天工作](chat-work.md)，各能力是否上线仍查路线图。
 
@@ -85,6 +88,7 @@ Core、Node、Tool、Skill 等词的解释见 [架构文档的名词说明](ARCH
 | M6 的 DSH 工具与会话机制 | [追加验证、固定包与限制](DSH-TOOLS-VERIFICATION.md) |
 | M6 的 DSH 图片与查询工具 | [真实解码、权限、协议、前端接入及本地验证](DSH-BUILTIN-TOOLS-VERIFICATION.md) |
 | M6 的会话附件 | [任意文件、外发同意、迁移和独立 Core 重启验证](CHAT-ATTACHMENTS-VERIFICATION.md) |
+| Windows-MCP 会话链路 P83 | [真实模型安装、登记、调用、批准Skill复用与发布回退](WINDOWS-MCP-VERIFICATION.md)、[脱敏记录](assets/windows-mcp-evidence.json) |
 | 原生插件 P57–P61 | [固定包、真实宿主与 runsc、生产部署及费用证据](PLUGINS-VERIFICATION.md) |
 | 会话创建插件与 Skill P77 | [直接请求、缺口判断、真实模型/runsc/Windows 执行、批准与停用](CHAT-CREATION-VERIFICATION.md) |
 | 性格与自动记忆 P78/P79 | [实际模型调用、记忆隔离/纠正/撤销、部署与费用证据](assets/automatic-memory-evidence.json) |
@@ -137,6 +141,8 @@ DSH GitHub 架构/Harness 对照、上下文投影、工具清单与按需能力
 - [范围预授权自迭代](decisions/0035-scoped-self-iteration.md)：最少人工确认、可演进组件与可信控制部分、单活发布和回退的设计取舍。
 - [会话创建插件与 Skill](decisions/0037-chat-capability-creation.md)：复用优先、候选创建与验证、版本批准、幂等和停止边界。
 - [自动长期记忆](decisions/0039-automatic-memory.md)：持续保存与模型外发同意、当前原文提取、个人/项目范围及撤销传播。
+- [有界原文回取与停滞检测](decisions/0043-bounded-context-retrieval.md)：短引用、记忆筛选与 Token 成本；状态见路线图 P88。
+- [累计调用与金额额度可关闭](decisions/0044-optional-usage-quotas.md)：统一关闭次数、轮数和金额额度，保留审计、权限及停止；状态见路线图 P89。
 - [失败后的自然语言反馈](decisions/0036-natural-failure-feedback.md)：网页失败继续、保留费用预留、仅解释的模型总结和不可调用时的自然语言兜底。
 
 - [DSH 上下文压缩验证](CONTEXT-COMPACTION-VERIFICATION.md)：固定版本、测试、上线与限制。

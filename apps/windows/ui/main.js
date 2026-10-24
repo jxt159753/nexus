@@ -2,6 +2,7 @@
 
 import {
   ApiError,
+  api,
   TOOL_LABELS,
   activeTurnOfConversation,
   archiveConversation,
@@ -47,6 +48,7 @@ import {
   renderChat,
   renderDock,
   renderSettings,
+  renderDevices,
   renderConversations,
   runAction,
   ui,
@@ -80,6 +82,8 @@ const $ = (id) => document.getElementById(id);
 const native = window.__NEXUS_NATIVE__ || null;
 const CORE_URL_KEY = "nexus.coreUrl";
 let pollTimer = null;
+let deviceTimer = null;
+let deviceLoading = false;
 let lastSignature = "";
 let lastSnapshotAt = 0;
 let refreshing = false;
@@ -126,14 +130,19 @@ function updateConnection() {
     setConnection("连接中");
     return;
   }
+  if (!state.nodesFresh) {
+    setConnection("正在同步设备", "offline");
+    return;
+  }
   const online = state.nodes.filter((node) => node.online).length;
   const suffix = state.control?.paused ? " · 已暂停派发" : "";
-  setConnection(`Core 已连接 · ${online}/${state.nodes.length} 设备在线${suffix}`, "live");
+  setConnection(`${online} 台设备在线${suffix}`, "live");
 }
 
 function showLogin(message = "") {
   clearTimeout(pollTimer);
   pollTimer = null;
+  clearTimeout(deviceTimer);
   resetState();
   resetAttachments();
   visualization?.visible(false);
@@ -199,7 +208,7 @@ function syncVisualization(visible = state.view === "home") {
     nodes: state.nodes,
     tasks,
     activeTurn: state.activeTurn,
-    nodeId: state.lastSent?.node_id || state.prefs.nodeId || "",
+    nodeId: state.lastSent?.client_node_id || "",
     messageKey: state.lastSent?.request_id || "",
     paused: !!state.control?.paused,
   });
@@ -322,7 +331,29 @@ function syncViews(force = false) {
   }
 }
 
+// Device presence must not wait for history, model output or task details.
+async function syncDevices() {
+  clearTimeout(deviceTimer);
+  if (!state.ready || deviceLoading) return;
+  if (document.hidden) return;
+  deviceLoading = true;
+  try {
+    await loadNodes();
+  } catch {
+    state.nodesFresh = false;
+  } finally {
+    deviceLoading = false;
+    if (state.ready) {
+      updateConnection();
+      renderDevices();
+      syncVisualization();
+      deviceTimer = setTimeout(syncDevices, state.nodesFresh ? 2000 : 5000);
+    }
+  }
+}
+
 function startPolling() {
+  syncDevices();
   clearTimeout(pollTimer);
   const tick = async () => {
     if (!state.ready) {
@@ -386,6 +417,23 @@ function openSettings() {
     .catch((error) => notify(errorText(error), true));
 }
 
+function renameDevice(node) {
+  const name = el("input");
+  name.value = nodeName(node.node_id);
+  name.maxLength = 40;
+  const body = el("div");
+  body.append(el("p", "hint", "例如“书房电脑”“随身手机”。保存后，所有客户端都可以用这个名称指代设备。"), name);
+  openSheet({ title: "设备名称", body, actions: [
+    { label: "取消", className: "quiet", onClick: closeSheet },
+    { label: "保存", className: "primary", onClick: () => runAction(async () => {
+      await api(`/api/v1/nodes/${node.node_id}/name`, { method: "PATCH", body: JSON.stringify({ name: name.value.trim() }) });
+      closeSheet();
+      await syncDevices();
+    }) },
+  ] });
+  name.focus();
+}
+
 function closeSettings() {
   $("settings").hidden = true;
 }
@@ -419,7 +467,7 @@ function clearComposer(view) {
 
 async function sendFrom(view) {
   if (!state.ready) {
-    notify("正在连接 Core", true);
+    notify("正在连接", true);
     return;
   }
   if (state.activeTurn) {
@@ -538,7 +586,7 @@ function openConsentSheet(prepared, view, text) {
   body.append(notSent);
 
   body.append(el("p", "scope-label", "将在设备上使用"));
-  body.append(el("p", "", `${nodeName(state.prefs.nodeId)} · 工作区内已配置的读取/查找/写入/固定命令${imageAvailable ? "，以及受控图片读取" : ""}。写入仍会展示差异并读回校验。`));
+  body.append(el("p", "", `Core 根据你的话自动选择已授权设备 · 已配置的读取/查找/写入/固定命令${imageAvailable ? "，以及受控图片读取" : ""}。写入仍会展示差异并读回校验。`));
   body.append(el("p", "hint", "费用受 Core 的本轮上限约束；费用未知时不会按 0 计算。批准执行与同意结果回传是两件事；执行前若需要审批，会在消息里的任务卡再次询问。不开启工作工具或不同意结果外发时，本轮不会触发图片工具。"));
 
   const onlyChat = button("仅普通聊天", "quiet", () => runAction(async () => {
@@ -587,26 +635,9 @@ function openScope(focus = "") {
   projectSelect.value = conversation?.project_id || state.prefs.projectId || "";
   body.append(projectSelect);
 
-  body.append(el("p", "scope-label", "目标设备"));
-  const nodeList = el("div", "choice-row");
-  if (!state.nodes.length) {
-    body.append(el("p", "hint", "Core 尚未配置 Node；仍可进行普通聊天。"));
-  }
-  for (const node of state.nodes) {
-    const label = el("label", "choice" + (node.node_id === state.prefs.nodeId ? " on" : ""));
-    const input = document.createElement("input");
-    input.type = "radio";
-    input.name = "scope-node";
-    input.value = node.node_id;
-    input.checked = node.node_id === state.prefs.nodeId;
-    label.append(input, document.createTextNode(`${nodeName(node.node_id)}${node.online ? "" : " · 离线"}`));
-    input.addEventListener("change", () => {
-      for (const item of nodeList.querySelectorAll(".choice")) item.classList.remove("on");
-      label.classList.add("on");
-    });
-    nodeList.append(label);
-  }
-  body.append(nodeList);
+  body.append(el("p", "scope-label", "自动选择设备"));
+  body.append(el("p", "hint", "NEXUS 会按你的话选择可用设备。可以说“我的电脑”“我的手机”或你设置的设备名称；目标有歧义时再询问。"));
+  for (const node of state.nodes) body.append(el("p", "", `${nodeName(node.node_id)} · ${state.nodesFresh ? (node.online ? "在线" : "离线") : "状态同步中"}`));
 
   body.append(el("p", "scope-label", "本轮工具与外发"));
   const toolsLabel = el("label", "switch");
@@ -633,8 +664,6 @@ function openScope(focus = "") {
   body.append(el("p", "hint", "更改只影响下一轮；当前已发送的请求不会被改写。工具结果回传默认关闭；打开后，纯文字工具结果可在后续轮次沿用这项显示偏好。若服务器返回图片工具能力，每一轮仍会单独确认图片快照外发，历史选择不代替本轮同意。"));
 
   const save = button("保存范围", "primary", () => runAction(async () => {
-    const checkedNode = $("sheet-body").querySelector('input[name="scope-node"]:checked');
-    if (checkedNode) setPref("nodeId", checkedNode.value);
     setPref("projectId", projectSelect.value || "");
     setPref("tools", tools.checked);
     setPref("resultFeedback", feedback.checked);
@@ -793,7 +822,7 @@ function openTurnDetails(turn) {
   facts.append(el("li", "", `状态：${turn.status} · 阶段：${turn.phase || "reply"}${turn.work_status ? " · 工作：" + turn.work_status : ""}`));
   facts.append(el("li", "", `费用：${turn.cost_status === "unknown" ? "未知，保留预留" : formatMoney(turn.cost_microunits)}`));
   facts.append(el("li", "", `上下文：${turn.include_context ? "附带最近对话" : "仅本轮输入"}${turn.context_truncated ? "（已裁剪）" : ""}`));
-  facts.append(el("li", "", `工具：${turn.allow_tools ? "允许" : "未允许"} · 设备：${turn.node_id ? nodeName(turn.node_id) : "未指定"}`));
+  facts.append(el("li", "", `工具：${turn.allow_tools ? "允许" : "未允许"} · 设备：${turn.node_id ? nodeName(turn.node_id) : "Core 自动选择"}`));
   if (turn.memory_references?.length) facts.append(el("li", "", `引用记忆：${turn.memory_references.length} 条`));
   body.append(facts);
   body.append(el("p", "hint", "这里只显示过程摘要；完整请求正文和原始工具输出保留在 Core 的执行记录中，不在此处展开。"));
@@ -972,9 +1001,10 @@ function bindEvents() {
     }
   });
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden && state.ready) refresh(true);
+    if (!document.hidden && state.ready) { syncDevices(); refresh(true); }
   });
-  window.addEventListener("online", () => { if (state.ready) refresh(true); });
+  window.addEventListener("online", () => { if (state.ready) { syncDevices(); refresh(true); } });
+  window.addEventListener("focus", () => { if (state.ready) syncDevices(); });
   initAttachmentComposer();
 }
 
@@ -991,6 +1021,7 @@ async function stopActive() {
 }
 
 bindUI({
+  renameDevice,
   openChat,
   closeChat,
   openSettings,

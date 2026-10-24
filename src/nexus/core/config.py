@@ -7,14 +7,14 @@ from pydantic import Field, StrictBool, StrictInt, StrictStr, model_validator
 from nexus.contracts.base import MAX_MESSAGE_BYTES, MAX_RESULT_BYTES, StrictContract
 from nexus.core.models.config import ModelConfig
 from nexus.plugins.config import PluginConfig
-from nexus.contracts.basic import ToolKey, CommandId
+from nexus.contracts.basic import ToolKey, CommandId, ResourceId
 from nexus.contracts.base import CommandDigest
 
 
 
 class TrustedNode(StrictContract):
     tools: frozenset[ToolKey] = frozenset()
-    roots: frozenset[Literal["workspace"]] = frozenset()
+    roots: frozenset[ResourceId] = frozenset()
     resource_version: StrictInt = Field(default=1, ge=1)
     command_digests: dict[CommandId, CommandDigest] = Field(default_factory=dict, max_length=16)
     interaction_digests: dict[CommandId, CommandDigest] = Field(default_factory=dict, max_length=16)

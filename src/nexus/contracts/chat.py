@@ -97,6 +97,8 @@ class ChatSubmission(StrictContract):
     work_digest: StrictStr | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     allow_work_results: StrictBool = False
     workspace_work: StrictBool = False
+    all_nodes: StrictBool = False
+    client_node_id: UUID | None = None
     enqueue: StrictBool = False
     reference_turn_ids: list[UUID] = Field(default_factory=list, max_length=3)
     references_digest: StrictStr | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
@@ -104,6 +106,17 @@ class ChatSubmission(StrictContract):
     attachment_ids: list[UUID] = Field(default_factory=list, max_length=4)
     attachments_digest: StrictStr | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     allow_attachment_model: StrictBool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def default_device_routing(cls, value):
+        # New clients preview the global catalog and omit a target device.
+        # Explicit legacy node/grant scopes retain their original authority.
+        if (isinstance(value, dict) and value.get("allow_tools") is True
+                and "all_nodes" not in value and value.get("node_id") is None
+                and not value.get("work_grant_id") and not value.get("allow_skills")):
+            return {**value, "all_nodes": True, "workspace_work": True}
+        return value
 
     @model_validator(mode="after")
     def bounded(self):
@@ -132,7 +145,9 @@ class ChatSubmission(StrictContract):
             raise ValueError("memory consent must select records")
         if (not self.text.strip() and not self.attachment_ids) or len(self.text.encode("utf-8")) > 6000:
             raise ValueError("bounded nonempty text required")
-        if self.allow_tools and self.node_id is None:
+        if self.all_nodes and (self.node_id is not None or not self.workspace_work or self.allow_skills):
+            raise ValueError("automatic device routing requires previewed work consent without a pinned node")
+        if self.allow_tools and self.node_id is None and not self.all_nodes:
             raise ValueError("tool suggestions require an explicit node")
         if self.allow_skills and (not self.allow_tools or self.skills_digest is None):
             raise ValueError("Skill suggestions require tool consent and a previewed catalog")
@@ -172,6 +187,9 @@ class ChatProgressText(StrictContract):
     truncated: StrictBool = False
 
 
+from nexus.contracts.file_transfer import ChatFile
+
+
 class ChatPresentation(StrictContract):
     """Read-only display projection; completion describes the reply, not tool success."""
 
@@ -185,3 +203,4 @@ class ChatPresentation(StrictContract):
     live_text: StrictStr = ""
     final_text: StrictStr | None = None
     collapse_process: StrictBool = False
+    files: list[ChatFile] = Field(default_factory=list, max_length=8)

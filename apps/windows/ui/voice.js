@@ -202,10 +202,7 @@ export function initVoice(value) {
       const control = button("语音", "quiet", () => openVoice(false));
       control.id = `${id}-voice`;
       control.type = "button";
-      const wakeControl = button("语音唤醒", "quiet", () => openVoice(true));
-      wakeControl.id = `${id}-wake`;
-      wakeControl.type = "button";
-      actions.prepend(control, wakeControl);
+      if (native) actions.prepend(control);
     }
   }
   const bar = el("section", "voice-status");

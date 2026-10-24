@@ -21,10 +21,14 @@ const COLORS = {
   muted: 0x8b93a1,
 };
 
-const TASK_ACTIVE = new Set(["queued", "awaiting_approval", "dispatching", "sent", "running", "preparing", "stopping", "waiting"]);
+const TASK_ACTIVE = new Set(["queued", "awaiting_approval", "ready", "dispatching", "sent", "running", "recovering", "verifying", "preparing", "stopping", "waiting"]);
 const TASK_FAILED = new Set(["failed", "timed_out", "cancelled", "expired"]);
 const TERMINAL_TASK_WINDOW_MS = 30 * 60 * 1000;
 const TASK_MARKER_LIMIT = 12;
+const FLOW_TRAVEL_MS = 2400;
+const AFTERGLOW_HOLD_MS = 6000;
+const AFTERGLOW_FADE_MS = 2000;
+const MESSAGE_FLOW_LIMIT = 4;
 
 const PARTICLE_VERTEX = `
 attribute float aScale;
@@ -55,8 +59,6 @@ void main() {
   float a = smoothstep(0.5, 0.015, d);
   gl_FragColor = vec4(uColor, a * uOpacity * vAlpha);
 }`;
-
-let state = null;
 
 function hash(value) {
   let h = 2166136261;
@@ -225,7 +227,7 @@ function text(value) {
 export function initVisualization(container) {
   if (!container) return null;
   if (!window.WebGLRenderingContext || !window.WebGL2RenderingContext) {
-    container.append(Object.assign(document.createElement("p"), { className: "viz-fallback", textContent: "当前环境不支持 WebGL 3D 视图。" }));
+    container.append(Object.assign(document.createElement("p"), { className: "viz-fallback", textContent: "这台设备暂不支持动态画面，聊天和设备功能仍可使用。" }));
     return null;
   }
 
@@ -233,7 +235,7 @@ export function initVisualization(container) {
   try {
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
   } catch {
-    container.append(Object.assign(document.createElement("p"), { className: "viz-fallback", textContent: "当前环境无法初始化 3D 视图。" }));
+    container.append(Object.assign(document.createElement("p"), { className: "viz-fallback", textContent: "动态画面暂时无法加载，聊天和设备功能仍可使用。" }));
     return null;
   }
 
@@ -255,7 +257,7 @@ export function initVisualization(container) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
   container.append(renderer.domElement);
-  renderer.domElement.setAttribute("aria-label", "NEXUS Core 与 Node 三维能量图");
+  renderer.domElement.setAttribute("aria-label", "助手与设备动态");
   renderer.domElement.setAttribute("role", "img");
 
   const scene = new THREE.Scene();
@@ -266,19 +268,16 @@ export function initVisualization(container) {
   scene.add(coreGroup, world);
 
   const glowTexture = makeGlowTexture();
-  const particleMaterials = [];
+  const particleMaterials = new Set();
   const selectable = [];
   const nodeGroups = new Map();
   const taskGroups = new Map();
   const links = [];
-  const taskFlows = [];
-  const nodeSpins = new Map();
-  const taskSpins = new Map();
-  const taskAngles = new Map();
-  let messageFlow = null;
+  const messageFlows = new Map();
+  let state = null;
   let messageKey = "";
-  let messageDoneKey = "";
-  let messageExpires = 0;
+  let animationTime = 0;
+  let previousFrame = null;
   const pointer = new THREE.Vector2();
   const raycaster = new THREE.Raycaster();
   const pointers = new Map();
@@ -300,7 +299,6 @@ export function initVisualization(container) {
   let lastY = 0;
   let pinchDistance = 0;
   let lastInteraction = performance.now();
-  let lastSignature = "";
   let frame = 0;
 
   function particleMaterial(color, opacity, size) {
@@ -318,7 +316,8 @@ export function initVisualization(container) {
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
-    particleMaterials.push(material);
+    particleMaterials.add(material);
+    material.addEventListener("dispose", () => particleMaterials.delete(material));
     return material;
   }
 
@@ -498,7 +497,7 @@ export function initVisualization(container) {
     links.push({ nodeId, curve, flow, count, offset: (hash(nodeId) % 1000) / 1000, color, speed: 0.14, scatter });
   }
 
-  function addNode(node, position, tasks) {
+  function addNode(node, position) {
     const color = node.online ? COLORS.online : COLORS.offline;
     const group = new THREE.Group();
     group.position.copy(position);
@@ -507,9 +506,7 @@ export function initVisualization(container) {
     const orbit = pointsFrom(torusGeometry(Math.floor(quality.nodeParticles * 0.65), 0.5, 0.22, hash(node.node_id) + 7), color, 0.06, node.online ? 0.65 : 0.2);
     const orbitGroup = new THREE.Group();
     orbitGroup.add(orbit);
-    const nodeSpin = nodeSpins.get(node.node_id) || { shellX: 0, shellY: 0, orbitY: 0.2, orbitZ: 0.4 };
-    shell.rotation.set(nodeSpin.shellX, nodeSpin.shellY, 0);
-    orbitGroup.rotation.set(0.7, nodeSpin.orbitY, nodeSpin.orbitZ);
+    orbitGroup.rotation.set(0.7, 0.2, 0.4);
     group.add(shell, orbitGroup);
     const nucleus = new THREE.Mesh(
       new THREE.SphereGeometry(0.07, 16, 12),
@@ -531,99 +528,178 @@ export function initVisualization(container) {
     group.add(hit);
     selectable.push(hit);
     world.add(group);
-    nodeGroups.set(node.node_id, { group, shell, orbitGroup, glow, hit, position });
-
-    const allNodeTasks = tasks
-      .filter((task) => task.node_id === node.node_id)
-      .sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")));
-    const extra = Math.max(0, allNodeTasks.length - TASK_MARKER_LIMIT);
-    const nodeTasks = allNodeTasks.slice(-TASK_MARKER_LIMIT);
-    if (extra > 0) {
-      const badge = makeCountSprite(extra);
-      badge.position.set(0.02, 0.78, 0);
-      badge.scale.set(0.55, 0.28, 1);
-      group.add(badge);
-    }
-    nodeTasks.forEach((task, index) => {
-      const color = taskColor(task);
-      const angle = taskAngles.get(task.task_id) ?? (index / Math.max(1, nodeTasks.length)) * Math.PI * 2 + 0.3;
-      taskAngles.set(task.task_id, angle);
-      const orbit = new THREE.Group();
-      const taskSpin = taskSpins.get(task.task_id) || { y: 0, z: 0.2 };
-      orbit.rotation.set(0.5, taskSpin.y, taskSpin.z);
-      const marker = new THREE.Mesh(
-        new THREE.OctahedronGeometry(0.055, 0),
-        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.96 }),
-      );
-      marker.position.set(Math.cos(angle) * 0.76, Math.sin(angle) * 0.28, Math.sin(angle) * 0.76);
-      marker.userData.entity = { kind: "task", task, node };
-      marker.userData.highlight = marker;
-      const halo = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: glowTexture, color, transparent: true, opacity: 0.24, depthWrite: false, blending: THREE.AdditiveBlending,
-      }));
-      halo.scale.set(0.5, 0.5, 1);
-      marker.add(halo);
-      const hit = new THREE.Mesh(
-        new THREE.SphereGeometry(0.2, 10, 8),
-        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
-      );
-      hit.position.copy(marker.position);
-      hit.userData.entity = { kind: "task", task, node };
-      hit.userData.highlight = marker;
-      orbit.add(marker, hit);
-      group.add(orbit);
-      selectable.push(hit);
-      taskGroups.set(task.task_id, { marker, orbit, node, task });
-      if (TASK_ACTIVE.has(task.status)) {
-        const count = quality.mobile ? 14 : 24;
-        const positions = new Float32Array(count * 3);
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-        const material = new THREE.PointsMaterial({
-          color, size: 0.1, map: glowTexture, transparent: true, opacity: 1,
-          depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true,
-        });
-        const points = new THREE.Points(geometry, material);
-        points.frustumCulled = false;
-        world.add(points);
-        const jitter = Array.from({ length: count }, () => new THREE.Vector3(
-          (Math.random() - 0.5) * 0.07, (Math.random() - 0.5) * 0.07, (Math.random() - 0.5) * 0.07,
-        ));
-        const head = new THREE.Sprite(new THREE.SpriteMaterial({
-          map: glowTexture, color, transparent: true, opacity: 0.75,
-          depthWrite: false, blending: THREE.AdditiveBlending,
-        }));
-        head.scale.set(0.45, 0.45, 1);
-        world.add(head);
-        const curve = curveFor(position.clone().normalize().multiplyScalar(0.62), position, hash(task.task_id));
-        taskFlows.push({ points, count, curve, offset: (hash(task.task_id) % 1000) / 1000, speed: 0.22, head, jitter });
-      }
-    });
+    nodeGroups.set(node.node_id, { group, shell, orbit, orbitGroup, nucleus, glow, hit, position, node, badge: null });
   }
 
-  function rebuild(data) {
-    for (const child of [...world.children]) {
-      world.remove(child);
-      disposeObject(child);
-    }
-    selectable.length = 0;
-    nodeGroups.clear();
-    taskGroups.clear();
-    links.length = 0;
-    taskFlows.length = 0;
-    messageFlow = null;
-    closeDrawer(false);
-    selectable.push(coreGroup.userData.hit);
+  function addTask(task, node) {
+    const group = nodeGroups.get(node.node_id).group;
+    const color = taskColor(task);
+    const angle = (hash(task.task_id) % 1000) / 1000 * Math.PI * 2;
+    const orbit = new THREE.Group();
+    orbit.rotation.set(0.5, 0, 0.2);
+    const marker = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.055, 0),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.96 }),
+    );
+    marker.position.set(Math.cos(angle) * 0.76, Math.sin(angle) * 0.28, Math.sin(angle) * 0.76);
+    marker.userData.entity = { kind: "task", task, node };
+    marker.userData.highlight = marker;
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: glowTexture, color, transparent: true, opacity: 0.24, depthWrite: false, blending: THREE.AdditiveBlending,
+    }));
+    halo.scale.set(0.5, 0.5, 1);
+    marker.add(halo);
+    const hit = new THREE.Mesh(
+      new THREE.SphereGeometry(0.2, 10, 8),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+    );
+    hit.position.copy(marker.position);
+    hit.userData.entity = { kind: "task", task, node };
+    hit.userData.highlight = marker;
+    orbit.add(marker, hit);
+    group.add(orbit);
+    selectable.push(hit);
+    const flow = TASK_ACTIVE.has(task.status) ? createFlow(node.node_id, color, hash(task.task_id)) : null;
+    taskGroups.set(task.task_id, { marker, halo, hit, orbit, node, task, flow, retireAt: null });
+  }
 
+  function removeSelectable(object) {
+    const index = selectable.indexOf(object);
+    if (index >= 0) selectable.splice(index, 1);
+  }
+
+  function removeTask(id, item) {
+    if (selected.object === item.marker) closeDrawer();
+    removeSelectable(item.hit);
+    item.orbit.removeFromParent();
+    disposeObject(item.orbit);
+    removeFlow(item.flow);
+    taskGroups.delete(id);
+  }
+
+  function syncTasks(data) {
+    const tasks = new Map(taskList(data.tasks || new Map()).map((task) => [task.task_id, task]));
+    for (const item of taskGroups.values()) {
+      const task = tasks.get(item.task.task_id);
+      if (task) item.task = task;
+      const active = task && TASK_ACTIVE.has(task.status);
+      if (active) {
+        item.retireAt = null;
+        if (!item.flow) item.flow = createFlow(item.node.node_id, taskColor(task), hash(task.task_id));
+        if (item.flow.arrivalAt !== null) {
+          item.flow.startedAt += animationTime - Math.min(animationTime, item.flow.arrivalAt);
+          item.flow.arrivalAt = item.flow.fadeAt = null;
+        }
+      } else {
+        finishFlow(item.flow);
+        if ((!task || !taskVisible(task)) && item.retireAt === null) {
+          item.retireAt = item.flow?.fadeAt ?? animationTime + AFTERGLOW_HOLD_MS;
+        }
+      }
+      item.node = nodeGroups.get(item.node.node_id).node;
+      const entity = { kind: "task", task: item.task, node: item.node };
+      item.marker.userData.entity = item.hit.userData.entity = entity;
+      const color = taskColor(item.task);
+      item.marker.material.color.set(color);
+      item.halo.material.color.set(color);
+      if (item.flow) {
+        item.flow.head.material.color.set(color);
+        item.flow.points.material.color.set(color);
+      }
+    }
+
+    const candidates = visibleTaskList(data.tasks || new Map())
+      .sort((a, b) => Number(TASK_ACTIVE.has(b.status)) - Number(TASK_ACTIVE.has(a.status))
+        || String(b.created_at || "").localeCompare(String(a.created_at || "")));
+    for (const [nodeId, item] of nodeGroups) {
+      const nodeTasks = candidates.filter((task) => task.node_id === nodeId);
+      let count = [...taskGroups.values()].filter((task) => task.node.node_id === nodeId).length;
+      for (const task of nodeTasks) {
+        if (taskGroups.has(task.task_id)) continue;
+        if (count >= TASK_MARKER_LIMIT && TASK_ACTIVE.has(task.status)) {
+          const stale = [...taskGroups.values()].find((entry) => entry.node.node_id === nodeId
+            && !TASK_ACTIVE.has(entry.task.status) && !entry.flow && entry.retireAt === null);
+          if (stale) { removeTask(stale.task.task_id, stale); count -= 1; }
+        }
+        if (count < TASK_MARKER_LIMIT) { addTask(task, item.node); count += 1; }
+      }
+      const extra = nodeTasks.filter((task) => !taskGroups.has(task.task_id)).length;
+      if (item.extra !== extra) {
+        if (item.badge) {
+          item.badge.removeFromParent();
+          item.badge.material.map.dispose();
+          disposeObject(item.badge);
+        }
+        item.badge = extra ? makeCountSprite(extra) : null;
+        if (item.badge) {
+          item.badge.position.set(0.02, 0.78, 0);
+          item.badge.scale.set(0.55, 0.28, 1);
+          item.group.add(item.badge);
+        }
+        item.extra = extra;
+      }
+    }
+  }
+
+  function syncScene(data) {
     const nodes = [...(data.nodes || [])].sort((a, b) => String(a.node_id).localeCompare(String(b.node_id)));
-    const tasks = visibleTaskList(data.tasks || new Map());
     const layout = nodeLayout(nodes);
-    nodes.forEach((node, index) => {
+    const movedNodes = new Set();
+    for (const [nodeId, item] of nodeGroups) {
+      if (layout.has(nodeId)) continue;
+      for (const [id, task] of taskGroups) if (task.node.node_id === nodeId) removeTask(id, task);
+      for (const [key, flow] of messageFlows) {
+        if (flow.nodeId === nodeId) { removeFlow(flow); messageFlows.delete(key); }
+      }
+      if (selected.object === item.group) closeDrawer();
+      removeSelectable(item.hit);
+      item.group.removeFromParent();
+      item.badge?.material.map.dispose();
+      disposeObject(item.group);
+      const index = links.findIndex((link) => link.nodeId === nodeId);
+      if (index >= 0) {
+        links[index].flow.removeFromParent();
+        disposeObject(links[index].flow);
+        links.splice(index, 1);
+      }
+      nodeGroups.delete(nodeId);
+    }
+    nodes.forEach((node) => {
       const position = layout.get(node.node_id);
-      addNode(node, position, tasks);
-      addLink(node.node_id, position, node.online ? COLORS.online : COLORS.offline, hash(node.node_id) + index);
+      const color = node.online ? COLORS.online : COLORS.offline;
+      if (!nodeGroups.has(node.node_id)) {
+        addNode(node, position);
+        addLink(node.node_id, position, color, hash(node.node_id));
+      }
+      const item = nodeGroups.get(node.node_id);
+      item.node = node;
+      // Keep the endpoint vector shared with in-flight curves across layout updates.
+      if (!item.position.equals(position)) movedNodes.add(node.node_id);
+      item.position.copy(position);
+      item.group.position.copy(position);
+      item.group.userData.entity = item.hit.userData.entity = { kind: "node", node };
+      item.shell.material.uniforms.uColor.value.set(color);
+      item.shell.material.uniforms.uOpacity.value = node.online ? 0.85 : 0.28;
+      item.orbit.material.uniforms.uColor.value.set(color);
+      item.orbit.material.uniforms.uOpacity.value = node.online ? 0.65 : 0.2;
+      item.nucleus.material.color.set(color);
+      item.nucleus.material.opacity = node.online ? 0.95 : 0.45;
+      item.glow.material.color.set(color);
+      const link = links.find((entry) => entry.nodeId === node.node_id);
+      link.flow.material.color.set(color);
+      if (movedNodes.has(node.node_id)) link.curve.updateArcLengths();
     });
-    lastInteraction = Math.min(lastInteraction, performance.now());
+    for (const item of taskGroups.values()) {
+      if (movedNodes.has(item.node.node_id)) item.flow?.curve.updateArcLengths();
+    }
+    for (const flow of messageFlows.values()) {
+      if (movedNodes.has(flow.nodeId)) flow.curve.updateArcLengths();
+    }
+    syncTasks(data);
+    if (selected.object) {
+      selected.entity = selected.object.userData.entity || selected.entity;
+      setDrawer(selected.entity);
+    }
   }
 
   function setDrawer(entity) {
@@ -631,7 +707,8 @@ export function initVisualization(container) {
     const title = document.getElementById("viz-drawer-title");
     const body = document.getElementById("viz-drawer-body");
     if (!drawer || !title || !body) return;
-    title.textContent = entity.kind === "core" ? "Core" : entity.kind === "node" ? "Node" : "任务";
+    title.textContent = entity.kind === "core" ? "NEXUS" : entity.kind === "node" ? (entity.node.label || "我的设备") : "任务进度";
+    const technicalOpen = body.querySelector("details")?.open || false;
     body.replaceChildren();
     const row = (label, value) => {
       const item = document.createElement("div");
@@ -650,16 +727,18 @@ export function initVisualization(container) {
       row("设备", `${nodes.filter((node) => node.online).length}/${nodes.length} 在线`);
       row("进行中任务", tasks.filter((task) => TASK_ACTIVE.has(task.status)).length);
       row("当前回复", state?.activeTurn ? "进行中" : "空闲");
-      body.append(Object.assign(document.createElement("p"), { className: "viz-note", textContent: "Core 是任务、权限、记忆与费用的唯一权威；场景只展示公开状态，不写入状态。" }));
+      body.append(Object.assign(document.createElement("p"), { className: "viz-note", textContent: "这里显示助手与设备的实时工作状态。" }));
     } else if (entity.kind === "node") {
       const node = entity.node;
       const tasks = taskList(state?.tasks || new Map()).filter((task) => task.node_id === node.node_id);
       row("状态", node.online ? "在线" : "离线");
-      row("Node ID", node.node_id);
       row("工具", node.online ? `${(node.tools || []).length} 项` : "连接后确认");
-      row("根范围", (node.roots || []).join("、") || "未报告");
       row("任务", tasks.length ? `${tasks.length} 项` : "无");
       if ((node.tools || []).length) {
+        const technical = document.createElement("details");
+        technical.open = technicalOpen;
+        technical.append(Object.assign(document.createElement("summary"), {textContent: "技术详情"}));
+        technical.append(Object.assign(document.createElement("p"), {textContent: `设备编号：${node.node_id}`}));
         const list = document.createElement("ul");
         list.className = "viz-tools";
         for (const tool of node.tools) {
@@ -667,18 +746,16 @@ export function initVisualization(container) {
           item.textContent = tool;
           list.append(item);
         }
-        body.append(list);
+        technical.append(list);
+        body.append(technical);
       }
-      body.append(Object.assign(document.createElement("p"), { className: "viz-note", textContent: "设备权限由 Core 与本机配置共同约束；点击只查看，不执行工具。" }));
+      body.append(Object.assign(document.createElement("p"), { className: "viz-note", textContent: "在对话中直接提到设备名称，就能让助手使用它。" }));
     } else {
       const task = entity.task;
-      const labels = { awaiting_approval: "等待审批", running: "执行中", succeeded: "已完成", failed: "失败", unknown: "结果未知", cancelled: "已取消" };
+      const labels = { queued:"等待处理", ready:"准备就绪", dispatching:"正在发送", sent:"已提交", recovering:"正在核对", verifying:"核对结果", preparing:"准备中", stopping:"正在停止", waiting:"等待中", timed_out:"处理超时", expired:"已过期", awaiting_approval: "等待确认", running: "执行中", succeeded: "已完成", failed: "未完成", unknown: "结果待核对", cancelled: "已取消" };
       row("状态", labels[task.status] || task.status);
-      row("动作", task.request?.intent || "任务");
-      row("节点", entity.node?.node_id || task.node_id || "未指定");
-      row("任务 ID", task.task_id);
-      row("尝试", task.attempts?.length ?? "—");
-      body.append(Object.assign(document.createElement("p"), { className: "viz-note", textContent: "任务状态与审批以 Core 为准；这里不提供替代状态机。" }));
+      row("设备", entity.node?.label || state?.nodes?.find(node => node.node_id === task.node_id)?.label || "我的设备");
+      body.append(Object.assign(document.createElement("p"), { className: "viz-note", textContent: "完整结果和需要确认的操作会显示在对话与任务记录中。" }));
     }
     drawer.hidden = false;
     drawer.dataset.kind = entity.kind;
@@ -712,22 +789,18 @@ export function initVisualization(container) {
     highlight.scale.setScalar(1.12);
     selected.object = highlight;
     setDrawer(selected.entity);
-    if (selected.entity.kind === "node") {
-      const position = nodeGroups.get(selected.entity.node.node_id)?.group.getWorldPosition(new THREE.Vector3());
-      if (position) {
-        desiredTarget.copy(position).multiplyScalar(0.55);
-        desiredDistance = Math.min(desiredDistance, 5.7);
-      }
-    } else if (selected.entity.kind === "task") {
-      const position = nodeGroups.get(selected.entity.node?.node_id)?.group.getWorldPosition(new THREE.Vector3());
-      if (position) {
-        desiredTarget.copy(position).multiplyScalar(0.55);
-        desiredDistance = Math.min(desiredDistance, 5.7);
-      }
-    } else {
-      desiredTarget.set(0, 0, 0);
-      desiredDistance = 7.2;
-    }
+    updateFocus();
+    desiredDistance = selected.entity.kind === "core" ? 7.2 : Math.min(desiredDistance, 5.7);
+    thetaVelocity = phiVelocity = 0;
+    lastInteraction = performance.now();
+  }
+
+  function updateFocus() {
+    // A task orbits its device; focus on that stable center, not its moving marker.
+    const nodeId = selected.entity?.node?.node_id;
+    const focus = nodeId ? nodeGroups.get(nodeId)?.group : coreGroup;
+    if (focus) focus.getWorldPosition(desiredTarget);
+    else desiredTarget.set(0, 0, 0);
   }
 
   function pick(clientX, clientY) {
@@ -773,7 +846,11 @@ export function initVisualization(container) {
     if (pointers.size === 2) {
       const [a, b] = [...pointers.values()];
       const next = Math.hypot(a.x - b.x, a.y - b.y);
-      if (pinchDistance) distance = Math.max(4.2, Math.min(12, distance * (pinchDistance / next)));
+      if (pinchDistance && next > 0) {
+        desiredDistance = Math.max(4.2, Math.min(12, desiredDistance * (pinchDistance / next)));
+        distance = desiredDistance;
+      }
+      moved = Math.max(moved, 5);
       pinchDistance = next;
       return;
     }
@@ -793,8 +870,14 @@ export function initVisualization(container) {
 
   function onPointerUp(event) {
     if (!pointers.delete(event.pointerId)) return;
+    if (pointers.size === 1) {
+      const remaining = [...pointers.values()][0];
+      lastX = remaining.x;
+      lastY = remaining.y;
+      pinchDistance = 0;
+    }
     if (pointers.size === 0) {
-      if (dragging && moved < 5) selectObject(pick(event.clientX, event.clientY));
+      if (event.type !== "pointercancel" && dragging && moved < 5) selectObject(pick(event.clientX, event.clientY));
       dragging = false;
       pinchDistance = 0;
     }
@@ -813,66 +896,90 @@ export function initVisualization(container) {
     distance = 7.4;
     desiredDistance = 7.4;
     desiredTarget.set(0, 0, 0);
+    target.set(0, 0, 0);
+    thetaVelocity = phiVelocity = 0;
+    lastInteraction = performance.now();
     closeDrawer(false);
   }
 
-  function removeMessageFlow() {
-    if (!messageFlow) return;
-    world.remove(messageFlow.points, messageFlow.head);
-    disposeObject(messageFlow.points);
-    disposeObject(messageFlow.head);
-    messageFlow = null;
+  function removeFlow(flow) {
+    if (!flow) return;
+    world.remove(flow.points, flow.head);
+    disposeObject(flow.points);
+    disposeObject(flow.head);
   }
 
-  function startMessageFlow(nodeId) {
-    if (!links.length) return;
-    const preferred = nodeId ? links.find((link) => link.nodeId === nodeId) : null;
-    const link = preferred || links.find((item) => nodeGroups.get(item.nodeId)?.group.visible !== false) || links[0];
-    if (!link) return;
+  function createFlow(nodeId, color, seed) {
+    const end = nodeGroups.get(nodeId).position;
+    const curve = curveFor(end.clone().normalize().multiplyScalar(0.62), end, seed);
     const count = quality.mobile ? 18 : 34;
     const positions = new Float32Array(count * 3);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     const material = new THREE.PointsMaterial({
-      color: 0xdff4ff, size: quality.mobile ? 0.08 : 0.1, map: glowTexture,
+      color, size: quality.mobile ? 0.08 : 0.1, map: glowTexture,
       transparent: true, opacity: 0.95, depthWrite: false,
       blending: THREE.AdditiveBlending, sizeAttenuation: true,
     });
     const points = new THREE.Points(geometry, material);
     points.frustumCulled = false;
     const head = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: glowTexture, color: 0xeaf8ff, transparent: true, opacity: 0.9,
+      map: glowTexture, color, transparent: true, opacity: 0.9,
       depthWrite: false, blending: THREE.AdditiveBlending,
     }));
     head.scale.set(0.55, 0.55, 1);
     world.add(points, head);
-    messageFlow = { points, count, curve: link.curve, head, nodeId: link.nodeId };
+    const flow = { points, count, curve, head, nodeId, startedAt: animationTime, arrivalAt: null, fadeAt: null };
+    updateFlow(flow);
+    return flow;
+  }
+
+  function finishFlow(flow) {
+    if (!flow || flow.arrivalAt !== null) return;
+    // Finish at the device, including a return leg already in progress.
+    const phase = (animationTime - flow.startedAt) / FLOW_TRAVEL_MS;
+    const nextArrival = Math.ceil((phase - 1) / 2) * 2 + 1;
+    flow.arrivalAt = flow.startedAt + Math.max(1, nextArrival) * FLOW_TRAVEL_MS;
+    flow.fadeAt = flow.arrivalAt + AFTERGLOW_HOLD_MS;
+  }
+
+  function afterglowOpacity(fadeAt) {
+    if (fadeAt === null) return 1;
+    const t = Math.max(0, Math.min(1, (animationTime - fadeAt) / AFTERGLOW_FADE_MS));
+    return 1 - t * t * (3 - 2 * t);
+  }
+
+  function updateFlow(flow) {
+    const opacity = afterglowOpacity(flow.fadeAt);
+    const phaseAt = (lag) => {
+      const time = Math.max(flow.startedAt, animationTime - lag);
+      const elapsed = Math.min(time, flow.arrivalAt ?? time) - flow.startedAt;
+      const phase = elapsed / FLOW_TRAVEL_MS % 2;
+      return phase <= 1 ? phase : 2 - phase;
+    };
+    const positions = flow.points.geometry.getAttribute("position");
+    for (let i = 0; i < flow.count; i += 1) {
+      const point = flow.curve.getPointAt(phaseAt(i * 12));
+      positions.setXYZ(i, point.x, point.y, point.z);
+    }
+    positions.needsUpdate = true;
+    flow.head.position.copy(flow.curve.getPointAt(phaseAt(0)));
+    flow.head.material.opacity = 0.9 * opacity;
+    flow.points.material.opacity = 0.95 * opacity;
+    return opacity > 0;
   }
 
   function syncMessageFlow(data) {
     const key = data.messageKey || data.activeTurn || "";
-    if (!key) {
-      if (messageFlow && performance.now() > messageExpires) removeMessageFlow();
-      return;
+    for (const [id, flow] of messageFlows) {
+      if (id !== key || !data.activeTurn) finishFlow(flow);
     }
-    if (!messageFlow) {
-      if (key === messageDoneKey) return;
-      messageKey = key;
-      messageDoneKey = "";
-      startMessageFlow(data.nodeId);
-      messageExpires = performance.now() + 6000;
-    } else if (key !== messageKey || (data.nodeId && messageFlow.nodeId !== data.nodeId)) {
-      removeMessageFlow();
-      messageKey = key;
-      messageDoneKey = "";
-      startMessageFlow(data.nodeId);
-      messageExpires = performance.now() + 6000;
-    }
-    if (data.activeTurn) messageExpires = performance.now() + 2500;
-    if (!data.activeTurn && messageFlow && performance.now() > messageExpires) {
-      removeMessageFlow();
-      messageDoneKey = key;
-    }
+    if (!key || key === messageKey || !links.length || messageFlows.size >= MESSAGE_FLOW_LIMIT) return;
+    const link = links.find((item) => item.nodeId === data.nodeId) || links[0];
+    const flow = createFlow(link.nodeId, 0xeaf8ff, hash(key));
+    messageFlows.set(key, flow);
+    messageKey = key;
+    if (!data.activeTurn) finishFlow(flow);
   }
 
   function updateFlows(now) {
@@ -887,88 +994,70 @@ export function initVisualization(container) {
       }
       positions.needsUpdate = true;
     }
-    for (const flow of taskFlows) {
-      const positions = flow.points.geometry.getAttribute("position");
-      for (let i = 0; i < flow.count; i += 1) {
-        const t = ((i / flow.count) + time * flow.speed + flow.offset) % 1;
-        const point = flow.curve.getPointAt(t);
-        const jitter = flow.jitter[i];
-        positions.setXYZ(i, point.x + jitter.x, point.y + jitter.y, point.z + jitter.z);
-      }
-      positions.needsUpdate = true;
-      const headT = (time * 0.075 + flow.offset) % 1;
-      const headPoint = flow.curve.getPointAt(1 - headT);
-      flow.head.position.copy(headPoint);
-      flow.head.material.opacity = 0.55 + Math.sin(time * 3 + flow.offset * 12) * 0.2;
+    for (const [id, item] of taskGroups) {
+      if (item.flow && !updateFlow(item.flow)) { removeFlow(item.flow); item.flow = null; }
+      const opacity = afterglowOpacity(item.retireAt);
+      item.marker.material.opacity = 0.96 * opacity;
+      item.halo.material.opacity = 0.24 * opacity;
+      if (!opacity) removeTask(id, item);
     }
-    if (messageFlow) {
-      const positions = messageFlow.points.geometry.getAttribute("position");
-      const direction = 1.0;
-      for (let i = 0; i < messageFlow.count; i += 1) {
-        const t = ((i / messageFlow.count) + time * 0.55) % 1;
-        const point = messageFlow.curve.getPointAt(1 - t * direction);
-        positions.setXYZ(i, point.x, point.y, point.z);
-      }
-      positions.needsUpdate = true;
-      const headT = (time * 0.38) % 1;
-      const headPoint = messageFlow.curve.getPointAt(1 - headT);
-      messageFlow.head.position.copy(headPoint);
-      messageFlow.head.material.opacity = 0.75 + Math.sin(time * 4.2) * 0.18;
+    for (const [key, flow] of messageFlows) {
+      if (!updateFlow(flow)) { removeFlow(flow); messageFlows.delete(key); }
     }
   }
 
   function animate(now) {
     if (!visible) {
-      frame = requestAnimationFrame(animate);
+      previousFrame = null;
       return;
     }
-    const time = now * 0.001;
+    const delta = previousFrame === null ? 0 : Math.min(100, Math.max(0, now - previousFrame));
+    previousFrame = now;
+    animationTime += delta;
+    const step = delta / (1000 / 60);
+    const time = animationTime * 0.001;
     if (!dragging) {
-      theta += thetaVelocity;
-      phi = Math.max(0.28, Math.min(2.88, phi + phiVelocity));
-      thetaVelocity *= 0.955;
-      phiVelocity *= 0.955;
-      if (now - lastInteraction > 3800) theta += 0.00042;
+      theta += thetaVelocity * step;
+      phi = Math.max(0.28, Math.min(2.88, phi + phiVelocity * step));
+      thetaVelocity *= Math.pow(0.955, step);
+      phiVelocity *= Math.pow(0.955, step);
+      if (now - lastInteraction > 3800) theta += 0.00042 * step;
     }
-    target.lerp(desiredTarget, 0.045);
-    distance += (desiredDistance - distance) * 0.055;
+    updateFocus();
+    target.lerp(desiredTarget, 1 - Math.pow(0.955, step));
+    distance += (desiredDistance - distance) * (1 - Math.pow(0.945, step));
     setCamera();
 
     const core = coreGroup.userData;
     if (core) {
-      core.innerGroup.rotation.y += 0.0017;
-      core.innerGroup.rotation.x += 0.0005;
-      core.diskGroup.rotation.z += 0.0015;
-      core.vortexGroup.rotation.y -= 0.0021;
-      core.vortexGroup.rotation.x += 0.0004;
-      core.outerGroup.rotation.y -= 0.0009;
-      core.outerGroup.rotation.z += 0.0006;
-      core.ring.rotation.z += 0.002;
+      core.innerGroup.rotation.y += 0.0017 * step;
+      core.innerGroup.rotation.x += 0.0005 * step;
+      core.diskGroup.rotation.z += 0.0015 * step;
+      core.vortexGroup.rotation.y -= 0.0021 * step;
+      core.vortexGroup.rotation.x += 0.0004 * step;
+      core.outerGroup.rotation.y -= 0.0009 * step;
+      core.outerGroup.rotation.z += 0.0006 * step;
+      core.ring.rotation.z += 0.002 * step;
       const breath = 1 + Math.sin(time * 1.1) * 0.025;
       core.corona.scale.set(2.4 * breath, 2.4 * breath, 1);
-      core.nucleus.rotation.y += 0.004;
-      core.nucleus.rotation.x += 0.002;
+      core.nucleus.rotation.y += 0.004 * step;
+      core.nucleus.rotation.x += 0.002 * step;
     }
-    world.rotation.y += 0.00035;
-    for (const [nodeId, item] of nodeGroups) {
-      const spin = nodeSpins.get(nodeId) || { shellX: 0, shellY: 0, orbitY: 0.2, orbitZ: 0.4 };
-      spin.shellX += 0.0015;
-      spin.shellY += 0.003;
-      spin.orbitZ += 0.004;
-      spin.orbitY += 0.002;
-      nodeSpins.set(nodeId, spin);
-      item.shell.rotation.set(spin.shellX, spin.shellY, 0);
-      item.orbitGroup.rotation.set(0.7, spin.orbitY, spin.orbitZ);
-      item.glow.material.opacity = 0.28 + Math.sin(time * 1.3 + item.position.x) * 0.08;
+    // Camera orbit supplies scene rotation around the focus. Rotating the world
+    // as well would move the focused device away from that pivot.
+    for (const item of nodeGroups.values()) {
+      item.shell.rotation.x += 0.0015 * step;
+      item.shell.rotation.y += 0.003 * step;
+      item.orbitGroup.rotation.z += 0.004 * step;
+      item.orbitGroup.rotation.y += 0.002 * step;
+      item.glow.material.opacity = item.node.online
+        ? 0.28 + Math.sin(time * 1.3 + item.position.x) * 0.08 : 0.14;
     }
-    for (const [taskId, item] of taskGroups) {
-      const spin = taskSpins.get(taskId) || { y: 0, z: 0.2 };
-      spin.y += 0.007;
-      spin.z += 0.002;
-      taskSpins.set(taskId, spin);
-      item.orbit.rotation.set(0.5, spin.y, spin.z);
+    for (const item of taskGroups.values()) {
+      item.orbit.rotation.y += 0.007 * step;
+      item.orbit.rotation.z += 0.002 * step;
     }
-    updateFlows(now);
+    updateFlows(animationTime);
     for (const material of particleMaterials) material.uniforms.uTime.value = time;
     if (composer) {
       try {
@@ -993,7 +1082,9 @@ export function initVisualization(container) {
   container.addEventListener("contextmenu", blockContextMenu);
   const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(container);
-  document.getElementById("viz-drawer-close")?.addEventListener("click", () => closeDrawer());
+  const drawerClose = document.getElementById("viz-drawer-close");
+  const onCloseDrawer = () => closeDrawer();
+  drawerClose?.addEventListener("click", onCloseDrawer);
   resize();
   setCamera();
   frame = requestAnimationFrame(animate);
@@ -1011,33 +1102,21 @@ export function initVisualization(container) {
     select(clientX, clientY) {
       selectObject(pick(clientX, clientY));
     },
-    reset() {
-      theta = 0.42;
-      phi = 1.22;
-      distance = 7.4;
-      desiredDistance = 7.4;
-      desiredTarget.set(0, 0, 0);
-      closeDrawer(false);
-    },
+    reset: onDoubleClick,
   };
 
   return {
     update(data) {
       state = data;
-      const signature = JSON.stringify({
-        nodes: (data.nodes || []).map((node) => [node.node_id, node.online, node.tools, node.roots]),
-        tasks: visibleTaskList(data.tasks || new Map()).map((task) => [task.task_id, task.status, task.node_id]),
-        active: data.activeTurn || null,
-        paused: data.paused || false,
-      });
-      if (signature !== lastSignature) {
-        lastSignature = signature;
-        rebuild(data);
-      }
+      syncScene(data);
       syncMessageFlow(data);
     },
     visible(value) {
+      if (visible === value) return;
       visible = value;
+      previousFrame = null;
+      cancelAnimationFrame(frame);
+      if (visible) frame = requestAnimationFrame(animate);
     },
     resize,
     input: bridge,
@@ -1045,10 +1124,13 @@ export function initVisualization(container) {
     destroy() {
       cancelAnimationFrame(frame);
       resizeObserver.disconnect();
+      drawerClose?.removeEventListener("click", onCloseDrawer);
+      container.removeEventListener("contextmenu", blockContextMenu);
       renderer.dispose();
       composer?.value.dispose();
-      disposeObject(coreGroup);
-      disposeObject(world);
+      for (const item of nodeGroups.values()) item.badge?.material.map.dispose();
+      glowTexture.dispose();
+      disposeObject(scene);
       container.replaceChildren();
     },
   };

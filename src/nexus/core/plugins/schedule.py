@@ -125,6 +125,12 @@ async def tick(service,now=None):
 async def run(service):
     while True:
         if service.config.enabled:
+            from nexus.core.plugins.observations import tick as observe
+            from nexus.core.plugins.business import observe as evaluate_rollouts
+            await observe(service)
+            await evaluate_rollouts(service)
+            from nexus.core.plugins.mcp import poll as poll_mcp
+            await poll_mcp(service)
             await tick(service)
             from nexus.core.plugins.lifecycle import tick as continue_work
             await continue_work(service)

@@ -540,6 +540,19 @@ body::before,body::after,.visual::before,.visual::after,.visual-core,.visual-gri
 .login-card label.remember{display:flex;align-items:center;gap:8px;margin:-4px 0 14px;color:#a8a8a8;font-size:12px;cursor:pointer}
 .login-card label.remember input{width:15px;height:15px;min-height:0;margin:0;padding:0;border-radius:4px;accent-color:#f2f2f2}
 
+/* Everyday controls stay compact; less frequent settings open on demand. */
+.settings-disclosure > summary { cursor:pointer; font-size:15px; font-weight:600; padding:4px 0; }
+.settings-disclosure[open] > summary { margin-bottom:18px; }
+.settings-disclosure .settings-row { flex-wrap:wrap; }
+.settings-section p { line-height:1.7; }
+.chat-chips,.dock .chips { min-height:0; gap:6px; }
+.chip { font-size:12px; padding:5px 10px; }
+.composer-actions { gap:6px; flex-wrap:wrap; }
+.composer-actions .primary { margin-left:auto; }
+.settings-section input { width:100%; min-width:0; }
+button:focus-visible,summary:focus-visible { outline:2px solid #a6d5ff; outline-offset:3px; }
+@media (max-width:600px) { .topbar { gap:8px; } .connection { font-size:11px; } .composer-actions button { min-height:40px; } }
+
 /* ---------- chat presentation v1 ---------- */
 .process-panel{margin:12px 0;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;background:#000}
 .process-head{display:flex;align-items:center;gap:8px;min-height:38px;padding:7px 11px;background:#000}
@@ -555,14 +568,12 @@ body::before,body::after,.visual::before,.visual::after,.visual-core,.visual-gri
 .process-live{margin:10px 0;padding:9px 11px;border-left:2px solid #666;background:#000;overflow-wrap:anywhere}
 .process-live-label{margin:0 0 5px;font-size:10.5px;letter-spacing:.08em;color:#888}
 .process-live .prose{font-size:13px;line-height:1.7;color:#c9c9c9}
-.final-answer{margin:14px 0 0;padding:12px 14px;border:1px solid #2a2a2a;border-radius:12px;background:#000;overflow-wrap:anywhere}
-.final-label{margin:0 0 7px;font-size:10.5px;letter-spacing:.08em;color:#888}
+.final-answer{margin:12px 0 0;overflow-wrap:anywhere}
 .final-answer .prose{font-size:14px;line-height:1.75;color:#f2f2f2}
 @media (max-width:760px){
   .process-panel{margin:10px 0;border-radius:10px}
   .process-head{padding:6px 9px}
   .process-body{padding:0 9px 9px}
-  .final-answer{padding:10px 11px;border-radius:10px}
 }
 
 /* ---------- 3D visualization ---------- */

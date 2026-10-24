@@ -120,7 +120,10 @@ async def presentation(conn: aiosqlite.Connection, turn: dict) -> dict:
         label = "执行已结束，结果见任务记录"
     elif phase == "completed" and (failed or turn.get("error_code")):
         label = "回复已完成，部分操作未完成"
+    from nexus.core.cognitive.chat_files import turn_files
+    from nexus.contracts.file_transfer import ChatFile
     return ChatPresentation(
+        files=[ChatFile.model_validate_json(json.dumps(file)) for file in await turn_files(conn,turn)],
         phase=phase, label=label, process=process, process_truncated=truncated,
         live_text=live, final_text=final,
         collapse_process=phase == "completed" and bool(final) and not failed and not turn.get("error_code")

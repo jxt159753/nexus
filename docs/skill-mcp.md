@@ -1,10 +1,16 @@
 # Skill Shell 与受控 MCP
 
-本文件说明后端接口。实施与生产状态查 [P65](ROADMAP.md#p65skill-shell-与受控-mcp)，设计见 [ADR 0034](decisions/0034-skill-managed-mcp.md)。前端/Windows 桥由用户控制 DSH 按 [工作单](PLUGINS-FRONTEND.md#skillmcp-追加接入要求)实施。
+本文件说明后端接口。最初实现查 [P65](ROADMAP.md#p65skill-shell-与受控-mcp)，实际 Windows-MCP 接通和当前发布查 [P83](ROADMAP.md#p83-windows-mcp)；设计见 [ADR 0034](decisions/0034-skill-managed-mcp.md)、[ADR 0042](decisions/0042-conversation-capability-readiness.md)。其他前端需求仍由用户控制 DSH 按 [工作单](PLUGINS-FRONTEND.md#skillmcp-追加接入要求)实施。
 
 ## 使用条件
 
 Core 启用 plugins 与 extensions，双方登记 `plugin.call@1`、workspace 及一致的 plugin_digest。Node 启用 plugins、配置实际 Shell 路径；托管 MCP 另须在本地策略显式设置 `allow_managed_mcp=true`，修改后同步 Core 信任摘要。配置示例见 [Node](../config/plugins.node.example.toml)。模型和 Skill 不能修改这些开关或权限模式。
+
+Core 信任的是完整 `NodeConfig.plugin_digest()`，包括 Node 侧相关资源配置，不是单独 `PluginNodeConfig.digest()`。用节点接口报告的实际摘要核对；`plugin_inspect` 同时报告执行可用状态及阻塞原因。已有注册项、full 模式或 Node 在线均不能代替这些检查。
+
+手机、Windows 和网页均经同一个 Core 选择设备。工作目录中各设备的 `plugin_inspect` 描述附带最多 20 项托管 MCP 登记摘要及截断标记，仅含名称、修订和状态，不外发配置路径／参数。`plugin_inspect('builtin.mcp')` 的 `data.registrations` 返回相同设备的登记列表；列表 `revision` 表示当前 active（若无则最新）版本，`latest_revision` 表示最新登记修订，失败／等待中的更新不掩盖仍 active 的旧版。列表和摘要均不等于实际执行成功，空列表不覆盖设备的静态配置。
+
+用户问“能否调用 Windows-MCP”时，先只读检查电脑端插件及执行状态；若需了解具体工具，再用 `mcp_list(server)` 读取契约。不能因入口在手机、此会话没有安装记录或旧助手说过“不支持”而否定电脑能力；能力询问本身也不授权重新安装、登记或试运行桌面动作。实际发布与验证范围见 [P87](ROADMAP.md#p87-mobile-mcp)。
 
 Shell 以 Node 当前用户权限运行，工作目录不构成文件隔离。原生 Skill 保留现有生成、测试、具体版本批准与启用流程；full 免运行步骤的执行确认，不代替旧 M4 Skill 的版本批准。普通模式每个原生步骤创建具体审批任务，审批绑定固定版本、参数、设备与策略。
 
@@ -54,6 +60,18 @@ manifest 使用 `verification_profile: skill_native_steps_v1`；仍最多三步�
 模型通过 builtin.mcp 的 `mcp_register/mcp_discover/mcp_reload/mcp_remove` 使用相同 Core 版本与任务边界；`mcp_list` 不执行设备操作，不指定 server 只返回最多 20 个摘要，指定 server 返回已发现完整工具契约。`mcp_call_tool` 输入 server、name、arguments、catalog_digest，Node 实际调用前重新 tools/list；摘要变化先拒绝调用并要求重载。普通模式的 MCP 管理/调用须当前具体动作授权，不复用同一插件此前其他动作的确认；full 仍受原范围约束。
 
 登记不是下载器。NEXUS 可先用获准 Shell 或原生 Skill 安装到选定设备，再登记实际执行程序，发现后通过通用工具入口调用。真实 MCP 工具 `isError:true` 为失败；声明 outputSchema 时核对 structuredContent。注册/重载不会在 Core 导入服务器或生成代码。
+
+指定 server 的模型 `mcp_list` 也会返回 `not_registered/pending/failed`、配置和最新修订，帮助恢复未完成登记；执行入口仍只接受 active。`plugin_inspect('builtin.mcp')` 提供精确登记 schema。跨 Linux Core / Windows Node 的可执行文件路径使用规范化正斜杠参与摘要。FastMCP `x-fastmcp-wrap-result` 布尔注解不影响字段校验，其他不支持的 schema 仍拒绝。
+
+原生步骤收到业务失败时，Skill `error.tool_result` 保存已校验的完整底层结果，`step_id/task_id` 指向来源，步骤标为 failed、后续不执行；聊天在原结果外发授权内反馈这条证据。`NATIVE_STEP_FAILED` 本身不能证明目录/插件摘要不符，任务传输成功也不能证明 MCP 成功。
+
+## Windows-MCP 实际接入
+
+已验证包版本为0.8.8，实际要求 Python>=3.14；使用独立环境及 stdio，不替换系统 Python、不设置开机启动、不打开端口。安装日志以后台 job 的真实退出码和停止证据为准；`builtin.jobs/job_output` 使用 Node job_id，Core 独立 `job_output` 使用 task_id，不能混用。长安装用当前会话的有界后台 Shell，不能装进有10秒上限的原生 Skill 步骤后将 started 当完成。
+
+关闭该 MCP 子进程遥测的启动方式是独立 Python 的 argv：`-c`、`import os;os.environ['ANONYMIZED_TELEMETRY']='false';from windows_mcp.__main__ import main;main()`、`serve --transport stdio --tools ...` 的分项参数。不新增通用环境/秘密注入权限。上游额外提供 `ControlStatus`；`USER_CONTROL` 表示检测到用户操作后暂时让权，保留保护，通过状态和明确结果判断是否可继续，不关闭保护或重复未知操作。
+
+当前检查 Skill 固定调用 Process list（name=nexus-node、limit=2）。上游名称匹配可能带出相似进程，不能把所有返回项称为 Nexus 子进程。它证明进程存在及一次资源采样，不能证明全部业务健康。批准、启用与有效期限以版本接口为准；保持启用不等于无限期批准，策略/依赖变化仍检查。版本及两次真实调用见[验证记录](WINDOWS-MCP-VERIFICATION.md)。
 
 ## 恢复与兼容
 

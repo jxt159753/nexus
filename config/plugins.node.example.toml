@@ -3,6 +3,9 @@
 [plugins]
 enabled = false
 allow_host_python = false
+# Owner-managed MCP registry: enables configuration/discovery/calls from Core.
+# Changing this flag changes plugin_digest; update Core's trusted digest too.
+allow_managed_mcp = false
 pwsh = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
 bash = 'C:\Program Files\Git\bin\bash.exe'
 git = 'C:\Program Files\Git\bin\git.exe'

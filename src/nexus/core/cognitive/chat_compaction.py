@@ -91,7 +91,7 @@ async def root_calls(conn, turn_id):
 
 
 def remaining(config, calls):
-    spent = accounted_cost(calls)
+    spent = accounted_cost(calls, require_known=config.cost_limits_enabled)
     amount = (config.task_cost_microunits - spent
               if config.cost_limits_enabled else config.model_reservation())
     if config.chat_output_limit(amount) < 32:

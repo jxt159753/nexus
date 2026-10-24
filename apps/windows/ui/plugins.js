@@ -258,12 +258,11 @@ export async function changeGoal(conversationId, goalId, status, requestId) {
  * the exact outbound text and the per-round budget before POSTing; this helper
  * deliberately does not add tools, raise limits or choose a different model.
  */
-export async function submitPluginGeneration({ conversationId, nodeId, text, workspace = true }) {
+export async function submitPluginGeneration({ conversationId, text }) {
   if (!conversationId) throw new ApiError(400, "NO_CONVERSATION");
-  if (!nodeId) throw new ApiError(400, "NO_NODE");
   const history = await api(`/api/v1/chat/conversations/${conversationId}/turns`);
   const revision = history?.conversation?.revision ?? 0;
-  const catalog = workspace ? await api(`/api/v1/chat/work-catalog?node_id=${nodeId}`) : null;
+  const catalog = await api("/api/v1/chat/work-catalog");
   const payload = {
     request_id: uuid(),
     expected_revision: revision,
@@ -271,7 +270,7 @@ export async function submitPluginGeneration({ conversationId, nodeId, text, wor
     include_context: false,
     allow_model: true,
     allow_tools: true,
-    node_id: nodeId,
+    all_nodes: true,
     allow_skills: false,
     ...(catalog?.work_digest ? {
       workspace_work: true,

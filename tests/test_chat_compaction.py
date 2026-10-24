@@ -109,7 +109,10 @@ def test_manual_compact_is_one_call_idempotent_and_survives_recovery(world,monke
         assert len(provider.requests)==count
         follow,_=await send(chat,world,conv["conversation_id"],allow_compaction=True)
         raw=(await chat.get(world.owner,follow["turn_id"]))["context_messages"]
-        assert len(raw)==2 and all(identifier in raw[0]["content"] for identifier in ids)
+        assert len(raw)==2 and "原文引用 ctx:" in raw[0]["content"]
+        async with world.db.transaction(write=False) as conn:
+            saved = await one(conn,"SELECT source_ids_json FROM chat_compactions WHERE turn_id=?",(turn["turn_id"],))
+            assert json.loads(saved[0]) == ids
     asyncio.run(run())
 
 

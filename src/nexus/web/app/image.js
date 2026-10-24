@@ -26,13 +26,15 @@ function integer(value, min, max) {
   return Number.isInteger(value) && value >= min && value <= max;
 }
 
-function bytesOf(data) {
+function bytesOf(data, withPath = true) {
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
-  for (const key of ["path", "source_sha256", "source_size_bytes", "source_media_type", "original_width",
-    "original_height", "image", "downscaled", "first_frame_only"]) {
+  const keys = ["source_sha256", "source_size_bytes", "source_media_type", "original_width",
+    "original_height", "image", "downscaled", "first_frame_only"];
+  if (withPath) keys.unshift("path");
+  for (const key of keys) {
     if (!(key in data)) return null;
   }
-  if (typeof data.path !== "string" || !data.path || data.path.length > 240) return null;
+  if (withPath && (typeof data.path !== "string" || !data.path || data.path.length > 240)) return null;
   if (!HEX64.test(data.source_sha256) || !SOURCE_TYPES.has(data.source_media_type)) return null;
   if (!integer(data.source_size_bytes, 1, IMAGE_LIMITS.maxSourceBytes)) return null;
   if (!integer(data.original_width, 1, IMAGE_LIMITS.maxSourceDimension)
@@ -72,7 +74,7 @@ function bytesOf(data) {
 
   return {
     root_id: data.root_id === "workspace" ? "workspace" : "workspace",
-    path: data.path,
+    path: withPath ? data.path : "",
     source_sha256: data.source_sha256,
     source_size_bytes: data.source_size_bytes,
     source_media_type: data.source_media_type,
@@ -144,6 +146,30 @@ export function inspectImageResult(data) {
     firstFrameOnly: checked.first_frame_only,
     path: checked.path,
     sha256: checked.image.sha256,
+  };
+}
+
+export function inspectAttachmentSnapshot(snapshot) {
+  // Attachment previews carry the same verified ImageSnapshot without a
+  // workspace path. Nothing else is accepted as an image source.
+  const checked = bytesOf(snapshot, false);
+  if (!checked) return { ok: false, reason: "图片快照未通过严格白名单校验" };
+  return {
+    ok: true,
+    data: checked,
+    url: `data:${checked.image.media_type};base64,${checked.image.data_base64}`,
+    mediaType: checked.image.media_type,
+    width: checked.image.width,
+    height: checked.image.height,
+    originalWidth: checked.original_width,
+    originalHeight: checked.original_height,
+    sizeBytes: checked.image.size_bytes,
+    sourceSizeBytes: checked.source_size_bytes,
+    sourceMediaType: checked.source_media_type,
+    downscaled: checked.downscaled,
+    firstFrameOnly: checked.first_frame_only,
+    sha256: checked.image.sha256,
+    sourceSha256: checked.source_sha256,
   };
 }
 
@@ -264,6 +290,81 @@ export function createImageEvidence(data, { onOpen = null } = {}) {
   thumb.addEventListener("click", () => {
     if (onOpen) onOpen({ url: info.url, alt: image.alt, caption: `workspace/${info.path} · ${info.width}×${info.height}`, trigger: thumb });
     else openImagePreview({ url: info.url, alt: image.alt, caption: `workspace/${info.path} · ${info.width}×${info.height}`, trigger: thumb });
+  });
+  return figure;
+}
+
+export function createAttachmentEvidence(snapshot, { title = "图片快照", onOpen = null } = {}) {
+  const info = inspectAttachmentSnapshot(snapshot);
+  if (!info.ok) return null;
+  const name = String(title || "图片快照").slice(0, 200);
+  const figure = document.createElement("figure");
+  figure.className = "image-evidence attachment-image";
+
+  const frame = document.createElement("div");
+  frame.className = "image-frame";
+  const thumb = document.createElement("button");
+  thumb.type = "button";
+  thumb.className = "image-thumb";
+  thumb.setAttribute("aria-label", `展开附件图片预览：${name}，${info.width}×${info.height}`);
+  thumb.setAttribute("aria-haspopup", "dialog");
+  const image = document.createElement("img");
+  image.src = info.url;
+  image.alt = `${name} 的已验证快照，${info.width}×${info.height}`;
+  image.loading = "lazy";
+  image.decoding = "async";
+  image.addEventListener("error", () => {
+    thumb.replaceWith(Object.assign(document.createElement("p"), {
+      className: "hint image-broken",
+      textContent: "图片快照通过校验，但浏览器无法解码显示；原件仍已上传，可下载。",
+    }));
+  }, { once: true });
+  thumb.append(image);
+  frame.append(thumb);
+  figure.append(frame);
+
+  const caption = document.createElement("figcaption");
+  const heading = document.createElement("strong");
+  heading.textContent = name;
+  caption.append(heading);
+
+  const sizeLine = document.createElement("p");
+  sizeLine.className = "image-dimensions";
+  sizeLine.textContent = `原图 ${info.originalWidth}×${info.originalHeight} → 快照 ${info.width}×${info.height}`;
+  caption.append(sizeLine);
+
+  const badges = document.createElement("p");
+  badges.className = "image-badges";
+  badges.append(badge(info.downscaled ? "已缩小" : "未缩小"));
+  badges.append(badge(info.mediaType === "image/jpeg" ? "有损 JPEG 快照" : "PNG 快照"));
+  if (info.firstFrameOnly) badges.append(badge("仅首帧"));
+  caption.append(badges);
+
+  caption.append(detailsLine("快照大小", `${info.sizeBytes} 字节`));
+  caption.append(detailsLine("快照 SHA-256", `${info.sha256.slice(0, 16)}…`));
+  const sourceLabel = info.sourceMediaType.replace("image/", "").toUpperCase();
+  caption.append(detailsLine("原文件", `${sourceLabel} · ${info.sourceSizeBytes} 字节`));
+
+  const notes = [];
+  if (info.downscaled) notes.push(`已从原图 ${info.originalWidth}×${info.originalHeight} 缩小`);
+  if (info.mediaType === "image/jpeg") notes.push("快照使用有损 JPEG");
+  if (info.firstFrameOnly) notes.push("GIF/WebP 只保留首帧");
+  notes.push("透明区域按白底显示");
+  const note = document.createElement("p");
+  note.className = "hint image-note";
+  note.textContent = `${notes.join("；")}。这是 Core 验证过的 PNG/JPEG 快照，不是原始 SVG/HTML 或动图；上传成功不等于模型已经读取。`;
+  caption.append(note);
+
+  const hint = document.createElement("p");
+  hint.className = "hint image-open-hint";
+  hint.textContent = "选择缩略图或按 Enter 展开预览；预览只读取已校验数据，不会重新上传、执行或调用模型。";
+  caption.append(hint);
+  figure.append(caption);
+
+  thumb.addEventListener("click", () => {
+    const open = { url: info.url, alt: image.alt, caption: `${name} · ${info.width}×${info.height}`, trigger: thumb };
+    if (onOpen) onOpen(open);
+    else openImagePreview(open);
   });
   return figure;
 }

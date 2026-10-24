@@ -172,4 +172,38 @@ class InteractProposal(StrictContract):
     arguments: WorkInteractArguments
 
 
-WORK_PROPOSAL = TypeAdapter(Annotated[SystemProposal | DirectoryProposal | ReadProposal | SearchProposal | WriteProposal | CommandProposal | StatusProposal | SkillProposal | ToolProposal | CapabilityProposal | SkillCreateProposal | WebSearchProposal | WebFetchProposal | LinesProposal | GlobProposal | GrepProposal | EditProposal | ObserveProposal | InteractProposal | ImageProposal | TimeProposal | JobListProposal | JobOutputProposal | PluginInspectProposal | PluginExecuteProposal | PluginInstallProposal, Field(discriminator="intent")])
+from nexus.contracts.android import AndroidDeviceStatusArguments, AndroidNotificationDigestArguments
+
+
+class AndroidDeviceStatusProposal(StrictContract):
+    intent: Literal["android_device_status"]
+    arguments: AndroidDeviceStatusArguments
+
+
+class AndroidNotificationDigestProposal(StrictContract):
+    intent: Literal["android_notification_digest"]
+    arguments: AndroidNotificationDigestArguments
+
+
+from nexus.contracts.file_transfer import SendFileArguments
+
+
+class SendFileProposal(StrictContract):
+    intent: Literal['send_file']
+    arguments: SendFileArguments
+
+
+WORK_ACTION = Annotated[SendFileProposal | AndroidDeviceStatusProposal | AndroidNotificationDigestProposal | SystemProposal | DirectoryProposal | ReadProposal | SearchProposal | WriteProposal | CommandProposal | StatusProposal | SkillProposal | ToolProposal | CapabilityProposal | SkillCreateProposal | WebSearchProposal | WebFetchProposal | LinesProposal | GlobProposal | GrepProposal | EditProposal | ObserveProposal | InteractProposal | ImageProposal | TimeProposal | JobListProposal | JobOutputProposal | PluginInspectProposal | PluginExecuteProposal | PluginInstallProposal, Field(discriminator="intent")]
+
+
+class NodeAction(StrictContract):
+    node_id: UUID
+    action: WORK_ACTION
+
+
+class RoutedProposal(StrictContract):
+    intent: Literal["on_node"]
+    arguments: NodeAction
+
+
+WORK_PROPOSAL = TypeAdapter(Annotated[WORK_ACTION | RoutedProposal, Field(discriminator="intent")])

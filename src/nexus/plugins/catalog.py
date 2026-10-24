@@ -17,6 +17,15 @@ def release(identifier,name,description,runtime,tools):
         description=description,license='MIT',runtime=runtime,tools=tools))
 
 
+GOAL_CRITERION = obj(extra=True)
+GOAL_CRITERION['description'] = '严格字段：id、description、category(artifact/test/effect)、tool、arguments、assertions。后两者为{path:JSON Pointer,equals:JSON值}数组，assertions至少一项。'
+GOAL_STEP = obj(extra=True)
+GOAL_STEP['description'] = '严格字段：id、instruction、depends_on(步骤id数组，默认空)、criteria(验收id数组，至少一项)。'
+GOAL_PLAN = obj({'expected_revision':integer(0,1000),'constraints':array(text(800),8),
+    'criteria':array(GOAL_CRITERION,12),'steps':array(GOAL_STEP,16),
+    'reason':text(500)},('expected_revision','criteria','steps'))
+
+
 RELEASES={item.manifest.plugin_id:item for item in [
     release('skill','固定流程说明','读取 NEXUS 已批准 Skill 的说明和固定步骤；不自行授予执行权限。','core',[
         tool('skill','列出或加载当前设备可用的已批准 Skill 说明。',{'version_id':text(36)})]),
@@ -45,7 +54,13 @@ RELEASES={item.manifest.plugin_id:item for item in [
         tool('load_workspace_dependencies','返回本节点实际运行时和已安装的文档处理库路径。'),
         tool('create_worktree','从本地固定 commit 创建隔离分支和检出目录。',{'path':text(240),'branch':text(100),'ref':text(100)},('path','branch','ref'),'manage'),
         tool('lsp','配置的语言服务器：定义、引用、实现和悬停文档。',{'server':text(64),'operation':choice('definition','references','implementation','hover'),'path':text(240),'line':integer(1,1000000),'character':integer(1,100000)},('server','operation','path','line','character'))]),
-    release('mcp','MCP 资源','读取管理员已配置的 MCP 服务器资源。','node',[
+    release('mcp','MCP 接入','Core 管理版本化配置、发现与重载；Node 执行受控 MCP 资源和工具调用。','node',[
+        tool('mcp_list','列出已登记服务器摘要；指定 server 加载该服务器的完整工具契约。',{'server':text(64)}),
+        tool('mcp_register','登记配置并实际发现工具；期望版本为0表示首次登记。',{'server':text(64),'expected_revision':integer(0,10000),'configuration':obj(extra=True)},('server','expected_revision','configuration'),'manage'),
+        tool('mcp_reload','重新初始化并发现工具，成功后原子切换目录。',{'server':text(64),'expected_revision':integer(1,10000)},('server','expected_revision'),'manage'),
+        tool('mcp_discover','初始化已登记服务器并读取实际工具目录。',{'server':text(64)},('server',),'execute'),
+        tool('mcp_remove','停用当前登记并保留历史，取消关联未决任务。',{'server':text(64),'expected_revision':integer(1,10000)},('server','expected_revision'),'manage'),
+        tool('mcp_call_tool','调用已发现工具；目录变更时拒绝执行并要求重载。',{'server':text(64),'name':text(128),'arguments':obj(extra=True),'catalog_digest':text(64)},('server','name','arguments','catalog_digest'),'manage'),
         tool('list_mcp_resources','列出服务器资源。',{'server':text(64),'cursor':text(1000)},('server',)),
         tool('list_mcp_resource_templates','列出资源模板。',{'server':text(64),'cursor':text(1000)},('server',)),
         tool('read_mcp_resource','读取已配置服务器 URI。',{'server':text(64),'uri':text(2000)},('server',))]),
@@ -79,7 +94,10 @@ RELEASES={item.manifest.plugin_id:item for item in [
         tool('present','呈现已存在文件，保留摘要、实际内容和大小限制。',{'files':array(obj({'path':text(240),'description':text(500)},('path',)),4)},('files',),'read')]),
     release('goal','持续目标','Core 管理有期限、有执行预算的目标状态。','core',[
         tool('create_goal','创建当前会话目标。',{'objective':text(2000),'max_rounds':integer(1,20),'duration_minutes':integer(1,1440)},('objective',),'manage'),
-        tool('get_goal','查询当前会话目标。'),
+        tool('get_goal','查询当前会话目标、固定验收条件、依赖计划、检查点摘要与真实任务证据。传step_id读取该步骤最近的完整检查点及未完成事项。',{'step_id':text(40)}),
+        tool('goal_wait','等待owner已配置的文件/设备/任务观察变化；不变时不调用模型。',{'goal_id':text(36),'watch_id':text(36),'reason':text(500)},('goal_id','watch_id','reason'),'manage'),
+        tool('goal_plan','保存或重规划目标的依赖步骤。首次定义验收，之后不得放宽条件/约束或改动已完成步骤；最多3次重规划。断言path使用JSON Pointer，arguments检查工具参数，assertions检查持久任务结果。',{'goal_id':text(36),'plan':GOAL_PLAN},('goal_id','plan'),'manage'),
+        tool('goal_checkpoint','保存步骤进度、未完成事项和真实task_id；成功必须满足该步骤的全部验收断言。',{'goal_id':text(36),'checkpoint':obj({'expected_revision':integer(1,1000),'step_id':text(40),'status':choice('succeeded','failed','blocked'),'evidence':array(obj({'criterion_id':text(40),'task_id':text(36)},('criterion_id','task_id')),12),'note':text(1000),'remaining':array(text(1000),8)},('expected_revision','step_id','status'))},('goal_id','checkpoint'),'manage'),
         tool('update_goal','更新目标状态，不把模型完成声明当作任务证据。',{'goal_id':text(36),'status':choice('active','paused','complete','blocked')},('goal_id','status'),'manage')]),
     release('schedule','提醒与周期任务','有截止、次数及原费用上限的 Core 调度。','core',[
         tool('schedule_create','创建提醒；execute=true 才在原会话唤醒有界任务。支持延时、绝对时间、周期、日/周和 cron，连续执行共用原根请求费用上限。',{'title':text(100),'prompt':text(2000),'execute':boolean(),'after_seconds':integer(1,604800),'at':text(100),'every_seconds':integer(60,604800),'daily':text(8),'weekdays':array(integer(1,7),7),'cron':text(100),'time_zone':text(100),'max_runs':integer(1,100),'duration_days':integer(1,30)},('prompt',),'manage'),
@@ -97,6 +115,9 @@ RELEASES={item.manifest.plugin_id:item for item in [
 
 for _tool in RELEASES['builtin.browser'].manifest.tools:
     _tool.input_schema['properties']['page_id']=text(128)
+
+RELEASES['builtin.mcp'].manifest.version='1.1.0'
+RELEASES['builtin.goal'].manifest.version='1.1.0'
 
 
 def definition(plugin_id, name):

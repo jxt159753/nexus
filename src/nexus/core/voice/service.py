@@ -14,6 +14,7 @@ from nexus.contracts.voice import (
     VoiceSpeakCompleted, VoiceSpeakStop, VoiceState, VoiceStop, VoiceStopped, pack_voice_audio,
 )
 from nexus.core.config import VoiceConfig
+from nexus.core.models.config import ModelConfig
 from nexus.core.security.types import AccessDenied, Principal
 from nexus.core.storage.database import audit, one, timestamp, utc_now
 from nexus.core.storage.tasks import Conflict
@@ -90,8 +91,9 @@ class VoiceService:
     def __init__(self, database, config: VoiceConfig, owner_id: UUID, *, asr: AsrProvider,
                  tts: TtsProvider, responder: Callable | None = None,
                  conversation_factory: Callable | None = None, streamer: Callable | None = None,
-                 canceller: Callable | None = None) -> None:
+                 canceller: Callable | None = None, model_config: ModelConfig | None = None) -> None:
         self.database, self.config, self.owner_id = database, config, owner_id
+        self.models = model_config if model_config is not None else ModelConfig()
         self.asr, self.tts = asr, tts
         self.responder, self.streamer = responder, streamer
         self.conversation_factory, self.canceller = conversation_factory, canceller
@@ -224,7 +226,7 @@ class VoiceService:
                               "WHERE json_extract(j.value,'$.day')=? AND json_extract(j.value,'$.kind')=?",
                               (day, kind))
             ceiling = self.config.daily_asr_seconds if kind == "asr" else self.config.daily_tts_chars
-            if total[0] + units > ceiling or len(session.calls) >= 100:
+            if (self.models.cost_limits_enabled and total[0] + units > ceiling) or (self.models.call_limits_enabled and len(session.calls) >= 100):
                 raise AccessDenied("BUDGET_EXCEEDED")
             session.calls.append({"kind": kind, "day": day, "reserved": units, "observed": 0,
                                   "status": "reserved", "started_at": timestamp(utc_now()),
@@ -247,7 +249,7 @@ class VoiceService:
     async def begin_listening(self, session):
         if not session.active:
             return
-        if session.turns >= self.config.max_turns:
+        if self.models.call_limits_enabled and session.turns >= self.config.max_turns:
             await self.stop(session, "turn_limit")
             return
         session.utterance_id = uuid4()
@@ -450,7 +452,7 @@ class VoiceService:
             day = utc_now().date().isoformat()
             total = await one(conn, "SELECT count(*) FROM voice_sessions s,json_each(s.metrics_json,'$.proactive') p "
                               "WHERE json_extract(p.value,'$.day')=? AND json_extract(p.value,'$.status')!='suppressed'", (day,))
-            if total[0] >= self.config.proactive_daily_limit:
+            if self.models.call_limits_enabled and total[0] >= self.config.proactive_daily_limit:
                 raise AccessDenied("VOICE_QUOTA")
             suppressed = self._dnd()
             session.proactive.append({"event_id": event_id, "day": day,

@@ -4,11 +4,7 @@ const chatPresentationState = new Map();
 const chatLabels = {queued:"等待回复",generating:"正在回复",completed:"已完成",incomplete:"达到输出上限，回复未完整结束",stopping:"正在停止",stopped:"已停止",interrupted:"服务中断，未自动重发",failed:"回复失败",expired:"请求已过期"};
 function chatNodes(nodes) {
   chatWorkState.nodes=new Map(nodes.map(node=>[node.node_id,node]));
-  const selected=$("chat-node").value;
-  $("chat-node").replaceChildren(...nodes.map(n=>new Option(`${n.node_id} · ${n.online ? "在线" : "离线"}`,n.node_id)));
-  if (!nodes.length) $("chat-node").add(new Option("暂无配置节点；可继续普通聊天",""));
-  if (nodes.some(n=>n.node_id===selected)) $("chat-node").value=selected;
-  if (chatSkillState.node && chatSkillState.node!==$("chat-node").value) chatSkillsInvalidate();
+
 }
 function chatReset() {
   chatWorkReset();
@@ -175,6 +171,10 @@ function chatRender() {
       const presentation=turn.presentation?.version===1 ? turn.presentation : null;
       question.append(el("strong","你"),el("div",turn.text,"chat-prose"));
       answer.append(el("strong","NEXUS"));
+      if(presentation?.files?.length) {
+        const slot=el("div");answer.append(slot);
+        import("./app/chat-files.js").then(({renderChatFiles})=>{if(slot.isConnected)slot.append(renderChatFiles(presentation.files,api,()=>crypto.randomUUID()));});
+      }
       if (presentation) {
         if (presentation.final_text!==null) answer.append(el("strong",presentation.phase==="completed" ? "最终回答" : "本轮反馈"),chatContent(presentation.final_text));
         answer.append(chatPresentationPanel(turn,presentation));
@@ -300,10 +300,8 @@ function initChat() {
     const compactOnly=$("chat-text").value.trim()==="/compact";
     const allowCompaction=$("chat-compaction").checked;
     if (compactOnly && (!allowCompaction || !$("chat-context").checked)) throw new Error("请勾选会话上下文和压缩同意");
-    const allowTools=!compactOnly && $("chat-tools").checked && !!$("chat-node").value, nodeId=allowTools ? $("chat-node").value : null;
-    const allowSkills=!compactOnly && !chatWorkActive() && $("chat-skills").checked;
-    if (allowSkills && (!allowTools || !chatSkillState.catalog || chatSkillState.node!==nodeId)) throw new Error("请重新查看流程目录后再允许发送");
-    const skillsDigest=allowSkills ? chatSkillState.catalog.skills_digest : null;
+    const allowTools=!compactOnly && chatWorkActive(), nodeId=null;
+    const allowSkills=false, skillsDigest=null;
     const memories=compactOnly ? {} : {...memorySubmission(),...chatReferenceSubmission()};
     const work=compactOnly ? {} : await chatWorkSubmission();
     const signature=JSON.stringify([conversation.conversation_id,$("chat-text").value,$("chat-context").checked,allowTools,nodeId,allowSkills,skillsDigest,memories,work,allowCompaction,compactOnly]);

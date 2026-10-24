@@ -1,0 +1,170 @@
+{
+  "task": "P80 Android App with independent Node and Core realtime voice",
+  "recorded_at": "2026-10-23T10:12:59.976489+00:00",
+  "status": "local_technical_delivery_complete_user_acceptance_pending",
+  "environment": {
+    "host": "Windows",
+    "python": "3.13.9",
+    "jdk": "21.0.11",
+    "gradle": "9.4.1",
+    "agp": "9.2.1",
+    "compile_sdk": "36.1",
+    "target_sdk": 36,
+    "min_sdk": 26,
+    "emulator_sdk_int": 37,
+    "emulator_image": "android-37.2/google_apis_playstore_ps16k/x86_64",
+    "page_size": 16384,
+    "real_android_device": false
+  },
+  "artifacts": [
+    {
+      "path": "var/artifacts/android/NEXUS-Android-0.1.0-debug.apk",
+      "bytes": 11893209,
+      "sha256": "7307a9e3e07abef4cfbc64513cf234deb3dd695ed25944d48274a6493ff0d1e5"
+    },
+    {
+      "path": "var/artifacts/android/NEXUS-Android-0.1.0-release-unsigned.apk",
+      "bytes": 1527354,
+      "sha256": "e10a4d1909f53ecc6f54b1801dfb8a0aeea3b13e580a6f38f021709ad18ee40c"
+    }
+  ],
+  "signing": {
+    "debug": "Android debug key; apksigner verification passed, v2 signature",
+    "release": "unsigned R8-shrunk candidate; not directly installable"
+  },
+  "build": {
+    "result": "passed",
+    "log": "var/android-final-build.log",
+    "tasks": [
+      ":app:testDebugUnitTest",
+      ":app:assembleDebug",
+      ":app:assembleRelease",
+      ":app:lintDebug"
+    ],
+    "lint_errors": 0,
+    "lint_warnings": {
+      "OldTargetApi": 1,
+      "AndroidGradlePluginVersion": 1,
+      "GradleDependency": 5,
+      "NewerVersionAvailable": 4,
+      "DataExtractionRules": 1
+    }
+  },
+  "jvm_tests": [
+    {
+      "suite": "ai.nexus.protocol.VoiceWireTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "ai.nexus.protocol.WireTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "ai.nexus.android.VoiceOrderingTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "core_regression": {
+    "passed": 247,
+    "failed": 0,
+    "seconds": 26.03,
+    "files": [
+      "test_android.py",
+      "test_task_contract.py",
+      "test_protocol.py",
+      "test_contract_boundaries.py",
+      "test_harness_http.py",
+      "test_security.py"
+    ],
+    "coverage": [
+      "030 to 031 migration backup and grant preservation",
+      "Python/Kotlin digest vectors",
+      "strict tool/resource intersection",
+      "notification task approval"
+    ]
+  },
+  "voice_regression": {
+    "passed": 36,
+    "failed": 0,
+    "seconds": 20.54,
+    "files": [
+      "test_android.py",
+      "test_voice.py",
+      "test_voice_lifecycle.py",
+      "test_voice_chat_bridge.py"
+    ],
+    "note": "Includes Android tests also present in core_regression; counts are not added together."
+  },
+  "android_instrumentation": {
+    "passed": 6,
+    "failed": 0,
+    "seconds": 23.645,
+    "suites": {
+      "CoreIntegrationTest": 1,
+      "DeviceTest": 3,
+      "UiSnapshotTest": 1,
+      "VoiceIntegrationTest": 1
+    },
+    "coverage": [
+      "real loopback Core login and chat stop",
+      "separate Node process and device API result/ack",
+      "approved and redacted notification",
+      "Keystore tamper detection",
+      "durable receipt conflicts, cancellation, restart unknown and acknowledgement",
+      "actual Compose screenshots",
+      "Core control/audio WS, playback drain, next listening round, button interrupt and stop"
+    ],
+    "final_voice_fix_recheck": {
+      "passed": 1,
+      "failed": 0,
+      "seconds": 4.688,
+      "log": "var/android-final-voice-device.log",
+      "note": "Final debug APK installed successfully; recheck uses the same VoiceIntegrationTest, not an additional unique test."
+    }
+  },
+  "screenshots": [
+    {
+      "path": "docs/assets/android-chat.png",
+      "bytes": 132853,
+      "sha256": "0ebb07c56456fad188067d34b0568c0935e994b31152fefd38e7a915952d0064"
+    },
+    {
+      "path": "docs/assets/android-device.png",
+      "bytes": 196432,
+      "sha256": "8cef7337be99a99b90b85eed4a3a577d3da5b996ab45f9873ca8a535c3890252"
+    }
+  ],
+  "privacy_checks": {
+    "fixture_credentials_absent_from_both_apks": true,
+    "fixture_files_absent_from_both_apks": true,
+    "paid_provider_calls": 0,
+    "human_microphone_used": false,
+    "voice_media": "in-memory silent PCM and local Chat/ASR/TTS replacements"
+  },
+  "resolved_validation_issues": [
+    "New test import and loopback fixture configuration corrected",
+    "MockWebServer close handshake and server-side cleanup corrected; final tests passed"
+  ],
+  "scope_limits": [
+    "No production deployment or production account registration",
+    "No formal release signing or store publication",
+    "No real handset microphone/speaker/Bluetooth or acoustic AEC verification",
+    "No vendor battery/background or full network/process-kill matrix",
+    "No attachment upload, wake word, background recording or automatic acoustic barge-in"
+  ],
+  "approval_review": "Automatic review rejected bypassing concrete notification task approval in full mode. Stricter approval remains; no bypass applied.",
+  "delivery_checks": {
+    "local_document_links_checked": 454,
+    "missing_links": 0,
+    "dedicated_fixture_emulator_and_adb_stopped": true
+  }
+}

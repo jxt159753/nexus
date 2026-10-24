@@ -39,6 +39,9 @@ async def skill_run_allowed(conn, run, now):
         return False
     try:
         approval = await approved_version(conn, version, now)
+        if run['permission_context_id']:
+            from nexus.core.extensions.native_steps import context
+            await context(conn,run)
         work = await one(conn,"SELECT step_id FROM chat_work_steps WHERE skill_run_id=?",(run["run_id"],))
         if work:
             from nexus.core.security.work import allowed_step

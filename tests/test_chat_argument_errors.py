@@ -8,11 +8,32 @@ import pytest
 from pydantic import SecretStr
 
 from nexus.contracts.basic import FilePreviewArguments
+from nexus.contracts.work import SkillCreateArguments, WORK_PROPOSAL
+from nexus.core.models.tool_validation import argument_error
 from nexus.core.models.chat import DeepSeekChatProvider
 from nexus.core.models.config import ModelConfig
 from test_chat import Stream, app_for, rows, sse
 from test_chat_work import basic, file_task
 from test_workspace_work import send_workspace
+
+
+def test_native_skill_error_keeps_nested_path_and_static_repair_hint():
+    from pydantic import ValidationError
+    from nexus.plugins.catalog import RELEASES
+    arguments={'reason':'create reusable check','skill':{'kind':'skill',
+        'manifest':{'kind':'skill','capability_id':'user.mcp_health','description':'fixed MCP health check',
+            'input_schema':{'type':'object','properties':{},'additionalProperties':False},
+            'output_schema':{'type':'object','properties':{},'additionalProperties':True},
+            'verification_profile':'skill_native_steps_v1'},'markdown':'check',
+        'steps':[{'id':'check','tool':'plugin.call','plugin_id':'builtin.mcp',
+            'plugin_tool':'mcp_call_tool','plugin_digest':RELEASES['builtin.mcp'].digest(),'arguments':{}}], 'tests':[]}}
+    with pytest.raises(ValidationError) as failure:
+        WORK_PROPOSAL.validate_json(json.dumps({'intent':'skill_create','arguments':arguments}))
+    error=argument_error(0,'device1__skill_create',arguments,SkillCreateArguments.model_json_schema(),failure.value)
+    assert len(error['issues'])==1
+    assert error['issues'][0]['field'].endswith('skill.steps.0')
+    assert 'tool_version: 1' in error['issues'][0]['hint']
+    assert 'extra_forbidden' not in json.dumps(error)
 
 
 def native(name, arguments, *, index=0, identifier="write-1"):

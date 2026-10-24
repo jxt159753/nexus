@@ -101,8 +101,8 @@ async def queue(work, conn, turn_id, now):
     request = json.loads(row["request_json"])
     if not (request.get("allow_model") and request.get("allow_work_results")):
         return
-    await permissions.valid_grant(conn, row["work_grant_id"], now, owner_id=row["owner_id"],
-        scope=work.chat.harness.scope(UUID(request["node_id"])))
+    from nexus.core.cognitive.node_routing import validate_turn
+    await validate_turn(work.chat, conn, row, now)
     calls = await chat_compaction.root_calls(conn, turn_id)
     count = sum(call["web_step_id"] is None and not call["compaction_call"] for call in calls)
     if count >= 5:

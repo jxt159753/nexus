@@ -42,16 +42,13 @@ class ChatVoiceBridge:
             raise AccessDenied("BUSY")
         consent = session.consent
         options = {}
-        if consent.get("allow_tools"):
+        if consent.get("allow_tools") and consent.get("allow_work_results"):
+            from nexus.core.cognitive.node_routing import directory
             async with self.chat.database.transaction(write=False) as conn:
-                directory = await work_catalog.catalog(self.chat, conn, principal, session.node_id)
-            options.update(allow_tools=True, node_id=session.node_id)
-            if {"read_file", "find_files", "write_file", "read", "glob", "grep", "edit", "web_search",
-                "web_fetch", "read_image", "plugin_inspect", "plugin_execute", "skill_create"}.intersection(item["name"] for item in directory["catalog"]):
-                options.update(workspace_work=True, allow_work_results=True, work_digest=directory["work_digest"])
-            elif history.get("work_grant"):
-                options.update(work_grant_id=UUID(history["work_grant"]["grant_id"]),
-                               allow_work_results=True, work_digest=directory["work_digest"])
+                available = await directory(self.chat, conn, principal)
+            if available['nodes']:
+                options.update(allow_tools=True, all_nodes=True, client_node_id=session.node_id, workspace_work=True,
+                               allow_work_results=True, work_digest=available['work_digest'])
         request = ChatSubmission(
             request_id=uuid5(NAMESPACE_URL, f"voice:{session.voice_session_id}:{session.utterance_id}"),
             expected_revision=history["conversation"]["revision"], text=text[:2000], allow_model=True,

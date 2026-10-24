@@ -100,7 +100,7 @@ def create_app(config: CoreConfig) -> FastAPI:
         database, config.voice, config.owner_id,
         asr=voice_asr, tts=voice_tts,
         responder=voice_responder, conversation_factory=voice_conversation,
-        streamer=voice_streamer, canceller=voice_canceller,
+        streamer=voice_streamer, canceller=voice_canceller, model_config=config.models,
     )
     voice_link = VoiceLink(guards, config, voice)
     voice.validate_owner = guards.service.validate_principal
@@ -117,6 +117,7 @@ def create_app(config: CoreConfig) -> FastAPI:
         plugin_scheduler = None
         plugin_tester = None
         voice_watcher = None
+        health_watcher = None
         try:
             await database.initialize()
             await harness.executions.resume_verification()
@@ -139,13 +140,16 @@ def create_app(config: CoreConfig) -> FastAPI:
             chatter = asyncio.create_task(chat.run())
             generator = asyncio.create_task(extensions.run())
             skill_runner = asyncio.create_task(skills.run())
+            chat.plugins.health.workers = {'harness':scheduler,'chat':chatter,'language':interpreter,'extensions':generator,
+                'skills':skill_runner,'plugins':plugin_scheduler,'plugin_tests':plugin_tester}
+            health_watcher = asyncio.create_task(chat.plugins.health.run())
             yield
         finally:
             try:
-                for task in (voice_watcher, plugin_tester, plugin_scheduler, skill_runner, generator, chatter, interpreter, scheduler):
+                for task in (health_watcher, voice_watcher, plugin_tester, plugin_scheduler, skill_runner, generator, chatter, interpreter, scheduler):
                     if task is not None:
                         task.cancel()
-                await asyncio.gather(*(task for task in (voice_watcher, plugin_tester, plugin_scheduler, skill_runner, generator, chatter, interpreter, scheduler) if task is not None), return_exceptions=True)
+                await asyncio.gather(*(task for task in (health_watcher, voice_watcher, plugin_tester, plugin_scheduler, skill_runner, generator, chatter, interpreter, scheduler) if task is not None), return_exceptions=True)
                 await chat.work.web.close()
                 await voice_link.close()
                 await link.close()
@@ -164,10 +168,16 @@ def create_app(config: CoreConfig) -> FastAPI:
     app.include_router(ChatHTTP(chat, guards).router)
     app.include_router(PermissionHTTP(chat, guards).router)
     app.include_router(PluginHTTP(chat.plugins, guards).router)
+    from nexus.core.plugins.autonomy_http import AutonomyHTTP
+    app.include_router(AutonomyHTTP(chat.plugins, guards).router)
+    from nexus.core.plugins.mcp_http import MCPHTTP
+    app.include_router(MCPHTTP(chat.plugins, guards).router)
     app.include_router(voice_link.router)
     from nexus.core.voice.http import VoiceHTTP
     app.include_router(VoiceHTTP(voice, chat, guards, config).router)
     app.include_router(AttachmentHTTP(chat, guards).router)
+    from nexus.core.cognitive.file_transfer import FileTransferHTTP
+    app.include_router(FileTransferHTTP(chat, guards, harness).router)
     app.include_router(ExtensionHTTP(extensions, guards).router)
     app.include_router(sandbox_link.router)
     app.state.node_link = link

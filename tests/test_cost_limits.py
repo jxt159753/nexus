@@ -26,6 +26,8 @@ def test_disabled_amounts_do_not_shrink_output_or_audit_reservation():
     calls = [{"cost_status": "calculated", "outcome": "completed", "cost_microunits": 9_000_000}]
     assert remaining(config, calls) == config.model_reservation()
     calls[0]["cost_status"] = "unknown"
+    assert remaining(config, calls) == config.model_reservation()
+    calls[0]["outcome"] = "unknown"
     with pytest.raises(AccessDenied):
         remaining(config, calls)
 
@@ -72,7 +74,8 @@ def test_disabled_usd_caps_preserve_call_count_price_and_model_guards(world, mon
             config = chat.config.model_copy(update={"daily_calls": 2})
             assert await budget_error(conn, config, now) is None
             assert await budget_error(conn, config.model_copy(update={"enabled": False}), now) == "MODEL_DISABLED"
-            assert await budget_error(conn, config.model_copy(update={"price_valid_until": now.date()-timedelta(days=1)}), now) == "MODEL_PRICING_EXPIRED"
+            assert await budget_error(conn, config.model_copy(update={"price_valid_until": now.date()-timedelta(days=1)}), now) is None
+            assert await budget_error(conn, config.model_copy(update={"cost_limits_enabled": True, "price_valid_until": now.date()-timedelta(days=1)}), now) == "MODEL_PRICING_EXPIRED"
         turn, _ = await send(chat, world, conv["conversation_id"])
         assert not await chat.process_one()
         assert (await chat.get(world.owner, turn["turn_id"]))["error_code"] == "BUDGET_EXCEEDED"

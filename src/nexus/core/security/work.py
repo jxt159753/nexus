@@ -24,19 +24,30 @@ async def valid_grant(conn, grant_id, now, *, owner_id=None, node_id=None, scope
     return grant
 
 
+async def step_grant(conn, step_id):
+    return await one(conn,"SELECT g.* FROM chat_work_steps s JOIN chat_turns t USING(turn_id) JOIN chat_work_grants g ON g.grant_id=COALESCE(s.routed_grant_id,t.work_grant_id) WHERE s.step_id=?",(str(step_id),))
+
+
 async def allowed_step(conn, step_id, now, *, scope=None):
-    row = await one(conn,"SELECT s.*,t.owner_id,t.work_grant_id,t.work_status,t.recovery_required,t.status AS turn_status,t.expires_at FROM chat_work_steps s JOIN chat_turns t USING(turn_id) WHERE step_id=?",(str(step_id),))
+    row = await one(conn,"SELECT s.*,t.owner_id,COALESCE(s.routed_grant_id,t.work_grant_id) AS work_grant_id,t.work_status,t.recovery_required,t.status AS turn_status,t.expires_at FROM chat_work_steps s JOIN chat_turns t USING(turn_id) WHERE step_id=?",(str(step_id),))
     if row is None or row["recovery_required"] or row["turn_status"] in {"stopped","stopping","failed","interrupted","expired"} or row["status"] not in {"pending","waiting","permission"} or row["work_status"] not in {"waiting","permission"} or row["expires_at"]<=timestamp(now):
         raise AccessDenied("WORK_STOPPED")
     grant = await valid_grant(conn,row["work_grant_id"],now,owner_id=row["owner_id"],scope=scope)
+    if grant['parent_grant_id']:
+        root = await valid_grant(conn,grant['parent_grant_id'],now,owner_id=row['owner_id'])
+        # Executors also use these counters to bound nested plugin calls.
+        grant = {**dict(grant), 'used_operations':root['used_operations'], 'max_operations':root['max_operations'],
+                 'operation_limits_enabled':root['operation_limits_enabled']}
     return row,grant
 
 
 async def operation(conn, step_id, key, now):
     row,grant=await allowed_step(conn,step_id,now)
+    if grant["parent_grant_id"]:
+        grant=await valid_grant(conn,grant["parent_grant_id"],now,owner_id=row["owner_id"])
     if await one(conn,"SELECT 1 FROM chat_work_operations WHERE grant_id=? AND operation_key=?",(grant["grant_id"],key)):
         return
-    if grant["used_operations"]>=grant["max_operations"]:
+    if grant["operation_limits_enabled"] and grant["used_operations"]>=grant["max_operations"]:
         raise AccessDenied("WORK_OPERATION_LIMIT")
     await conn.execute("INSERT INTO chat_work_operations VALUES(?,?)",(grant["grant_id"],key))
     await conn.execute("UPDATE chat_work_grants SET used_operations=used_operations+1 WHERE grant_id=?",(grant["grant_id"],))
@@ -69,24 +80,35 @@ async def task_step(conn, task_id):
 
 
 async def check_task(conn, task, scope, now):
+    native_mode=None
+    if task.action.tool=='plugin.call':
+        from nexus.core.extensions.native_steps import task_mode
+        native_mode=await task_mode(conn,task)
     identifier=await task_step(conn,task.task_id)
     if identifier is None:
+        if native_mode is not None: return native_mode=='full'
+        if task.action.tool=='plugin.call' and task.action.arguments.mcp_binding is not None:
+            from nexus.core.security.modes import effective
+            return (await effective(conn,task.action.arguments.context_id))['effective_mode']=='full'
         return False
     step,grant=await allowed_step(conn,identifier,now,scope=scope)
     if grant["node_id"]!=str(task.node_id) or grant["owner_id"]!=str(task.owner_id):
         raise AccessDenied("POLICY_DENIED")
     plan=await one(conn,'SELECT plan_mode FROM conversations WHERE conversation_id=?',(grant['conversation_id'],))
-    if plan[0] and task.action.tool in {'command.run','filesystem.write','filesystem.edit','interaction.act'}:
+    if plan[0] and task.action.tool in {'command.run','filesystem.write','filesystem.edit','interaction.act','filesystem.receive'}:
         raise AccessDenied('PLAN_MODE_READ_ONLY')
     if task.current_attempt_id is None and not step["skill_run_id"] and await one(conn,"SELECT 1 FROM chat_controls WHERE turn_id=? AND kind='steer' AND applied_call_id IS NULL",(step["turn_id"],)):
         raise AccessDenied("WORK_STOPPED")
+    if native_mode is not None: return native_mode=='full'
+    if task.action.tool == "android.notification_digest":
+        return False  # A concrete Harness approval, including in full mode.
     if grant['permission_mode'] == 'full':
         return True
     if task.action.tool in {"filesystem.write","filesystem.edit"} and step["permission_decision"]!="approve" and not grant["auto_files"]:
         raise AccessDenied("WORK_CONFIRMATION_REQUIRED")
     if task.action.tool=="interaction.act" and step["permission_decision"]!="approve" and (grant["auto_files"] or grant["profile"]!="standard"):
         import json
-        prior=await conn.execute_fetchall("SELECT proposal_json FROM chat_work_steps WHERE turn_id=? AND permission_decision='approve'",(step["turn_id"],))
+        prior=await conn.execute_fetchall("SELECT s.proposal_json FROM chat_work_steps s JOIN chat_turns t USING(turn_id) WHERE s.turn_id=? AND s.permission_decision='approve' AND COALESCE(s.routed_grant_id,t.work_grant_id)=?",(step["turn_id"],grant['grant_id']))
         if not any(json.loads(item[0])["intent"]=="interact_target" and json.loads(item[0])["arguments"]["target_id"]==task.action.arguments.target_id for item in prior):
             raise AccessDenied("WORK_CONFIRMATION_REQUIRED")
     if task.action.tool=="command.run" and grant["profile"]!="standard" and step["permission_decision"]!="approve":

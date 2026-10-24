@@ -2,6 +2,7 @@
 
 import {
   ApiError,
+  api,
   TOOL_LABELS,
   activeTurnOfConversation,
   archiveConversation,
@@ -43,9 +44,11 @@ import {
   formatTime,
   notify,
   openSheet,
+  refreshComposerState,
   renderChat,
   renderDock,
   renderSettings,
+  renderDevices,
   renderConversations,
   runAction,
   ui,
@@ -53,14 +56,67 @@ import {
 
 import { initVisualization } from "./visualization.js";
 import { initVoice, stopVoice } from "./voice.js";
+import {
+  closePluginPage,
+  openConversationPermission,
+  openPluginPage,
+} from "./plugin-page.js";
+import { loadConversationPermission, pluginState } from "./plugins.js";
+import {
+  attachmentBlockReason,
+  attachmentBlocksSend,
+  attachmentState,
+  bindAttachmentUI,
+  draftAttachments,
+  clearAttachments,
+  ensureAttachments,
+  initAttachmentComposer,
+  leaveConversation,
+  openAttachmentConsentSheet,
+  previewAttachments,
+  resetAttachments,
+  withAttachmentConsent,
+} from "./attachments.js";
 
 const $ = (id) => document.getElementById(id);
+const native = window.__NEXUS_NATIVE__ || null;
+const CORE_URL_KEY = "nexus.coreUrl";
 let pollTimer = null;
+let deviceTimer = null;
+let deviceLoading = false;
 let lastSignature = "";
 let lastSnapshotAt = 0;
 let refreshing = false;
 let booting = true;
 let visualization = null;
+let nodeAutoStarted = false;
+
+function normalizeCoreUrl(value) {
+  const url = new URL(value.trim());
+  if (url.username || url.password || url.search || url.hash) throw new Error("Core 地址不能包含凭证、查询或片段");
+  const loopback = ["127.0.0.1", "localhost", "::1", "[::1]"].includes(url.hostname);
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) {
+    throw new Error("Core 必须使用 HTTPS；本机调试允许 http://127.0.0.1");
+  }
+  if (url.pathname !== "/" && url.pathname !== "") throw new Error("Core 地址只填写站点根地址");
+  return url.origin;
+}
+
+function showCoreField() {
+  if (!native) return;
+  $("core-field").hidden = false;
+  $("remember-field").hidden = false;
+  $("core-url").value = localStorage.getItem(CORE_URL_KEY) || "";
+}
+
+async function prepareNativeCore() {
+  if (!native) return true;
+  showCoreField();
+  const saved = localStorage.getItem(CORE_URL_KEY);
+  if (!saved) return false;
+  await native.setCoreUrl(saved);
+  return true;
+}
 
 function setConnection(text, kind = "") {
   const node = $("connection");
@@ -74,23 +130,71 @@ function updateConnection() {
     setConnection("连接中");
     return;
   }
+  if (!state.nodesFresh) {
+    setConnection("正在同步设备", "offline");
+    return;
+  }
   const online = state.nodes.filter((node) => node.online).length;
   const suffix = state.control?.paused ? " · 已暂停派发" : "";
-  setConnection(`Core 已连接 · ${online}/${state.nodes.length} 设备在线${suffix}`, "live");
+  setConnection(`${online} 台设备在线${suffix}`, "live");
 }
 
 function showLogin(message = "") {
   clearTimeout(pollTimer);
   pollTimer = null;
+  clearTimeout(deviceTimer);
   resetState();
+  resetAttachments();
   visualization?.visible(false);
   $("shell").hidden = true;
   $("login").hidden = false;
   $("login-form").reset();
+  showCoreField();
   const error = $("login-error");
   error.hidden = !message;
   error.textContent = message;
-  $("token").focus();
+  if (native && !localStorage.getItem(CORE_URL_KEY)) $("core-url").focus();
+  else $("token").focus();
+}
+
+async function startNodeIfConfigured() {
+  if (!native || nodeAutoStarted) return;
+  nodeAutoStarted = true;
+  try {
+    const status = await native.nodeStatus();
+    if (status.running) return;
+    const saved = await native.loadNode();
+    if (!saved?.token) return;
+    if (state.nodes.some((node) => node.node_id === saved.node_id && node.online)) {
+      notify("检测到同一 Node 身份已在线（可能是独立启动器）；App 未重复启动，避免身份重复或能力降级", true);
+      return;
+    }
+    const value = await native.nodeStart({
+      core_ws_url: saved.core_ws_url,
+      node_id: saved.node_id,
+      node_token: saved.token,
+      workspace_root: saved.workspace_root,
+    });
+    if (!value.running) {
+      notify("本机 Node 自动启动失败，请在设置中检查配置", true);
+      return;
+    }
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      try {
+        await loadNodes();
+      } catch {
+        /* Core may still be waking up. */
+      }
+      if (state.nodes.some((node) => node.online)) break;
+    }
+    updateConnection();
+    renderDock();
+    syncVisualization(true);
+    if (!$("settings").hidden) renderSettings();
+  } catch (error) {
+    notify(`本机 Node 自动启动失败：${errorText(error)}`, true);
+  }
 }
 
 function syncVisualization(visible = state.view === "home") {
@@ -104,7 +208,7 @@ function syncVisualization(visible = state.view === "home") {
     nodes: state.nodes,
     tasks,
     activeTurn: state.activeTurn,
-    nodeId: state.lastSent?.node_id || state.prefs.nodeId || "",
+    nodeId: state.lastSent?.client_node_id || "",
     messageKey: state.lastSent?.request_id || "",
     paused: !!state.control?.paused,
   });
@@ -124,13 +228,64 @@ function enterApp() {
   }
   startPolling();
   syncVisualization(true);
+  startNodeIfConfigured();
 }
 
 async function bootstrap() {
   loadPrefs();
+  if (native) {
+    let ready = false;
+    try {
+      ready = await prepareNativeCore();
+    } catch (error) {
+      booting = false;
+      showLogin(error.message);
+      return;
+    }
+    if (!ready) {
+      booting = false;
+      showLogin();
+      return;
+    }
+    try {
+      if (await native.loadSession()) {
+        try {
+          await loadCore();
+          await ensurePendingDetails();
+          booting = false;
+          enterApp();
+          return;
+        } catch (error) {
+          if (!(error instanceof ApiError) || (error.status !== 401 && error.status !== 403)) {
+            booting = false;
+            showLogin(errorText(error));
+            return;
+          }
+          await native.forgetSession().catch(() => {});
+        }
+      }
+      const token = await native.loadOwner(localStorage.getItem(CORE_URL_KEY));
+      if (token) {
+        try {
+          await login(token);
+          await native.rememberSession().catch(() => {});
+        } catch (error) {
+          if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+            await native.forgetOwner().catch(() => {});
+          }
+          throw error;
+        }
+      }
+    } catch (error) {
+      booting = false;
+      showLogin(errorText(error));
+      return;
+    }
+  }
   try {
     await loadCore();
     await ensurePendingDetails();
+    await syncConversationPermission();
     booting = false;
     enterApp();
   } catch (error) {
@@ -148,6 +303,10 @@ async function refresh(force = false) {
   refreshing = true;
   try {
     if (state.conversation) await loadHistory(state.conversation.conversation_id);
+    await syncConversationPermission();
+    await ensureAttachments().catch((error) => {
+      if (error instanceof ApiError && error.status === 401) throw error;
+    });
     if (Date.now() - lastSnapshotAt > 4000) {
       await loadSnapshot();
       lastSnapshotAt = Date.now();
@@ -172,7 +331,29 @@ function syncViews(force = false) {
   }
 }
 
+// Device presence must not wait for history, model output or task details.
+async function syncDevices() {
+  clearTimeout(deviceTimer);
+  if (!state.ready || deviceLoading) return;
+  if (document.hidden) return;
+  deviceLoading = true;
+  try {
+    await loadNodes();
+  } catch {
+    state.nodesFresh = false;
+  } finally {
+    deviceLoading = false;
+    if (state.ready) {
+      updateConnection();
+      renderDevices();
+      syncVisualization();
+      deviceTimer = setTimeout(syncDevices, state.nodesFresh ? 2000 : 5000);
+    }
+  }
+}
+
 function startPolling() {
+  syncDevices();
   clearTimeout(pollTimer);
   const tick = async () => {
     if (!state.ready) {
@@ -197,6 +378,18 @@ async function ensurePendingDetails() {
   await Promise.all(pending.map((id) => taskDetail(id).catch(() => {})));
 }
 
+async function syncConversationPermission() {
+  if (!state.conversation) return;
+  if (pluginState.conversationPermissionId !== state.conversation.conversation_id) {
+    pluginState.conversationPermission = null;
+  }
+  try {
+    await loadConversationPermission(state.conversation.conversation_id);
+  } catch {
+    /* the chat keeps working; the chip reports an explicit error on demand */
+  }
+}
+
 function openChat() {
   state.view = "chat";
   $("home-view").hidden = true;
@@ -216,6 +409,7 @@ function closeChat() {
 }
 
 function openSettings() {
+  closePluginPage();
   $("settings").hidden = false;
   renderSettings();
   Promise.all([loadNodes(), loadProjects(), loadUsage(), loadControl()])
@@ -223,8 +417,38 @@ function openSettings() {
     .catch((error) => notify(errorText(error), true));
 }
 
+function renameDevice(node) {
+  const name = el("input");
+  name.value = nodeName(node.node_id);
+  name.maxLength = 40;
+  const body = el("div");
+  body.append(el("p", "hint", "例如“书房电脑”“随身手机”。保存后，所有客户端都可以用这个名称指代设备。"), name);
+  openSheet({ title: "设备名称", body, actions: [
+    { label: "取消", className: "quiet", onClick: closeSheet },
+    { label: "保存", className: "primary", onClick: () => runAction(async () => {
+      await api(`/api/v1/nodes/${node.node_id}/name`, { method: "PATCH", body: JSON.stringify({ name: name.value.trim() }) });
+      closeSheet();
+      await syncDevices();
+    }) },
+  ] });
+  name.focus();
+}
+
 function closeSettings() {
   $("settings").hidden = true;
+}
+
+function openPlugins(tab = "permissions") {
+  closeSettings();
+  openPluginPage(tab);
+}
+
+function openAutomation() {
+  if (!state.conversation) {
+    notify("请先打开一个会话，再查看目标与提醒", true);
+    return;
+  }
+  openPlugins("automation");
 }
 
 function composerText(view) {
@@ -243,7 +467,7 @@ function clearComposer(view) {
 
 async function sendFrom(view) {
   if (!state.ready) {
-    notify("正在连接 Core", true);
+    notify("正在连接", true);
     return;
   }
   if (state.activeTurn) {
@@ -252,29 +476,82 @@ async function sendFrom(view) {
   }
   const textarea = composerText(view);
   const text = textarea.value;
-  if (!text.trim()) {
-    notify("请先输入内容", true);
+  const selected = draftAttachments().filter((item) => item.status === "uploaded" && item.attachment);
+  if (!text.trim() && !selected.length) {
+    notify("请先输入内容或选择附件", true);
     textarea.focus();
+    return;
+  }
+  if (attachmentBlocksSend()) {
+    notify(attachmentBlockReason() || "附件还没有准备好，请稍后再发送", true);
     return;
   }
   const control = composerSend(view);
   control.disabled = true;
   try {
-    const prepared = await prepareSend(text);
+    const prepared = await prepareSend(text, {
+      hasAttachments: selected.length > 0,
+      attachmentFields: attachmentState.supported !== false,
+    });
     if (prepared.kind === "consent") {
       openConsentSheet(prepared, view, text);
       return;
     }
-    await sendPayload(prepared.payload);
-    clearComposer(view);
-    await refresh(true);
-    notify("已发送；输出会显示在输入框上方");
+    await finishSend(prepared, view, text);
   } catch (error) {
     notify(errorText(error), true);
   } finally {
-    if (control.isConnected) control.disabled = !state.ready || !!state.activeTurn;
+    if (control.isConnected) control.disabled = !state.ready || !!state.activeTurn || attachmentBlocksSend();
     syncViews();
   }
+}
+
+/*
+ * The base payload still has no attachment selection. Only this function,
+ * after a fresh model-preview and the user's explicit confirmation, attaches
+ * the digest. A failed send keeps both the uploaded originals and the draft.
+ */
+async function finishSend(prepared, view, text, after = null) {
+  const selected = draftAttachments().filter((item) => item.status === "uploaded" && item.attachment);
+  if (!selected.length) {
+    await sendPayload(prepared.payload);
+    clearAttachments();
+    after?.();
+    clearComposer(view);
+    await refresh(true);
+    notify("已发送；输出会显示在输入框上方");
+    return;
+  }
+  const preview = await previewAttachments();
+  let sending = false;
+  openAttachmentConsentSheet({
+    preview,
+    capabilityImageEnabled: attachmentState.capabilities?.image_model_enabled !== false,
+    onCancel: () => notify("已取消发送；附件与草稿仍然保留"),
+    onConfirm: async () => {
+      if (sending) return;
+      sending = true;
+      try {
+        const payload = {
+          ...withAttachmentConsent(prepared.payload, preview),
+          expected_revision: state.conversation?.revision ?? prepared.payload.expected_revision,
+        };
+        await sendPayload(payload);
+        closeSheet();
+        clearAttachments();
+        after?.();
+        clearComposer(view);
+        await refresh(true);
+        notify("已发送；附件范围按本次预览确认");
+      } finally {
+        sending = false;
+      }
+    },
+  });
+}
+
+function hasDraftAttachments() {
+  return draftAttachments().some((item) => item.status === "uploaded" && item.attachment);
 }
 
 function openConsentSheet(prepared, view, text) {
@@ -309,27 +586,28 @@ function openConsentSheet(prepared, view, text) {
   body.append(notSent);
 
   body.append(el("p", "scope-label", "将在设备上使用"));
-  body.append(el("p", "", `${nodeName(state.prefs.nodeId)} · 工作区内已配置的读取/查找/写入/固定命令${imageAvailable ? "，以及受控图片读取" : ""}。写入仍会展示差异并读回校验。`));
+  body.append(el("p", "", `Core 根据你的话自动选择已授权设备 · 已配置的读取/查找/写入/固定命令${imageAvailable ? "，以及受控图片读取" : ""}。写入仍会展示差异并读回校验。`));
   body.append(el("p", "hint", "费用受 Core 的本轮上限约束；费用未知时不会按 0 计算。批准执行与同意结果回传是两件事；执行前若需要审批，会在消息里的任务卡再次询问。不开启工作工具或不同意结果外发时，本轮不会触发图片工具。"));
 
   const onlyChat = button("仅普通聊天", "quiet", () => runAction(async () => {
     closeSheet();
-    const plain = await prepareSend(text, { toolsOverride: false });
+    const plain = await prepareSend(text, {
+      toolsOverride: false,
+      hasAttachments: hasDraftAttachments(),
+      attachmentFields: attachmentState.supported !== false,
+    });
     if (plain.kind !== "send") throw new Error("范围已变化，请重试");
-    await sendPayload(plain.payload);
-    clearComposer(view);
-    await refresh(true);
-    notify("已按普通聊天发送");
+    await finishSend(plain, view, text);
   }, onlyChat));
   const allow = button("同意并发送", "primary", () => runAction(async () => {
     closeSheet();
-    const allowed = await prepareSend(text, { allowWork: true });
+    const allowed = await prepareSend(text, {
+      allowWork: true,
+      hasAttachments: hasDraftAttachments(),
+      attachmentFields: attachmentState.supported !== false,
+    });
     if (allowed.kind !== "send") throw new Error("范围已变化，请重试");
-    await sendPayload(allowed.payload);
-    setPref("resultFeedback", true);
-    clearComposer(view);
-    await refresh(true);
-    notify("已发送；本轮允许工具结果回传");
+    await finishSend(allowed, view, text, () => setPref("resultFeedback", true));
   }, allow));
   openSheet({
     title: "本次需要你决定",
@@ -357,26 +635,9 @@ function openScope(focus = "") {
   projectSelect.value = conversation?.project_id || state.prefs.projectId || "";
   body.append(projectSelect);
 
-  body.append(el("p", "scope-label", "目标设备"));
-  const nodeList = el("div", "choice-row");
-  if (!state.nodes.length) {
-    body.append(el("p", "hint", "Core 尚未配置 Node；仍可进行普通聊天。"));
-  }
-  for (const node of state.nodes) {
-    const label = el("label", "choice" + (node.node_id === state.prefs.nodeId ? " on" : ""));
-    const input = document.createElement("input");
-    input.type = "radio";
-    input.name = "scope-node";
-    input.value = node.node_id;
-    input.checked = node.node_id === state.prefs.nodeId;
-    label.append(input, document.createTextNode(`${nodeName(node.node_id)}${node.online ? "" : " · 离线"}`));
-    input.addEventListener("change", () => {
-      for (const item of nodeList.querySelectorAll(".choice")) item.classList.remove("on");
-      label.classList.add("on");
-    });
-    nodeList.append(label);
-  }
-  body.append(nodeList);
+  body.append(el("p", "scope-label", "自动选择设备"));
+  body.append(el("p", "hint", "NEXUS 会按你的话选择可用设备。可以说“我的电脑”“我的手机”或你设置的设备名称；目标有歧义时再询问。"));
+  for (const node of state.nodes) body.append(el("p", "", `${nodeName(node.node_id)} · ${state.nodesFresh ? (node.online ? "在线" : "离线") : "状态同步中"}`));
 
   body.append(el("p", "scope-label", "本轮工具与外发"));
   const toolsLabel = el("label", "switch");
@@ -403,8 +664,6 @@ function openScope(focus = "") {
   body.append(el("p", "hint", "更改只影响下一轮；当前已发送的请求不会被改写。工具结果回传默认关闭；打开后，纯文字工具结果可在后续轮次沿用这项显示偏好。若服务器返回图片工具能力，每一轮仍会单独确认图片快照外发，历史选择不代替本轮同意。"));
 
   const save = button("保存范围", "primary", () => runAction(async () => {
-    const checkedNode = $("sheet-body").querySelector('input[name="scope-node"]:checked');
-    if (checkedNode) setPref("nodeId", checkedNode.value);
     setPref("projectId", projectSelect.value || "");
     setPref("tools", tools.checked);
     setPref("resultFeedback", feedback.checked);
@@ -516,6 +775,13 @@ function openChatMenu() {
   name.placeholder = "会话名称";
   body.append(name);
   body.append(el("p", "hint", "改名不会改变已有执行记录。归档只影响会话列表，不删除历史。"));
+  const manage = el("div", "settings-row plugin-menu-actions");
+  manage.append(
+    button("会话权限模式", "quiet", () => { closeSheet(); openConversationPermission(); }),
+    button("目标与提醒", "quiet", () => { closeSheet(); openAutomation(); }),
+    button("权限与插件页", "quiet", () => { closeSheet(); openPlugins("permissions"); }),
+  );
+  body.append(manage);
   const save = button("保存名称", "primary", () => runAction(async () => {
     if (!name.value.trim()) throw new ApiError(400, "EMPTY_MESSAGE");
     await renameConversation(conversation.conversation_id, name.value.trim());
@@ -527,6 +793,7 @@ function openChatMenu() {
   const archive = button(archiveLabel, "quiet", () => runAction(async () => {
     await archiveConversation(conversation.conversation_id, !conversation.archived);
     closeSheet();
+    leaveConversation();
     state.conversation = null;
     state.turns.clear();
     state.turnOrder = [];
@@ -555,7 +822,7 @@ function openTurnDetails(turn) {
   facts.append(el("li", "", `状态：${turn.status} · 阶段：${turn.phase || "reply"}${turn.work_status ? " · 工作：" + turn.work_status : ""}`));
   facts.append(el("li", "", `费用：${turn.cost_status === "unknown" ? "未知，保留预留" : formatMoney(turn.cost_microunits)}`));
   facts.append(el("li", "", `上下文：${turn.include_context ? "附带最近对话" : "仅本轮输入"}${turn.context_truncated ? "（已裁剪）" : ""}`));
-  facts.append(el("li", "", `工具：${turn.allow_tools ? "允许" : "未允许"} · 设备：${turn.node_id ? nodeName(turn.node_id) : "未指定"}`));
+  facts.append(el("li", "", `工具：${turn.allow_tools ? "允许" : "未允许"} · 设备：${turn.node_id ? nodeName(turn.node_id) : "Core 自动选择"}`));
   if (turn.memory_references?.length) facts.append(el("li", "", `引用记忆：${turn.memory_references.length} 条`));
   body.append(facts);
   body.append(el("p", "hint", "这里只显示过程摘要；完整请求正文和原始工具输出保留在 Core 的执行记录中，不在此处展开。"));
@@ -578,9 +845,26 @@ async function handleLogin(event) {
   const submit = event.submitter || $("login-form").querySelector("button");
   if (submit) submit.disabled = true;
   try {
-    await login($("token").value);
+    let url = null;
+    if (native) {
+      url = normalizeCoreUrl($("core-url").value);
+      await native.setCoreUrl(url);
+      localStorage.setItem(CORE_URL_KEY, url);
+    }
+    const token = $("token").value;
+    await login(token);
+    if (native) {
+      if ($("remember").checked) {
+        await native.rememberOwner(url, token).catch(() => {});
+        await native.rememberSession().catch(() => {});
+      } else {
+        await native.forgetOwner().catch(() => {});
+        await native.forgetSession().catch(() => {});
+      }
+    }
     await loadCore();
     await ensurePendingDetails();
+    await syncConversationPermission();
     enterApp();
   } catch (exception) {
     error.textContent = errorText(exception);
@@ -603,6 +887,10 @@ function confirmLogout() {
         closeSettings();
         await stopVoice();
         await logout();
+        if (native) {
+          await native.forgetOwner().catch(() => {});
+          await native.forgetSession().catch(() => {});
+        }
         showLogin();
       }) },
     ],
@@ -610,6 +898,11 @@ function confirmLogout() {
 }
 
 function bindEvents() {
+  if (!native) {
+    $("core-field").hidden = true;
+    $("core-url").disabled = true;
+    $("remember-field").hidden = true;
+  }
   $("login-form").addEventListener("submit", handleLogin);
   $("login").hidden = false;
   $("home-button").addEventListener("click", () => {
@@ -623,6 +916,10 @@ function bindEvents() {
     if ($("settings").hidden) openSettings(); else closeSettings();
   });
   $("settings-close").addEventListener("click", closeSettings);
+  $("plugins-button").addEventListener("click", () => {
+    if ($("plugin-view").hidden) openPlugins("permissions"); else closePluginPage();
+  });
+  $("plugin-close").addEventListener("click", closePluginPage);
   $("sheet-close").addEventListener("click", closeSheet);
   $("sheet").addEventListener("click", (event) => {
     if (event.target?.hasAttribute?.("data-close-sheet")) closeSheet();
@@ -635,17 +932,23 @@ function bindEvents() {
   $("dock-stop").addEventListener("click", stopActive);
   $("chat-stop").addEventListener("click", stopActive);
   $("new-conversation").addEventListener("click", () => runAction(async () => {
+    leaveConversation();
     const projectId = state.prefs.projectId || state.conversation?.project_id || null;
     await createConversation(projectId);
     await loadHistory(state.conversation.conversation_id);
+    await syncConversationPermission();
+    await ensureAttachments();
     openChat();
     renderDock();
     notify("已新建会话");
   }));
   $("dock-new").addEventListener("click", () => runAction(async () => {
+    leaveConversation();
     const projectId = state.prefs.projectId || state.conversation?.project_id || null;
     await createConversation(projectId);
     await loadHistory(state.conversation.conversation_id);
+    await syncConversationPermission();
+    await ensureAttachments();
     renderDock();
     syncVisualization(true);
     lastSignature = state.signature;
@@ -688,15 +991,21 @@ function bindEvents() {
   }
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
+      // A native image dialog owns Escape while it is open; do not also close
+      // the surrounding decision sheet in the same key press.
+      if (document.querySelector("dialog[open]")) return;
       if (!$("sheet").hidden) closeSheet();
+      else if (!$("plugin-view").hidden) closePluginPage();
       else if (!$("settings").hidden) closeSettings();
       else if ($("chat-view").classList.contains("drawer-open")) $("chat-view").classList.remove("drawer-open");
     }
   });
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden && state.ready) refresh(true);
+    if (!document.hidden && state.ready) { syncDevices(); refresh(true); }
   });
-  window.addEventListener("online", () => { if (state.ready) refresh(true); });
+  window.addEventListener("online", () => { if (state.ready) { syncDevices(); refresh(true); } });
+  window.addEventListener("focus", () => { if (state.ready) syncDevices(); });
+  initAttachmentComposer();
 }
 
 async function stopActive() {
@@ -712,6 +1021,7 @@ async function stopActive() {
 }
 
 bindUI({
+  renameDevice,
   openChat,
   closeChat,
   openSettings,
@@ -720,10 +1030,24 @@ bindUI({
   newConversation: () => $("new-conversation").click(),
   sendFrom,
   refresh,
+  updateConnection,
   scrollToTurn,
   stopTurn: stopActive,
   logout: confirmLogout,
   openTurnDetails,
+  openPlugins,
+  openConversationPermission,
+  openAutomation,
+});
+
+bindAttachmentUI({
+  notify,
+  openSheet,
+  closeSheet,
+  refresh,
+  openChat,
+  clearComposer,
+  refreshComposerState,
 });
 
 state.ready = false;

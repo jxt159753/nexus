@@ -1,4 +1,4 @@
-"""Bounded MCP resources and LSP navigation over configured transports only."""
+"""Bounded MCP discovery/tools/resources and configured LSP navigation."""
 
 import json
 import os
@@ -7,6 +7,41 @@ import sys
 from pathlib import Path
 from urllib.parse import urlsplit
 from urllib.request import Request,build_opener,ProxyHandler,HTTPRedirectHandler
+from nexus.plugins.mcp_contracts import catalog, check_call
+
+MCP_VERSIONS={'2025-11-25','2025-06-18','2025-03-26'}
+
+
+def mcp_operation(request, initialized, method, params, expected_catalog=None):
+    if initialized.get('protocolVersion') not in MCP_VERSIONS:
+        raise ValueError('unsupported MCP protocol version')
+    if method not in {'nexus/discover','tools/call'}:
+        return {'result':request(method,params),'verification':'configured_server_response'}
+    tools=[];cursor=None
+    if 'tools' in initialized.get('capabilities',{}):
+        for _ in range(8):
+            page=request('tools/list',{'cursor':cursor} if cursor else {})
+            if not isinstance(page,dict) or not isinstance(page.get('tools'),list): raise ValueError('invalid MCP tools response')
+            tools.extend(page['tools'])
+            if len(tools)>64: raise ValueError('MCP tool count limit exceeded')
+            next_cursor=page.get('nextCursor')
+            if next_cursor is None: break
+            if not isinstance(next_cursor,str) or not next_cursor or len(next_cursor)>1000 or next_cursor==cursor: raise ValueError('invalid MCP pagination')
+            cursor=next_cursor
+        else: raise ValueError('MCP discovery page limit exceeded')
+    tools,digest=catalog(tools)
+    if method=='nexus/discover':
+        info=initialized.get('serverInfo',{})
+        return {'tools':tools,'catalog_digest':digest,'server_info':{key:str(info.get(key,''))[:100] for key in ('name','version')},
+                'protocol_version':initialized['protocolVersion'],'verification':'mcp_tools_discovered'}
+    if not expected_catalog or expected_catalog!=digest: raise ValueError('MCP catalog changed; reload is required')
+    definition=check_call(tools,params['name'],params.get('arguments',{}))
+    result=request('tools/call',params)
+    if not isinstance(result,dict): raise ValueError('invalid MCP tool result')
+    if 'outputSchema' in definition and not result.get('isError'):
+        from nexus.plugins.schema import checked
+        checked(definition['outputSchema'],result.get('structuredContent'))
+    return {'result':result,'catalog_digest':digest,'status':'failed' if result.get('isError') else 'succeeded','verification':'mcp_tool_response_checked'}
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -56,28 +91,34 @@ def child(server,cwd):
                             shell=False,close_fds=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0),bufsize=0)
 
 
-def stdio(server,params,method,cwd,framed=False,document=None):
+def stdio(server,params,method,cwd,framed=False,document=None,expected_catalog=None):
     process=child(server,cwd)
     try:
         initialize=({'processId':None,'rootUri':Path(cwd).as_uri(),'capabilities':{'general':{'positionEncodings':['utf-16']}}} if framed else
-                    {'protocolVersion':'2025-06-18','capabilities':{},'clientInfo':{'name':'nexus','version':'1.0.0'}})
+                    {'protocolVersion':'2025-11-25','capabilities':{},'clientInfo':{'name':'nexus','version':'1.0.0'}})
         send(process,{'jsonrpc':'2.0','id':1,'method':'initialize','params':initialize},framed)
         result=receive(process,1,framed)
         if not isinstance(result,dict): raise ValueError('invalid initialization result')
+        if not framed and result.get('protocolVersion') not in MCP_VERSIONS: raise ValueError('unsupported MCP protocol version')
         send(process,{'jsonrpc':'2.0','method':'initialized' if framed else 'notifications/initialized','params':{}},framed)
         if framed and document:
             if result.get('capabilities',{}).get('positionEncoding','utf-16')!='utf-16': raise ValueError('unsupported LSP position encoding')
             send(process,{'jsonrpc':'2.0','method':'textDocument/didOpen','params':{'textDocument':document}},True)
-        send(process,{'jsonrpc':'2.0','id':2,'method':method,'params':params},framed)
-        result=receive(process,2,framed)
-        return {'result':result,'verification':'configured_server_response'}
+        counter=1
+        def request(name,value):
+            nonlocal counter
+            counter+=1
+            send(process,{'jsonrpc':'2.0','id':counter,'method':name,'params':value},framed)
+            return receive(process,counter,framed)
+        if framed: return {'result':request(method,params),'verification':'configured_server_response'}
+        return mcp_operation(request,result,method,params,expected_catalog)
     finally:
         if process.poll() is None: process.kill()
         process.wait(timeout=2)
         process.stdin.close();process.stdout.close()
 
 
-def http(server,params,method):
+def http(server,params,method,expected_catalog=None):
     url=server['url']; parsed=urlsplit(url)
     if (parsed.scheme!='https' and not (parsed.scheme=='http' and parsed.hostname in {'127.0.0.1','::1','localhost'})) or parsed.username or parsed.password:
         raise ValueError('MCP requires HTTPS or explicit loopback HTTP without URL credentials')
@@ -102,14 +143,19 @@ def http(server,params,method):
             raw=response.read(32769)
             if len(raw)>32768: raise ValueError('MCP response byte limit')
             return json.loads(raw)
-    first=request({'jsonrpc':'2.0','id':1,'method':'initialize','params':{'protocolVersion':'2025-06-18','capabilities':{},'clientInfo':{'name':'nexus','version':'1.0.0'}}})
+    first=request({'jsonrpc':'2.0','id':1,'method':'initialize','params':{'protocolVersion':'2025-11-25','capabilities':{},'clientInfo':{'name':'nexus','version':'1.0.0'}}})
     version=first.get('result',{}).get('protocolVersion') if isinstance(first,dict) else None
-    if version not in {'2025-06-18','2025-03-26'}: raise ValueError('unsupported MCP protocol version')
+    if version not in MCP_VERSIONS: raise ValueError('unsupported MCP protocol version')
     headers['MCP-Protocol-Version']=version
     request({'jsonrpc':'2.0','method':'notifications/initialized','params':{}})
-    result=request({'jsonrpc':'2.0','id':2,'method':method,'params':params})
-    if not isinstance(result,dict) or result.get('id')!=2 or 'error' in result: raise ValueError('MCP operation failed')
-    return {'result':result.get('result',{}),'verification':'configured_server_response'}
+    counter=1
+    def rpc(name,value):
+        nonlocal counter
+        counter+=1
+        result=request({'jsonrpc':'2.0','id':counter,'method':name,'params':value})
+        if not isinstance(result,dict) or result.get('id')!=counter or 'error' in result: raise ValueError('MCP operation failed')
+        return result.get('result',{})
+    return mcp_operation(rpc,first['result'],method,params,expected_catalog)
 
 
 def launch(runtime,payload,context,deadline,cancel):
@@ -119,10 +165,19 @@ def launch(runtime,payload,context,deadline,cancel):
 
 def mcp(runtime,value,name,context,deadline,cancel):
     server=runtime.policy.mcp.get(value['server'])
+    binding=getattr(runtime.invocation,'mcp_binding',None)
+    if name in {'mcp_register','mcp_reload','mcp_discover','mcp_call_tool'} and binding is None:
+        raise PermissionError('MCP management and tool calls require a Core registry binding')
+    if binding is not None:
+        if not runtime.policy.allow_managed_mcp or binding.server!=value['server']: raise PermissionError('managed MCP not allowed by Node policy')
+        server=binding.configuration
     if server is None or bool(server.url)==bool(server.process): raise ValueError('MCP server is not configured')
-    method={'list_mcp_resources':'resources/list','list_mcp_resource_templates':'resources/templates/list','read_mcp_resource':'resources/read'}[name]
-    params={key:value[key] for key in ('cursor','uri') if key in value}
-    return launch(runtime,{'kind':'mcp','server':server.model_dump(mode='json'),'method':method,'params':params,'cwd':str(runtime.cwd(context))},context,deadline,cancel)
+    method={'list_mcp_resources':'resources/list','list_mcp_resource_templates':'resources/templates/list','read_mcp_resource':'resources/read',
+            'mcp_register':'nexus/discover','mcp_reload':'nexus/discover','mcp_discover':'nexus/discover','mcp_call_tool':'tools/call'}[name]
+    params={key:value[key] for key in ('cursor','uri','name','arguments') if key in value}
+    expected=value.get('catalog_digest')
+    if name=='mcp_call_tool' and binding and binding.catalog_digest!=expected: raise PermissionError('MCP catalog binding mismatch')
+    return launch(runtime,{'kind':'mcp','server':server.model_dump(mode='json'),'method':method,'params':params,'expected_catalog':expected,'cwd':str(runtime.cwd(context))},context,deadline,cancel)
 
 
 def lsp(runtime,value,context,deadline,cancel):
@@ -147,8 +202,8 @@ def main():
         if not raw or len(raw)>65536: return 2
         value=json.loads(raw)
         if value['kind']=='lsp': result=stdio(value['server'],value['params'],value['method'],value['cwd'],True,value.get('document'))
-        elif value['server'].get('url'): result=http(value['server'],value['params'],value['method'])
-        else: result=stdio(value['server']['process'],value['params'],value['method'],value['cwd'])
+        elif value['server'].get('url'): result=http(value['server'],value['params'],value['method'],value.get('expected_catalog'))
+        else: result=stdio(value['server']['process'],value['params'],value['method'],value['cwd'],expected_catalog=value.get('expected_catalog'))
     except (OSError,ValueError,KeyError) as exc: result={'worker_error':str(exc)[:500]}
     sys.stdout.write(json.dumps(result,ensure_ascii=False,separators=(',',':')))
     return 0

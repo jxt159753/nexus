@@ -1,3 +1,4 @@
+from nexus.contracts.file_transfer import FileReceiveArguments, FileReceiveCall, FileReceiveResult
 from nexus.plugins.contracts import PluginNodeArguments, PluginNodeResult, PluginNodeCall
 
 from typing import Annotated, Literal, Self
@@ -219,11 +220,16 @@ class InteractCall(StrictContract):
     arguments: InteractArguments
 
 
-ToolCall = Annotated[SystemInfoCall | ListDirectoryCall | FileReadCall | FileSearchCall | FilePreviewCall | FileWriteCall | CommandRunCall | FileLinesCall | FileGlobCall | FileGrepCall | FileEditPreviewCall | FileEditCall | ObserveCall | InteractCall | ImageReadCall | PluginNodeCall, Field(discriminator="tool")]
-ToolResult = InteractionResult | SystemInfoResult | ListDirectoryResult | FileReadResult | FileSearchResult | FilePreviewResult | FileWriteResult | CommandRunResult | FileLinesResult | FileGlobResult | FileGrepResult | FileEditPreviewResult | FileEditResult | ImageReadResult | PluginNodeResult
+from nexus.contracts.android import AndroidDeviceStatusArguments, AndroidNotificationDigestArguments, AndroidDeviceStatusResult, AndroidNotificationDigestResult, AndroidDeviceStatusCall, AndroidNotificationDigestCall
+
+ToolCall = Annotated[SystemInfoCall | ListDirectoryCall | FileReadCall | FileSearchCall | FilePreviewCall | FileWriteCall | CommandRunCall | FileLinesCall | FileGlobCall | FileGrepCall | FileEditPreviewCall | FileEditCall | ObserveCall | InteractCall | ImageReadCall | PluginNodeCall | AndroidDeviceStatusCall | AndroidNotificationDigestCall | FileReceiveCall, Field(discriminator="tool")]
+ToolResult = InteractionResult | SystemInfoResult | ListDirectoryResult | FileReadResult | FileSearchResult | FilePreviewResult | FileWriteResult | CommandRunResult | FileLinesResult | FileGlobResult | FileGrepResult | FileEditPreviewResult | FileEditResult | ImageReadResult | PluginNodeResult | AndroidDeviceStatusResult | AndroidNotificationDigestResult | FileReceiveResult
 
 
 TOOL_ARGUMENT_MODELS = {
+    "filesystem.receive@1": FileReceiveArguments,
+    "android.device_status@1": AndroidDeviceStatusArguments,
+    "android.notification_digest@1": AndroidNotificationDigestArguments,
     "plugin.call@1": PluginNodeArguments,
     "filesystem.read_image@1": ImageReadArguments,
     "interaction.observe@1": ObserveArguments,
@@ -243,6 +249,9 @@ TOOL_ARGUMENT_MODELS = {
 }
 
 TOOL_RESULT_MODELS = {
+    "filesystem.receive@1": FileReceiveResult,
+    "android.device_status@1": AndroidDeviceStatusResult,
+    "android.notification_digest@1": AndroidNotificationDigestResult,
     "plugin.call@1": PluginNodeResult,
     "filesystem.read_image@1": ImageReadResult,
     "interaction.observe@1": InteractionResult,
@@ -267,6 +276,10 @@ def validate_result(command: ToolCall, result: ToolResult, max_bytes: int) -> To
     model = TOOL_RESULT_MODELS[f"{command.tool}@{command.tool_version}"]
     checked = model.model_validate_json(result.model_dump_json())
     args = command.arguments
+    if isinstance(checked, FileReceiveResult) and (checked.attachment_id != args.attachment_id or checked.sha256 != args.sha256 or checked.bytes_written != args.size_bytes):
+        raise ValueError("file delivery evidence mismatch")
+    if isinstance(checked, AndroidNotificationDigestResult) and len(checked.entries) > args.limit:
+        raise ValueError("notification result exceeds requested limit")
     if isinstance(checked, PluginNodeResult) and (checked.release_digest != args.release_digest or checked.tool != args.tool):
         raise ValueError("plugin result identity mismatch")
     if hasattr(checked, "root_id") and checked.root_id != args.root_id:

@@ -1,0 +1,85 @@
+{
+  "recorded_at": "2026-10-24T10:44:52.146686+08:00",
+  "scope": "P82 local Web and Windows bundled visualization; no production or native package changes",
+  "baseline": {
+    "passed": true,
+    "baseline": true,
+    "browser": "155.0.4283.62",
+    "evidence": [
+      {
+        "surface": "web",
+        "startsAtCore": false,
+        "focusCentered": false,
+        "completionRetainsOrb": false
+      },
+      {
+        "surface": "windows",
+        "startsAtCore": false,
+        "focusCentered": false,
+        "completionRetainsOrb": false
+      }
+    ],
+    "real_model_calls": 0
+  },
+  "browser": {
+    "passed": true,
+    "baseline": false,
+    "browser": "155.0.4283.62",
+    "evidence": [
+      {
+        "surface": "web",
+        "endpointError": 5.79553433516819e-16,
+        "particleMaterials": 7,
+        "allChecks": true
+      },
+      {
+        "surface": "windows",
+        "endpointError": 5.79553433516819e-16,
+        "particleMaterials": 7,
+        "allChecks": true
+      }
+    ],
+    "real_model_calls": 0
+  },
+  "pytest": {
+    "command": "python -m pytest tests/test_visualization_browser.py tests/test_app_page.py -q --basetemp=var/visualization-fix/pytest-tmp",
+    "passed": 3,
+    "seconds": 3.2
+  },
+  "screenshots": {
+    "web-flight.png": {
+      "path": "var\\visualization-fix\\web-flight.png",
+      "sha256": "da0deef73d9887375db1f59524aea9ad6c86aba3f21c213ef7bdcd501a09989c"
+    },
+    "web-afterglow.png": {
+      "path": "var\\visualization-fix\\web-afterglow.png",
+      "sha256": "98107a75a1da7285eb69cb41e215203269e19f45d28475cc55ff8d5de17491b4"
+    },
+    "web-mobile.png": {
+      "path": "var\\visualization-fix\\web-mobile.png",
+      "sha256": "9d81dac87b35a85a03f32f21b51ba70c61ebaf2b1ad71a01a0964f0a436bb070"
+    },
+    "windows-flight.png": {
+      "path": "var\\visualization-fix\\windows-flight.png",
+      "sha256": "da0deef73d9887375db1f59524aea9ad6c86aba3f21c213ef7bdcd501a09989c"
+    },
+    "windows-afterglow.png": {
+      "path": "var\\visualization-fix\\windows-afterglow.png",
+      "sha256": "98107a75a1da7285eb69cb41e215203269e19f45d28475cc55ff8d5de17491b4"
+    },
+    "windows-mobile.png": {
+      "path": "var\\visualization-fix\\windows-mobile.png",
+      "sha256": "9d81dac87b35a85a03f32f21b51ba70c61ebaf2b1ad71a01a0964f0a436bb070"
+    }
+  },
+  "source_sha256": {
+    "src/nexus/web/app/visualization.js": "c7368cba2a6dd28f0c6b5d89116202735df62ee0f6cca964adb6e7eb1ff6ed6a",
+    "apps/windows/ui/visualization.js": "c7368cba2a6dd28f0c6b5d89116202735df62ee0f6cca964adb6e7eb1ff6ed6a",
+    "tests/visualization_browser.cjs": "6c850e210b8561030ba75ca7d63c57d9bc4d6f151cb9c3bc8faf9cbeb471e17c"
+  },
+  "limitations": [
+    "Synthetic Core snapshots and deterministic animation clock; actual Edge/WebGL sampled rendering.",
+    "Pinch events were synthetic; mouse drag and double click used Playwright browser input.",
+    "No production deployment, Windows build/install or real-device/tool/model validation."
+  ]
+}

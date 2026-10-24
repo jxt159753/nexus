@@ -13,17 +13,19 @@ CHAT_MAX_TEXT_BYTES = 1_048_576
 class ModelConfig(StrictContract):
     enabled: StrictBool = False
     cost_limits_enabled: StrictBool = True
+    call_limits_enabled: StrictBool = True
     daily_cost_microunits: StrictInt = Field(default=1_000_000, ge=0, le=1_000_000)
     task_cost_microunits: StrictInt = Field(default=50_000, ge=0, le=50_000)
     daily_calls: StrictInt = Field(default=100, ge=0, le=100)
     max_output_tokens: StrictInt = Field(default=512, ge=32, le=512)
     chat_enabled: StrictBool = False
+    chat_work_max_actions: StrictInt = Field(default=4, ge=1, le=16)
     web_enabled: StrictBool = False
     chat_images_enabled: StrictBool = False
     web_request_cost_microunits: StrictInt = Field(default=750, ge=750, le=50_000)
     # DSH provider default; each actual request is also capped by its reservation.
     chat_max_output_tokens: StrictInt = Field(default=CHAT_MAX_OUTPUT_TOKENS, ge=32, le=CHAT_MAX_OUTPUT_TOKENS)
-    chat_input_bytes: StrictInt = Field(default=32768, ge=8192, le=32768)
+    chat_input_bytes: StrictInt = Field(default=32768, ge=8192, le=65536)
     # Adapter capacity and local admission budget are distinct. deepseek-flash
     # advertises a 1M context; costs/transport retain the stricter local limits.
     chat_context_window_tokens: StrictInt = Field(default=1_000_000, ge=4096, le=1_000_000)
@@ -36,6 +38,10 @@ class ModelConfig(StrictContract):
     input_price: StrictInt = Field(default=300_000, ge=1)
     output_price: StrictInt = Field(default=1_200_000, ge=1)
     price_valid_until: date = date(2026, 10, 25)
+
+    def work_actions_remaining(self, used: int = 0) -> int:
+        # A transport batch remains bounded; disabling quotas removes the total.
+        return max(0, self.chat_work_max_actions - used) if self.call_limits_enabled else 4
 
     def chat_output_limit(self, reservation: int | None = None, *, compact: bool = False) -> int:
         if not self.cost_limits_enabled:

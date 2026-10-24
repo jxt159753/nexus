@@ -1,0 +1,862 @@
+{
+  "observed_at": "2026-10-24T04:00:42.522261+00:00",
+  "status": "technical_verification_complete_user_acceptance_pending",
+  "production": {
+    "release": "/opt/nexus/releases/mcp-integration-20261024-0fc31da1",
+    "wheel_sha256": "0fc31da1cbd93c8e33d4415bb8bbae86698d3b0b8e2a75da6b35baa00f12ea37",
+    "pid": 398439,
+    "core_process_count": 1,
+    "runtime_resources_verified": 257,
+    "schema": 34,
+    "history_counts": {
+      "tasks": 96,
+      "task_attempts": 91,
+      "conversations": 66,
+      "chat_turns": 109,
+      "model_calls": 230,
+      "skill_runs": 5
+    },
+    "historical_unknown_tasks": 3,
+    "unknown_model_costs": 6,
+    "inactive_verified": true,
+    "previous_runtime_reads_current_database": true,
+    "installer_sha256": "0efd60a96c9e300b65d2f0492a8f7a14e6f4584296eaed12ed49bbf74796f96b",
+    "installer_bytes": 104075319
+  },
+  "windows": {
+    "version": "0.1.7",
+    "node_sha256": "902fd7be48d8dcc95a8efe47a631b5be83669ff5bd6a9a0892d4996756013e6e",
+    "node_online": true,
+    "node_plugin_config_digest": "16b829dba85e5f042f9d09f20bf4058eec793a6b8c781ef0862172022cbf6a02"
+  },
+  "installation": {
+    "package": "windows-mcp",
+    "version": "0.8.8",
+    "python": "3.14.3",
+    "job_id": "8029bcf4135041b0b3d3065ccc3011b9",
+    "exit_code": 0,
+    "execution_stopped": true,
+    "dependency_snapshot_sha256": "6bb98da657e7d8d4dbd7c881408dce81f6645b3f882a7117db3281a6d323d07f"
+  },
+  "mcp": {
+    "server": "windows-desktop",
+    "revision": 2,
+    "state": "active",
+    "catalog_digest": "bc25e9d2e246b6b27ba20c5d910f08e03f48f9a93f7762593dbcd3abc4f881d8",
+    "configuration_digest": "10d16f29e3d4907e31740c2549fce17461982365cea9520efb4f36e3b990f1b1"
+  },
+  "skill": {
+    "version_id": "851cd461-95c3-4fe6-8688-3abdd6523942",
+    "capability_id": "user.windows_mcp_health",
+    "revision": 1,
+    "artifact_digest": "c691a06d1757f8d930e50219fca017ef7919a3c8cd08c9df16d7f3edcb4cc506",
+    "test_status": "passed",
+    "enabled": true,
+    "approval_valid": true,
+    "approval": {
+      "approval_id": "ad7775e3-cc32-479b-9198-6a91680f3a11",
+      "test_id": "00abdad0-2676-44d0-a56c-4aec208da999",
+      "policy_version": 33,
+      "decision": "approve",
+      "created_at": "2026-10-24T03:47:43.351476+00:00",
+      "expires_at": "2026-10-31T03:47:43.351476+00:00"
+    }
+  },
+  "calls": {
+    "count": 60,
+    "calculated_cost_microunits": 213532,
+    "unknown": 0
+  },
+  "turns": [
+    {
+      "case": "continue",
+      "turn_id": "a663731c-cf9f-4f8d-bb7c-5b229f26c563",
+      "status": "completed",
+      "error_code": null,
+      "model_call_count": 10,
+      "conversation_id": "74158e70-cbe7-41a3-90aa-3f545b7bcf76",
+      "cost_microunits": 39257,
+      "cost_status": "calculated",
+      "steps": [
+        {
+          "intent": "get_node_status",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "job_output",
+          "status": "succeeded",
+          "task_id": "31e06037-1c42-4d85-9a9c-f5a9c6e5a258",
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "mcp_list",
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "pwsh",
+          "status": "succeeded",
+          "task_id": "a7447d69-8928-4b04-b0fb-f38bf99008d2",
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "pwsh",
+          "status": "succeeded",
+          "task_id": "ceec9003-9633-414a-97fa-e4680bdfef57",
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "pwsh",
+          "status": "succeeded",
+          "task_id": "05353c23-081c-46fd-bab6-b7045cf07759",
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "pwsh",
+          "status": "succeeded",
+          "task_id": "0bcf94bc-bc79-4a58-9a10-f83f96f17cb6",
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "mcp_register",
+          "status": "failed",
+          "task_id": "1b31180d-3ac3-453b-b3d3-83ed4e680d7d",
+          "skill_run_id": null
+        },
+        {
+          "intent": "get_node_status",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        }
+      ]
+    },
+    {
+      "case": "register",
+      "turn_id": "c85879e2-aa47-4d68-a05c-0c262ceefe68",
+      "status": "stopped",
+      "error_code": "POLICY_DENIED",
+      "model_call_count": 1,
+      "conversation_id": "74158e70-cbe7-41a3-90aa-3f545b7bcf76",
+      "cost_microunits": 2494,
+      "cost_status": "calculated",
+      "steps": [
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "stopped",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "stopped",
+          "task_id": null,
+          "skill_run_id": null
+        }
+      ]
+    },
+    {
+      "case": "register-v2",
+      "turn_id": "7539cb67-29a2-41a3-9524-69cff9bdabbd",
+      "status": "completed",
+      "error_code": "MCP_SERVER_UNAVAILABLE",
+      "model_call_count": 4,
+      "conversation_id": "74158e70-cbe7-41a3-90aa-3f545b7bcf76",
+      "cost_microunits": 10960,
+      "cost_status": "calculated",
+      "steps": [
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "mcp_list",
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "mcp_list",
+          "status": "stopped",
+          "task_id": null,
+          "skill_run_id": null
+        }
+      ]
+    },
+    {
+      "case": "register-v3",
+      "turn_id": "940a0432-ab5a-4721-b8f7-8e265a23fa25",
+      "status": "completed",
+      "error_code": null,
+      "model_call_count": 9,
+      "conversation_id": "74158e70-cbe7-41a3-90aa-3f545b7bcf76",
+      "cost_microunits": 42696,
+      "cost_status": "calculated",
+      "steps": [
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "mcp_list",
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "mcp_list",
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "mcp_register",
+          "status": "succeeded",
+          "task_id": "d6f1c5fb-cbf0-451b-9d6b-15d1c988aa43",
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "mcp_call_tool",
+          "status": "succeeded",
+          "task_id": "2310ff87-dec5-4e32-a128-004587627cf6",
+          "skill_run_id": null
+        }
+      ]
+    },
+    {
+      "case": "reuse",
+      "turn_id": "62c9acd4-414d-4b1d-9461-31af9b37f7a4",
+      "status": "completed",
+      "error_code": null,
+      "model_call_count": 9,
+      "conversation_id": "ed9b058e-a80d-41e5-8718-2890ffa5d18f",
+      "cost_microunits": 30464,
+      "cost_status": "calculated",
+      "steps": [
+        {
+          "intent": "inspect_capability",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "get_node_status",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "run_skill",
+          "tool": null,
+          "status": "failed",
+          "task_id": null,
+          "skill_run_id": "9ca634df-701c-49f4-8a5b-9acab65412b0"
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "mcp_list",
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "mcp_call_tool",
+          "status": "failed",
+          "task_id": "5de2aee1-6fa3-4686-84ee-0c1fdf172fd0",
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "mcp_list",
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "mcp_call_tool",
+          "status": "succeeded",
+          "task_id": "b3600e3c-e580-4c3d-8cae-ce76bc72093d",
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "mcp_call_tool",
+          "status": "succeeded",
+          "task_id": "e5749efd-6d88-4bc9-b542-c77da502a37f",
+          "skill_run_id": null
+        }
+      ]
+    },
+    {
+      "case": "reuse-v2",
+      "turn_id": "329fb4c7-3f84-4c09-b637-c651973a6436",
+      "status": "completed",
+      "error_code": null,
+      "model_call_count": 3,
+      "conversation_id": "b8647ba5-b629-43b9-b44a-aac793a84b60",
+      "cost_microunits": 7811,
+      "cost_status": "calculated",
+      "steps": [
+        {
+          "intent": "inspect_capability",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "run_skill",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": "a2d01fec-0f44-400b-9a5d-a680e50e75f9"
+        }
+      ]
+    },
+    {
+      "case": "run",
+      "turn_id": "bfef796c-65de-4a75-bfcb-e6b25afb052f",
+      "status": "completed",
+      "error_code": "VERSION_NOT_APPROVED",
+      "model_call_count": 2,
+      "conversation_id": "74158e70-cbe7-41a3-90aa-3f545b7bcf76",
+      "cost_microunits": 3360,
+      "cost_status": "calculated",
+      "steps": [
+        {
+          "intent": "inspect_capability",
+          "tool": null,
+          "status": "stopped",
+          "task_id": null,
+          "skill_run_id": null
+        }
+      ]
+    },
+    {
+      "case": "run-v2",
+      "turn_id": "98f2a1b9-e568-4448-9f53-837847bcee18",
+      "status": "completed",
+      "error_code": null,
+      "model_call_count": 3,
+      "conversation_id": "74158e70-cbe7-41a3-90aa-3f545b7bcf76",
+      "cost_microunits": 7808,
+      "cost_status": "calculated",
+      "steps": [
+        {
+          "intent": "inspect_capability",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "run_skill",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": "f19e25eb-00dd-4f0d-8ba1-0925bacaa34b"
+        }
+      ]
+    },
+    {
+      "case": "setup",
+      "turn_id": "73883135-23bf-4418-ac0b-43a5212197dd",
+      "status": "completed",
+      "error_code": "MODEL_INPUT_LIMIT",
+      "model_call_count": 2,
+      "conversation_id": "32c19fbb-a0f9-44b7-a51b-ba834e082d47",
+      "cost_microunits": 4257,
+      "cost_status": "calculated",
+      "steps": [
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        }
+      ]
+    },
+    {
+      "case": "setup-v2",
+      "turn_id": "c4abd31b-0364-41cc-b321-e89f54eb6b37",
+      "status": "failed",
+      "error_code": "MODEL_INPUT_LIMIT",
+      "model_call_count": 7,
+      "conversation_id": "bd3ca832-a1b0-42ca-9fda-b722cd957524",
+      "cost_microunits": 27980,
+      "cost_status": "calculated",
+      "steps": [
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "get_node_status",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "list_directory",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": "f50c953e-b73e-4018-b4ae-ce9c1845093b",
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "mcp_list",
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "pwsh",
+          "status": "failed",
+          "task_id": "5f7a29f4-9ff5-42f5-b8c9-d51e80e282a4",
+          "skill_run_id": null
+        },
+        {
+          "intent": "job_list",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "pwsh",
+          "status": "failed",
+          "task_id": "a4ed9d02-896c-4773-b026-e23f1ebe2e0b",
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "pwsh",
+          "status": "failed",
+          "task_id": "6fcdec98-88cc-4fe2-9493-d7e678ac4be9",
+          "skill_run_id": null
+        }
+      ]
+    },
+    {
+      "case": "setup-v3",
+      "turn_id": "a443330a-c1c2-4c6f-a621-c0493d5814e0",
+      "status": "completed",
+      "error_code": "POLICY_DENIED",
+      "model_call_count": 5,
+      "conversation_id": "74158e70-cbe7-41a3-90aa-3f545b7bcf76",
+      "cost_microunits": 14591,
+      "cost_status": "calculated",
+      "steps": [
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "get_node_status",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "mcp_list",
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "pwsh",
+          "status": "succeeded",
+          "task_id": "285d9421-79dd-412a-85c1-1bbff4f5ec21",
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "pwsh",
+          "status": "succeeded",
+          "task_id": "dc09c234-9576-424c-bde5-7a5803064134",
+          "skill_run_id": null
+        },
+        {
+          "intent": "job_output",
+          "tool": null,
+          "status": "stopped",
+          "task_id": null,
+          "skill_run_id": null
+        }
+      ]
+    },
+    {
+      "case": "skill",
+      "turn_id": "de8d88ce-263e-4fe0-afb5-c1890c4faeb0",
+      "status": "completed",
+      "error_code": null,
+      "model_call_count": 5,
+      "conversation_id": "74158e70-cbe7-41a3-90aa-3f545b7bcf76",
+      "cost_microunits": 21854,
+      "cost_status": "calculated",
+      "steps": [
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "mcp_list",
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "mcp_call_tool",
+          "status": "succeeded",
+          "task_id": "b2a486a1-2140-488d-a400-44c348489d9a",
+          "skill_run_id": null
+        },
+        {
+          "intent": "skill_create",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "skill_run_id": null
+        }
+      ]
+    }
+  ],
+  "skill_runs": [
+    {
+      "run_id": "9ca634df-701c-49f4-8a5b-9acab65412b0",
+      "version_id": "851cd461-95c3-4fe6-8688-3abdd6523942",
+      "artifact_digest": "c691a06d1757f8d930e50219fca017ef7919a3c8cd08c9df16d7f3edcb4cc506",
+      "status": "failed",
+      "verification": null,
+      "children": [
+        {
+          "task_id": "a135a4bd-c0b7-4733-b345-70e524c2b96a",
+          "task_status": "succeeded",
+          "execution_outcome": "known",
+          "verification": "node_report_schema_checked",
+          "mcp_status": "failed",
+          "mcp_result": {
+            "content": [
+              {
+                "text": "{\"code\": \"USER_CONTROL\", \"status\": {\"state\": \"user\", \"generation\": 2, \"wait_seconds\": 9.998965400000088}}",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          },
+          "attempts": [
+            {
+              "attempt_id": "9f14d810-dab6-423d-8338-bf6a4b761616",
+              "dispatch_count": 1,
+              "phase": "completed",
+              "execution_stopped": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run_id": "a2d01fec-0f44-400b-9a5d-a680e50e75f9",
+      "version_id": "851cd461-95c3-4fe6-8688-3abdd6523942",
+      "artifact_digest": "c691a06d1757f8d930e50219fca017ef7919a3c8cd08c9df16d7f3edcb4cc506",
+      "status": "succeeded",
+      "verification": "skill_steps_verified",
+      "children": [
+        {
+          "task_id": "a6b502fa-e887-4d48-b405-e2110c735641",
+          "task_status": "succeeded",
+          "execution_outcome": "known",
+          "verification": "node_report_schema_checked",
+          "mcp_status": "succeeded",
+          "mcp_result": {
+            "_meta": {
+              "fastmcp": {
+                "wrap_result": true
+              }
+            },
+            "content": [
+              {
+                "text": "Processes (2 shown):\n  PID  Name            CPU%    Memory\n-----  --------------  ------  --------\n61796  nexus-node.exe  0.0%    72.9 MB\n40676  node.exe        0.0%    47.9 MB",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "result": "Processes (2 shown):\n  PID  Name            CPU%    Memory\n-----  --------------  ------  --------\n61796  nexus-node.exe  0.0%    72.9 MB\n40676  node.exe        0.0%    47.9 MB"
+            }
+          },
+          "attempts": [
+            {
+              "attempt_id": "ee06dbeb-a045-45e1-95ee-e44c6cdf1897",
+              "dispatch_count": 1,
+              "phase": "completed",
+              "execution_stopped": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run_id": "f19e25eb-00dd-4f0d-8ba1-0925bacaa34b",
+      "version_id": "851cd461-95c3-4fe6-8688-3abdd6523942",
+      "artifact_digest": "c691a06d1757f8d930e50219fca017ef7919a3c8cd08c9df16d7f3edcb4cc506",
+      "status": "succeeded",
+      "verification": "skill_steps_verified",
+      "children": [
+        {
+          "task_id": "72ab47d6-8199-4384-aebe-944164908c24",
+          "task_status": "succeeded",
+          "execution_outcome": "known",
+          "verification": "node_report_schema_checked",
+          "mcp_status": "succeeded",
+          "mcp_result": {
+            "_meta": {
+              "fastmcp": {
+                "wrap_result": true
+              }
+            },
+            "content": [
+              {
+                "text": "Processes (2 shown):\n  PID  Name            CPU%    Memory\n-----  --------------  ------  --------\n61796  nexus-node.exe  0.0%    72.5 MB\n40676  node.exe        0.0%    47.8 MB",
+                "type": "text"
+              }
+            ],
+            "isError": false,
+            "structuredContent": {
+              "result": "Processes (2 shown):\n  PID  Name            CPU%    Memory\n-----  --------------  ------  --------\n61796  nexus-node.exe  0.0%    72.5 MB\n40676  node.exe        0.0%    47.8 MB"
+            }
+          },
+          "attempts": [
+            {
+              "attempt_id": "7bdd74bb-9ce8-4dc9-be46-e5bd8a1d7b65",
+              "dispatch_count": 1,
+              "phase": "completed",
+              "execution_stopped": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "permission_cleanup": {
+    "conversations": [
+      {
+        "conversation_id": "32c19fbb-a0f9-44b7-a51b-ba834e082d47",
+        "permission": {
+          "mode": null,
+          "effective_mode": "normal",
+          "source": "global",
+          "revision": 3,
+          "global_mode": "normal",
+          "global_revision": 1,
+          "fingerprint": "cc190ab28c9e99da54255f2f9dab066aae39701dfd7ee8f9f55067502361a75b"
+        }
+      },
+      {
+        "conversation_id": "74158e70-cbe7-41a3-90aa-3f545b7bcf76",
+        "permission": {
+          "mode": null,
+          "effective_mode": "normal",
+          "source": "global",
+          "revision": 3,
+          "global_mode": "normal",
+          "global_revision": 1,
+          "fingerprint": "cc190ab28c9e99da54255f2f9dab066aae39701dfd7ee8f9f55067502361a75b"
+        }
+      },
+      {
+        "conversation_id": "b8647ba5-b629-43b9-b44a-aac793a84b60",
+        "permission": {
+          "mode": null,
+          "effective_mode": "normal",
+          "source": "global",
+          "revision": 3,
+          "global_mode": "normal",
+          "global_revision": 1,
+          "fingerprint": "cc190ab28c9e99da54255f2f9dab066aae39701dfd7ee8f9f55067502361a75b"
+        }
+      },
+      {
+        "conversation_id": "bd3ca832-a1b0-42ca-9fda-b722cd957524",
+        "permission": {
+          "mode": null,
+          "effective_mode": "normal",
+          "source": "global",
+          "revision": 3,
+          "global_mode": "normal",
+          "global_revision": 1,
+          "fingerprint": "cc190ab28c9e99da54255f2f9dab066aae39701dfd7ee8f9f55067502361a75b"
+        }
+      },
+      {
+        "conversation_id": "ed9b058e-a80d-41e5-8718-2890ffa5d18f",
+        "permission": {
+          "mode": null,
+          "effective_mode": "normal",
+          "source": "global",
+          "revision": 3,
+          "global_mode": "normal",
+          "global_revision": 1,
+          "fingerprint": "cc190ab28c9e99da54255f2f9dab066aae39701dfd7ee8f9f55067502361a75b"
+        }
+      }
+    ],
+    "skill_enabled": true,
+    "approval_valid": true,
+    "global": {
+      "mode": "normal",
+      "revision": 1
+    }
+  },
+  "limits": {
+    "tested_tool": "Process",
+    "tested_arguments": {
+      "mode": "list",
+      "name": "nexus-node",
+      "limit": 2
+    },
+    "desktop_input_actions_tested": false,
+    "autonomous_core_node_source_changes": false,
+    "one_uninterrupted_first_attempt": false,
+    "known_existing_test_failure": "test_chat_context.py::test_capability_inspection_is_bounded_authorized_and_does_not_execute[True]"
+  },
+  "final_backup": "/var/backups/nexus/before-mcp-skill-evidence-20261024T035920Z",
+  "final_review": {
+    "documents": 7,
+    "local_links": 463,
+    "anchors": 88,
+    "scoped_diff_whitespace_check": "passed",
+    "workspace_resources_still_matching": 30,
+    "parallel_changes_excluded": [
+      "nexus/core/app.py",
+      "nexus/core/storage/tasks.py"
+    ],
+    "installed_node_hash_verified": true
+  }
+}

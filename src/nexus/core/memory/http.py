@@ -89,5 +89,6 @@ class RecordsHTTP:
         value["chat_enabled"] = value["enabled"] and language.config.chat_enabled and not request.app.state.chat.failed
         value["web_enabled"] = value["chat_enabled"] and language.config.web_enabled
         value["cost_limits_enabled"] = language.config.cost_limits_enabled
+        value["call_limits_enabled"] = language.config.call_limits_enabled
         value["chat_max_output_tokens"] = language.config.chat_output_limit()
         return value

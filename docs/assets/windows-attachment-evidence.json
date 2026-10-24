@@ -1,7 +1,7 @@
 {
   "passed": true,
-  "installer_sha256": "54aff24ef76fa4459ea1307f34bc6be47280af6eb86a554aaca0a1a3cc993c2d",
-  "core_version": "local P56 backend + 022 migration",
+  "installer_sha256": "5496eedc5b5f31f6857619fa8b70aa4faf5dd62716bf25f5144b840544ea9e55",
+  "core_version": "local source, attachment migration 022; test schema 026",
   "browser": "Edg/155.0.4283.62",
   "upload_over_2mib": true,
   "ui_has_no_fake_progress": true,

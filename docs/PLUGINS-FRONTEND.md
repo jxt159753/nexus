@@ -28,3 +28,13 @@
 Windows `src-tauri/src/node.rs` 当前每次启动仍重写旧版 `node.toml`，没有插件配置。请接入固定 Node 构建并保留本地插件策略、工作区、LSP/MCP/浏览器配置；部署时由 owner 在 Core 同步信任新的 `plugin_digest` 与静态能力，不能由模型或 Node 自报值自动扩大。未完成桥接时沿用已部署的独立 Node 启动器；启动旧 App Node 会造成能力降级或身份重复，不能把它显示成新插件执行端已接管。
 
 真实 Core + 更新后的 Windows Node；验证全局默认、会话覆盖与恢复继承、并发修改、模式降级、已派发操作、归档/撤销、生成测试失败及 full 自动启用；刷新不重复操作，错误与 unknown 保留。桌面/390px/键盘检查分别记录。没有实际后端证据的 UI 只记为待联调，不能宣布本轮完整交付。
+
+## Skill/MCP 追加接入要求
+
+2026-10-23 后端接口见 [Skill/MCP](skill-mcp.md)。这部分单独交给用户控制的 DSH，Codex 不改前端/原生桥或自动派发。P62 已完成的配置合并与桥接以当前源码/路线图为准，不沿用上文旧快照中“每次重写旧 node.toml”的判断。
+
+1. MCP 管理页按设备显示登记版本、待发现/可用/失败/停用和真实工具列表，分别调用 `/api/v1/mcp`、`/{server}/tools`、`/discover`、`/reload`、DELETE。写入携带稳定 request_id 与当前 conversation_id；修改和重载携带最新 expected_revision，409 后刷新，不换 ID 悄悄覆盖。
+2. 区分登记 pending、Task 审批/执行与配置 active；仅 active 及服务端核验后的 catalog_digest 表示可调用。重载失败仍显示旧 active 与新失败记录，不能将旧配置误标失效或新配置误标成功。普通模式复用原任务审批卡，full 根据服务端状态展示。
+3. Shell Skill 的运行请求增加 conversation_id；计划卡显示固定 plugin_id/tool/digest 和服务端 approval_required。契约测试显示“未运行宿主命令”，运行时展示实际退出码、失败/未知和数据，不把替身测试当安装成功。
+4. Windows HTTP 桥按现有 owner/Origin/CSRF 规则放行上述有限 MCP 路径与方法，不提供任意 URL/本地配置编辑。Node 本地策略增加显式 allow_managed_mcp 开关，保留 owner 原有设置，按实际配置更新 Core 信任摘要；模型不能打开该开关。
+5. 验证重复点击/刷新不重复安装、会话降权/归档阻断、发现失败保留旧目录、目录变更拒绝调用、重新登录与 Core/Node 重启；分别记录桌面/390px/安装版。生产升级状态查 P65，当前源码不等于线上已支持。

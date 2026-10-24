@@ -2,6 +2,8 @@
 
 import {
   ApiError,
+  api,
+  uuid,
   STATUS_LABELS,
   TASK_TERMINAL,
   TOOL_LABELS,
@@ -24,7 +26,14 @@ import {
   clearPrefs,
 } from "./api.js";
 
+import { renderChatFiles } from "./chat-files.js";
 import { markdownPreview, renderMarkdown } from "./markdown.js";
+import {
+  attachmentBlocksSend,
+  attachmentState,
+  leaveConversation,
+  renderTurnAttachments,
+} from "./attachments.js";
 import {
   createImageEvidence,
   createImageMetadata,
@@ -32,6 +41,8 @@ import {
   openImagePreview,
   safeJson,
 } from "./image.js";
+import { renderPluginWorkStep, renderStructuredQuestion } from "./plugin-view.js";
+import { modeLabel, pluginState } from "./plugins.js";
 
 const $ = (id) => document.getElementById(id);
 const presentationUi = new Map();
@@ -48,6 +59,9 @@ export const ui = {
   scrollToTurn: () => {},
   logout: () => {},
   openTurnDetails: () => {},
+  openPlugins: () => {},
+  openConversationPermission: () => {},
+  openAutomation: () => {},
 };
 
 export function bindUI(handlers) {
@@ -98,9 +112,19 @@ export function errorText(error) {
     RESULT_UNAVAILABLE: "当前没有可回传的结果",
     WORK_PERMISSION_EXPIRED: "本次工作授权已失效",
     EMPTY_MESSAGE: "请先输入内容",
+    EMPTY_ATTACHMENT_SELECTION: "请先选择附件",
     NO_CONVERSATION: "请先选择会话",
     INVALID_MESSAGE: "输入无法校验，请检查后重试",
     INVALID_RESPONSE: "服务返回了无法解析的内容",
+    INVALID_UPLOAD: "文件名或内容不符合服务器要求",
+    UPLOAD_TOO_LARGE: "附件超过服务器单文件上限",
+    UPLOAD_BUSY: "上传通道繁忙，请稍后重试",
+    UPLOAD_TIMEOUT: "上传超时；结果未知，重试前会核对服务器",
+    UPLOAD_ENCODING_UNSUPPORTED: "服务器拒绝该传输编码",
+    ATTACHMENT_IN_USE: "附件已关联聊天轮次，不能删除",
+    ATTACHMENT_UNAVAILABLE: "附件已不可用，请重新选择",
+    CONVERSATION_ARCHIVED: "会话已归档，不能上传或发送附件",
+    MODEL_INPUT_LIMIT: "本轮附件与上下文超过模型请求上限，请减少本轮选择；原文件仍保留",
     FORBIDDEN: "操作被拒绝",
     HTTP_503: "Core 暂时不可用",
   };
@@ -521,11 +545,28 @@ function renderWorkStep(turn, step) {
   const data = result?.data;
   const label = TOOL_LABELS[intent] || intent || "步骤";
   const box = card(`${step.step_index}. ${label}`, statusBadge(step.status));
-  const args = stepArguments(step);
-  if (args) box.append(el("p", "hint", args));
+  const args = step?.proposal?.arguments || {};
+  if (intent === "plugin_execute") {
+    const pluginId = args.plugin_id || "插件";
+    const tool = args.tool || "工具";
+    const input = args.input && typeof args.input === "object" ? JSON.stringify(args.input) : "";
+    box.append(el("p", "hint", `${pluginId} · ${tool}${input ? " · " + input.slice(0, 500) : ""}`));
+  } else if (intent === "plugin_inspect") {
+    box.append(el("p", "hint", args.plugin_id ? `查询固定插件 ${args.plugin_id}` : "查询插件运行注册表"));
+  } else if (intent === "plugin_install") {
+    const release = args.release || {};
+    const manifest = release.manifest || {};
+    box.append(el("p", "hint", `候选 ${manifest.plugin_id || "user.*"}@${manifest.version || "?"} · 独立测试与批准分开记录`));
+  }
+  if (intent !== "plugin_execute" && intent !== "plugin_inspect" && intent !== "plugin_install") {
+    const generic = stepArguments(step);
+    if (generic) box.append(el("p", "hint", generic));
+  }
 
-  if (step.status === "permission") {
+  const question = renderStructuredQuestion(box, turn, step);
+  if (step.status === "permission" && !question) {
     box.append(el("p", "hint", step.request_text || "这一步需要你的明确答复。"));
+    box.append(el("p", "hint", "这是对当前动作的执行授权，不是普通/完全权限模式开关；业务问题回答也不会打开完全模式。"));
     const actions = el("div", "actions");
     const reject = button("不同意", "quiet", () => runAction(async () => {
       await answerPermission(turn.turn_id, step.step_id, turn.revision, false);
@@ -539,11 +580,15 @@ function renderWorkStep(turn, step) {
     box.append(actions);
   }
 
-  let handled = false;
+  let handled = question;
+  const pluginIntent = ["plugin_execute", "plugin_inspect", "plugin_install"].includes(intent);
+  if (pluginIntent && !question && (step.result || step.status !== "permission")) {
+    handled = renderPluginWorkStep(box, turn, step) || handled;
+  }
   const resultKnown = result && result.execution_outcome !== "unknown"
     && (result.status === "succeeded" || result.status === undefined);
   const successful = step.status === "succeeded" && resultKnown;
-  if (successful && data) {
+  if (!pluginIntent && successful && data) {
     if (intent === "read_image") {
       const evidence = createImageEvidence(data);
       if (evidence) box.append(evidence);
@@ -569,7 +614,7 @@ function renderWorkStep(turn, step) {
     else ensureTask(taskId);
   }
 
-  const specialized = ["read_image", "get_current_time", "job_list", "job_output", "inspect_capability"].includes(intent);
+  const specialized = ["read_image", "get_current_time", "job_list", "job_output", "inspect_capability", "plugin_execute", "plugin_inspect", "plugin_install"].includes(intent);
   if (!handled && successful && result && !specialized && !step.task_id && !step.preview_task_id) {
     renderResultData(box, result.data || result);
   }
@@ -750,21 +795,18 @@ function presentationState(turn, presentation) {
 }
 
 function renderPresentationBody(assistant, turn, presentation) {
+  if(presentation.files?.length) assistant.append(renderChatFiles(presentation.files,api,uuid));
   const status = el("div", "status-line");
-  status.append(presentationBadge(presentation));
-  if (turn.work_status && turn.work_status !== "permission") status.append(el("span", "hint", `工作：${turn.work_status}`));
+  if (presentation.phase !== "completed") status.append(presentationBadge(presentation));
   if (turn.cost_status === "unknown") status.append(el("span", "hint", "部分费用待核对"));
-  else if (turn.cost_microunits !== null && turn.cost_microunits !== undefined) status.append(el("span", "hint", money(turn.cost_microunits)));
-  if (turn.web_call_count) status.append(el("span", "hint", `网页请求 ${turn.web_call_count} 次`));
-  if (turn.context_truncated) status.append(el("span", "hint", "部分历史或工具上下文已裁剪"));
-  assistant.append(status);
+  if (turn.context_truncated) status.append(el("span", "hint", "较早的内容未全部带入本次回复"));
+  if (status.childElementCount) assistant.append(status);
 
   const hint = errorHint(turn.error_code);
   if (hint && !presentation.final_text) assistant.append(el("p", "hint", hint));
 
   if (presentation.final_text !== null && presentation.final_text !== undefined) {
     const final = el("section", "final-answer");
-    final.append(el("p", "final-label", presentation.phase === "completed" ? "最终回答" : "本轮反馈"));
     const prose = el("div", "prose");
     renderProse(prose, presentation.final_text);
     final.append(prose);
@@ -867,7 +909,10 @@ function renderTurn(turn) {
   const user = el("div", "msg user");
   const userMeta = el("div", "msg-meta");
   userMeta.append(el("strong", "", "你"), el("span", "", formatTime(turn.created_at)));
-  user.append(userMeta, el("div", "prose", turn.text));
+  user.append(userMeta);
+  if (turn.text) user.append(el("div", "prose", turn.text));
+  const turnAttachments = renderTurnAttachments(turn);
+  if (turnAttachments) user.append(turnAttachments);
   article.append(user);
 
   const assistant = el("div", "msg assistant");
@@ -890,8 +935,9 @@ function renderTurn(turn) {
   }
 
   const actions = el("div", "actions");
-  const inspect = button("技术详情", "quiet", () => ui.openTurnDetails(turn));
-  actions.append(inspect);
+  if (turn.error_code || turn.work_steps?.length || turn.cost_status === "unknown") {
+    actions.append(button("技术详情", "quiet", () => ui.openTurnDetails(turn)));
+  }
   if (turn.turn_id === state.activeTurn && turn.status !== "stopped" && turn.status !== "failed") {
     const stop = button("停止回复", "quiet danger", () => ui.stopTurn?.());
     actions.append(stop);
@@ -904,15 +950,12 @@ function renderTurn(turn) {
 
 function chips() {
   const wrap = document.createDocumentFragment();
-  const conversation = state.conversation;
-  const project = conversation?.project_id ? projectName(conversation.project_id) || "已关联项目" : (state.prefs.projectId ? projectName(state.prefs.projectId) || "新会话项目" : "不关联项目");
-  const projectChip = button(`项目 · ${project}`, "chip", () => ui.openScope("project"));
-  const node = state.nodes.find((item) => item.node_id === state.prefs.nodeId);
-  const nodeChip = button(`${nodeName(state.prefs.nodeId)}${node && !node.online ? " · 离线" : ""}`, "chip" + (node && !node.online ? " off" : ""), () => ui.openScope("device"));
-  const toolsChip = button(`工具 · ${state.prefs.tools ? "开" : "关"}`, "chip" + (state.prefs.tools ? " on" : " off"), () => ui.openScope("tools"));
-  const feedbackChip = button(`结果回传 · ${state.prefs.resultFeedback ? "允许" : "询问"}`, "chip" + (state.prefs.resultFeedback ? " on" : ""), () => ui.openScope("tools"));
-  const contextChip = button(`上下文 · ${state.prefs.context ? "开" : "关"}`, "chip" + (state.prefs.context ? " on" : " off"), () => ui.openScope("context"));
-  wrap.append(projectChip, nodeChip, toolsChip, feedbackChip, contextChip);
+  const projectId = state.conversation?.project_id || state.prefs.projectId;
+  if (projectId) wrap.append(button(projectName(projectId) || "当前项目", "chip", () => ui.openScope("project")));
+  const permission = pluginState.conversationPermission;
+  wrap.append(button(permission?.effective_mode === "full" ? "完全权限" : "普通权限", "chip", () => ui.openConversationPermission()));
+  if (!state.prefs.tools) wrap.append(button("仅聊天", "chip", () => ui.openScope("tools")));
+  if (!state.prefs.context) wrap.append(button("不带历史", "chip", () => ui.openScope("context")));
   return wrap;
 }
 
@@ -984,7 +1027,7 @@ export function renderDock() {
   renderChips($("dock-chips"));
   const activeTurn = state.activeTurn && state.turns.get(state.activeTurn);
   $("dock-stop").hidden = !activeTurn;
-  $("dock-send").disabled = !state.ready || !!activeTurn;
+  $("dock-send").disabled = !state.ready || !!activeTurn || attachmentBlocksSend();
   $("dock-send").textContent = "发送";
   $("dock-text").disabled = !state.ready;
 }
@@ -999,9 +1042,10 @@ export function renderConversations() {
     const item = el("button", "conversation-item" + (conversation.conversation_id === state.conversation?.conversation_id ? " active" : ""));
     item.type = "button";
     item.append(el("strong", "", conversation.title || "新会话"));
-    const project = conversation.project_id ? projectName(conversation.project_id) || "项目会话" : "不关联项目";
-    item.append(el("small", "", `${formatDate(conversation.created_at)} · ${project}${conversation.archived ? " · 已归档" : ""}`));
+    const project = conversation.project_id ? projectName(conversation.project_id) || "项目会话" : "";
+    item.append(el("small", "", `${formatDate(conversation.created_at)}${project ? " · " + project : ""}${conversation.archived ? " · 已归档" : ""}`));
     item.addEventListener("click", () => runAction(async () => {
+      if (conversation.conversation_id !== state.conversation?.conversation_id) leaveConversation();
       await selectConversation(conversation.conversation_id);
       ui.openChat();
       ui.refresh(true);
@@ -1009,6 +1053,15 @@ export function renderConversations() {
     list.append(item);
   }
   $("archive-toggle").textContent = state.archived ? "查看进行中" : "查看归档";
+}
+
+export function refreshComposerState() {
+  const activeTurn = state.activeTurn && state.turns.get(state.activeTurn);
+  const blocked = attachmentBlocksSend();
+  const dock = $("dock-send");
+  const chat = $("chat-send");
+  if (dock) dock.disabled = !state.ready || !!activeTurn || blocked;
+  if (chat) chat.disabled = !state.ready || !!activeTurn || blocked;
 }
 
 export function renderChat(force = false) {
@@ -1019,12 +1072,13 @@ export function renderChat(force = false) {
   const conversation = state.conversation;
   const parts = [];
   if (conversation?.project_id) parts.push(`项目 ${projectName(conversation.project_id) || "已关联"}`);
-  else parts.push("不关联项目");
+  
   if (conversation?.archived) parts.push("已归档");
   if (state.control?.paused) parts.push("派发已暂停");
   if (state.activeTurn) parts.push("本轮进行中");
-  else if (conversation) parts.push("空闲");
+  
   $("chat-sub").textContent = parts.join(" · ");
+  $("chat-sub").hidden = !parts.length;
 
   const log = $("chat-messages");
   const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 120;
@@ -1047,14 +1101,9 @@ export function renderChat(force = false) {
   renderChips($("chat-chips"));
   const activeTurn = state.activeTurn && state.turns.get(state.activeTurn);
   $("chat-stop").hidden = !activeTurn;
-  $("chat-send").disabled = !state.ready || !!activeTurn;
-  const node = state.nodes.find((item) => item.node_id === state.prefs.nodeId);
-  const workspaceReady = !!node && node.roots?.includes("workspace")
-    && (node.tools || []).some((tool) => tool.startsWith("filesystem."));
-  const imageCapable = !!node && (node.tools || []).includes("filesystem.read_image@1");
-  // The server catalog decides whether read_image is actually exposed, but a
-  // node-level image capability already means this round must ask again.
-  const needsConsent = state.prefs.tools && workspaceReady && (!state.prefs.resultFeedback || imageCapable);
+  $("chat-send").disabled = !state.ready || !!activeTurn || attachmentBlocksSend();
+  const imageCapable = state.nodes.some((node) => (node.tools || []).includes("filesystem.read_image@1"));
+  const needsConsent = state.prefs.tools && (!state.prefs.resultFeedback || imageCapable);
   $("chat-send").textContent = needsConsent ? "查看并发送" : "发送";
   $("chat-text").disabled = !state.ready;
 }
@@ -1068,39 +1117,35 @@ export function renderSettings() {
   connection.append(el("h2", "", "连接与账户"));
   const core = el("div", "settings-row");
   const coreText = el("div", "grow");
-  coreText.append(el("strong", "", "Core"));
-  coreText.append(el("small", "", `${location.origin} · 会话有效至 ${state.session?.expires_at ? new Date(state.session.expires_at).toLocaleString() : "未知"}`));
+  coreText.append(el("strong", "", "已连接"));
+  coreText.append(el("small", "", `${window.__NEXUS_NATIVE__ ? localStorage.getItem("nexus.coreUrl") || "已配置服务" : location.origin} · 登录有效至 ${state.session?.expires_at ? new Date(state.session.expires_at).toLocaleString() : "未知"}`));
   core.append(coreText);
   connection.append(core);
   const actions = el("div", "settings-row");
   actions.append(button("退出登录", "quiet", () => ui.logout()));
-  actions.append(button("打开原控制台", "quiet", () => { location.href = "/"; }));
+
   connection.append(actions);
   body.append(connection);
 
-  const devices = el("section", "settings-section");
-  devices.append(el("h2", "", "设备"));
-  if (!state.nodes.length) devices.append(el("p", "", "Core 尚未配置 Node。"));
-  for (const node of state.nodes) {
-    const row = el("div", "settings-row");
-    const text = el("div", "grow");
-    text.append(el("strong", "", nodeName(node.node_id)));
-    text.append(el("small", "", `${node.online ? "在线" : "离线"} · ${node.online ? `${node.tools?.length || 0} 项工具` : "工具状态需连接后确认"}${node.roots?.length ? " · " + node.roots.join(", ") : ""}`));
-    row.append(text);
-    const choose = button(node.node_id === state.prefs.nodeId ? "当前目标" : "设为目标", "quiet", () => {
-      setPref("nodeId", node.node_id);
-      renderDock();
-      renderChat(true);
-      renderSettings();
-    });
-    choose.disabled = node.node_id === state.prefs.nodeId;
-    row.append(choose);
-    devices.append(row);
-  }
-  body.append(devices);
+  const permissionSection = el("section", "settings-section");
+  permissionSection.append(el("h2", "", "权限与扩展"));
+  permissionSection.append(el("p", "", "管理助手可以执行的操作、扩展功能和提醒。"));
+  permissionSection.append(el("p", "hint", "普通模式会在需要时询问；完全模式按你授权的范围执行。"));
+  const permissionActions = el("div", "settings-row");
+  permissionActions.append(button("管理权限与扩展", "primary", () => ui.openPlugins("permissions")));
 
-  const projects = el("section", "settings-section");
-  projects.append(el("h2", "", "项目"));
+  if (state.conversation) permissionActions.append(button("本会话权限", "quiet", () => ui.openConversationPermission()));
+  permissionSection.append(permissionActions);
+  body.append(permissionSection);
+
+  const devices = el("section", "settings-section");
+  devices.id = "settings-devices";
+  body.append(devices);
+  renderDevices();
+
+
+  const projects = el("details", "settings-section settings-disclosure");
+  projects.append(el("summary", "", "项目"));
   for (const project of state.projects) {
     const row = el("div", "settings-row");
     const text = el("div", "grow");
@@ -1142,35 +1187,22 @@ export function renderSettings() {
   projects.append(form);
   body.append(projects);
 
-  const imageNode = state.nodes.find((node) => (node.tools || []).includes("filesystem.read_image@1"));
-  const imageSection = el("section", "settings-section");
-  imageSection.append(el("h2", "", "图片读取"));
-  if (imageNode) {
-    imageSection.append(el("p", "", `服务器返回了 ${nodeName(imageNode.node_id)} 的图片工具能力。只有在工作工具开启、本轮同意结果外发，并且 Core 开启模型图片时才会使用。`));
-    imageSection.append(el("p", "hint", "快照最多 1024px / 8 KiB，可能继续缩小或使用有损 JPEG；GIF/WebP 只取首帧，透明区域显示白底。每轮都会重新确认图片快照外发，历史选择不代替本轮同意。"));
-    imageSection.append(el("p", "hint", "页面没有图片上传入口；图片只能来自配置工作区内的文件，并由设备工具读取。"));
-  } else {
-    imageSection.append(el("p", "", "服务器当前未返回可用的图片读取能力。"));
-    imageSection.append(el("p", "hint", "可能未在 Core/Node 配置 filesystem.read_image@1、Node 未安装固定 Pillow 13.0.0，或模型图片开关未开启。此处不提供上传入口，也不显示可用的看图功能。"));
-  }
-  body.append(imageSection);
-
-  const usage = el("section", "settings-section");
-  usage.append(el("h2", "", "模型与网页"));
+  const usage = el("details", "settings-section settings-disclosure");
+  usage.append(el("summary", "", "用量与费用"));
   const value = state.usage;
   if (!value) usage.append(el("p", "", "正在读取用量…"));
   else {
-    usage.append(el("p", "", `${value.enabled ? "已启用" : "未启用"} · ${value.calls} 次 API 调用（含网页）`));
+    usage.append(el("p", "", `${value.enabled ? "已启用" : "未启用"} · ${value.calls} 次调用（含网页）`));
     usage.append(el("p", "", value.cost_microunits === null
       ? "费用未知；未知费用保留预留额度。"
-      : `${money(value.cost_microunits)} · 公开峰值单价上界`));
+      : `${money(value.cost_microunits)} · 估算费用上界`));
     if (value.unknown_cost_calls) usage.append(el("p", "", `${value.unknown_cost_calls} 次调用费用未知`));
   }
   body.append(usage);
 
-  const privacy = el("section", "settings-section");
-  privacy.append(el("h2", "", "本地数据"));
-  privacy.append(el("p", "", "App 不保存模型密钥、Node 令牌或 owner 入学凭证；这里只保留显示偏好与最后会话。"));
+  const privacy = el("details", "settings-section settings-disclosure");
+  privacy.append(el("summary", "", "隐私与高级设置"));
+  privacy.append(el("p", "", "聊天发送前会说明实际分享范围。清除显示偏好不会删除聊天记录，也不会撤销已发送的内容。"));
   privacy.append(button("清除本地显示偏好", "quiet", () => {
     clearPrefs();
     renderDock();
@@ -1178,12 +1210,13 @@ export function renderSettings() {
     renderSettings();
     notify("已清除本地显示偏好");
   }));
+  if (!window.__NEXUS_NATIVE__) privacy.append(button("打开管理控制台", "quiet", () => { location.href = "/"; }));
   body.append(privacy);
 
   const about = el("section", "settings-section");
   about.append(el("h2", "", "关于"));
-  about.append(el("p", "", "NEXUS 对话界面 · 可视化占位版本"));
-  about.append(el("p", "", "过程视图、能力与记忆管理将在后续页面接入。"));
+  about.append(el("p", "", "NEXUS · 一个助手，连接你的设备"));
+
   body.append(about);
 }
 
@@ -1206,4 +1239,19 @@ export function closeSheet() {
   $("sheet").hidden = true;
   $("sheet-body").replaceChildren();
   $("sheet-actions").replaceChildren();
+}
+
+export function renderDevices() {
+  const box = $("settings-devices");
+  if (!box) return;
+  box.replaceChildren(el("h2", "", "我的设备"));
+  if (!state.nodes.length) box.append(el("p", "", "还没有连接的设备。"));
+  for (const node of state.nodes) {
+    const row = el("div", "settings-row");
+    const text = el("div", "grow");
+    text.append(el("strong", "", nodeName(node.node_id)));
+    text.append(el("small", "", state.nodesFresh ? (node.online ? "在线" : "离线") : "状态同步中"));
+    row.append(text, button("改名", "quiet", () => ui.renameDevice(node)));
+    box.append(row);
+  }
 }

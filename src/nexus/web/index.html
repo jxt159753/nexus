@@ -68,20 +68,16 @@
                 <label class="checkbox"><input id="chat-reference-consent" type="checkbox" disabled>本次同意将以上具体历史资料发送给 DeepSeek</label>
               </details>
               <label class="checkbox"><input id="chat-tools" type="checkbox" checked>本轮使用已配置的工具与工作区</label>
-              <label for="chat-node">工具目标设备</label><select id="chat-node"><option value="">暂无配置节点；可继续普通聊天</option></select>
-              <details class="chat-catalog"><summary>工作区工具范围</summary>
-                <p>已配置的 workspace 内文件读写和查找默认可用，无需额外授权；路径、文件变更检查及执行记录保留。命令仅限预先配置的固定模板，新能力版本仍须单独批准。</p>
-                <div id="chat-work-controls">
-                <label for="chat-work-profile">固定命令权限</label><select id="chat-work-profile"><option value="standard">允许自动执行已批准的固定命令</option><option value="read">固定命令也逐次用聊天确认</option></select>
-                <div class="button-row"><button id="chat-work-grant" type="button">按上述范围授权当前会话</button><button id="chat-work-revoke" type="button" class="danger">撤销会话授权并停止工作</button></div>
-                </div>
+              <p>设备由 Core 自动选择。可说“我的电脑”“我的手机”或设备名称。</p>
+              <details class="chat-catalog"><summary>已授权设备的工具范围</summary>
+                <button id="chat-work-revoke" type="button" class="danger" hidden>撤销旧会话授权并停止工作</button>
                 <p id="chat-work-status" class="hint"></p><pre id="chat-work-catalog"></pre>
               </details>
               <label class="checkbox"><input id="chat-work-enabled" type="checkbox" disabled>使用已配置的工作工具和网页搜索/抓取；相关结果及目录随本轮任务发送给 DeepSeek</label>
               <p class="hint">会话工作每轮最多 4 个动作、5 次模型交换，共用原每轮 $0.05 和每日 $1。超限、授权失效或结果未知会停止；新能力版本仍需单独批准启用。</p>
-              <button id="chat-skill-load" type="button" class="quiet">查看此设备可用流程</button>
+              <button id="chat-skill-load" type="button" class="quiet">查看已授权设备的流程</button>
               <div id="chat-skills-catalog" class="chat-catalog"></div>
-              <label class="checkbox"><input id="chat-skills" type="checkbox" disabled>本次允许将以上流程目录发送给 DeepSeek 并建议多步流程</label>
+              <label class="checkbox" hidden><input id="chat-skills" type="checkbox" disabled>本次允许将以上流程目录发送给 DeepSeek 并建议多步流程</label>
               <p id="chat-context-info" class="hint">最多最近 10 轮，超出上下文上限会提示裁剪。</p>
               <p id="chat-outbound-notice" class="hint">点击“发送给 DeepSeek”即同意外发本次输入及所选上下文和流程目录。单步工具可在确认卡允许自动回传；多步流程成功后先预览结果，再同意解读。每天 $1、每轮共用 $0.05，普通聊天 1 次、含结果解读最多 2 次调用。</p>
               <div class="button-row"><button id="chat-send" type="submit" class="primary" disabled>发送给 DeepSeek</button><button id="chat-stop" type="button" class="danger" disabled>停止回复</button></div>

@@ -1,0 +1,148 @@
+{
+  "date": "2026-10-24",
+  "status": "deployed; real model inspection succeeded, final answer blocked by existing daily call limit",
+  "observed_production_release": "file-chat-20261024-327a91e4",
+  "reported_turn": {
+    "created_at": "2026-10-24T07:01:20.783184+00:00",
+    "input": "你能否调用Windows mcp",
+    "client_device": "phone",
+    "all_nodes": true,
+    "computer_functions_present": [
+      "plugin_inspect",
+      "plugin_execute"
+    ],
+    "work_steps": 0,
+    "unsupported_claim": "电脑上根本没有已启用的 MCP 连接",
+    "registered_server": {
+      "server": "windows-desktop",
+      "revision": 2,
+      "state": "active"
+    }
+  },
+  "candidate": {
+    "baseline_sha256": "2265712a7e5cf8f5fff35e600b947f7019aa158954b6abbb5ae484e6657bf7c8",
+    "sha256": "797090a9db16c45aea259710f09466795573ee5392976d518b6999b5f2efae33",
+    "runtime_resource_count": 269,
+    "changed_resources": [
+      "nexus/core/cognitive/work_catalog.py",
+      "nexus/core/models/chat.py",
+      "nexus/core/plugins/service.py",
+      "nexus/core/plugins/mcp.py"
+    ]
+  },
+  "verification": {
+    "platform": "Windows / Python 3.13",
+    "baseline_new_tests_failed": 3,
+    "final_targeted_tests_passed": 5,
+    "source_first_batch_passed": 25,
+    "source_extended_batch": {
+      "passed": 64,
+      "failed": 2
+    },
+    "fixed_candidate_batch": {
+      "passed": 87,
+      "failed": 1,
+      "seconds": 44.68
+    },
+    "existing_failure": "test_chat_context.py::test_capability_inspection_is_bounded_authorized_and_does_not_execute[True]: old stopped assertion, completed in both production baseline and candidate",
+    "parallel_source_failure": "test_four_actual_file_results_are_retained_while_model_context_is_compacted: WORK_STALLED also reproduced with all four task changes reverted; excluded from fixed candidate",
+    "counts_overlap": true,
+    "provider": "local regression uses synthetic providers; real production check recorded separately",
+    "production_access": "backed-up single-active deployment and authenticated API verification",
+    "not_verified": [
+      "complete real model answer after inspection",
+      "phone hardware",
+      "desktop actions",
+      "production rollback exercise"
+    ],
+    "linux_final": {
+      "passed": 86,
+      "skipped": 1,
+      "deselected_known_failure": 1,
+      "seconds": 34.74
+    }
+  },
+  "deployment_performed": true,
+  "model_calls_created": 1,
+  "user_accepted": false,
+  "initial_candidate": {
+    "baseline_sha256": "327a91e47473b97c879166367dc8c113e4a9a83c7bdd6ae6d8516248ea08510c",
+    "sha256": "d2ad31ecdd0f1c3226388703276cced162cbcbf277df7451be2837c0d646039e",
+    "runtime_resource_count": 266,
+    "changed_resources": [
+      "nexus/core/cognitive/work_catalog.py",
+      "nexus/core/models/chat.py",
+      "nexus/core/plugins/service.py",
+      "nexus/core/plugins/mcp.py"
+    ]
+  },
+  "deployment": {
+    "release": "/opt/nexus/releases/mobile-mcp-20261024-797090a9",
+    "wheel_sha256": "797090a9db16c45aea259710f09466795573ee5392976d518b6999b5f2efae33",
+    "backup": "/var/backups/nexus/before-mobile-mcp-20261024T073142Z",
+    "backup_sha256": "5a7be082eec643667d3e45249b82c1e060eb920214f4a5f6ee30277d438c2a23",
+    "schema": 35,
+    "historical_records_preserved": true,
+    "runtime_resources_checked": 269,
+    "new_grants": 0,
+    "main_pid": 1194729,
+    "history_tables_checked": 37,
+    "historical_counts": {
+      "tasks": 109,
+      "task_attempts": 104,
+      "conversations": 69,
+      "chat_turns": 116,
+      "model_calls": 253
+    },
+    "core_process_count": 1,
+    "paused": false,
+    "configuration_unchanged": true,
+    "retained_parallel_release": "ui-refresh-20261024-2265712a",
+    "initial_cutover_blocked_before_service_stop": true,
+    "csrf_verified": true
+  },
+  "real_model_verification": {
+    "input": "你能否调用Windows mcp",
+    "client_device": "phone entry parameters; no phone hardware test",
+    "all_nodes": true,
+    "permission_mode": "normal",
+    "permission_unchanged": true,
+    "steps": [
+      {
+        "intent": "plugin_inspect",
+        "device": "computer",
+        "status": "succeeded",
+        "device_task_created": false
+      },
+      {
+        "intent": "get_node_status",
+        "device": "computer",
+        "status": "succeeded",
+        "device_task_created": false
+      }
+    ],
+    "registration": {
+      "catalog_digest": "bc25e9d2e246b6b27ba20c5d910f08e03f48f9a93f7762593dbcd3abc4f881d8",
+      "configuration_digest": "10d16f29e3d4907e31740c2549fce17461982365cea9520efb4f36e3b990f1b1",
+      "latest_revision": 2,
+      "revision": 2,
+      "server": "windows-desktop",
+      "state": "active"
+    },
+    "execution_status": "available",
+    "computer_online": true,
+    "final_status": "failed",
+    "error_code": "BUDGET_EXCEEDED",
+    "model_calls": 1,
+    "cost_microunits": 2357,
+    "cost_status": "calculated",
+    "test_conversation_archived": true,
+    "budget": {
+      "daily_calls": 100,
+      "daily_count_including_unsettled": 100,
+      "calls_today": 95,
+      "carried_unsettled_calls": 5,
+      "cost_limits_enabled": false
+    }
+  }
+}

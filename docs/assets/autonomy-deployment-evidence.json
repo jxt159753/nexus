@@ -1,0 +1,392 @@
+{
+  "task": "P81 cloud deployment",
+  "recorded_at": "2026-10-24T09:45:46.715440+08:00",
+  "status": "deployed_verified_pending_user_acceptance",
+  "baseline_release": "android-20261023-c123af78",
+  "candidate_wheel_sha256": "76b4788e38ac8fed98e739d425d6aef728d10919f4d8a6b2f5f2ddbb08f82071",
+  "candidate_resources": 250,
+  "changed_resources": [
+    "nexus/core/app.py",
+    "nexus/core/cognitive/chat.py",
+    "nexus/core/cognitive/chat_journal.py",
+    "nexus/core/plugins/core_tools.py",
+    "nexus/core/plugins/lifecycle.py",
+    "nexus/core/plugins/schedule.py",
+    "nexus/core/plugins/service.py",
+    "nexus/core/plugins/testing.py",
+    "nexus/node/receipts.py",
+    "nexus/plugins/catalog.py",
+    "nexus/contracts/autonomy.py",
+    "nexus/core/plugins/goals.py",
+    "nexus/core/plugins/observations.py",
+    "nexus/core/plugins/business.py",
+    "nexus/core/plugins/session_context.py",
+    "nexus/core/plugins/autonomy_http.py",
+    "nexus/core/plugins/health.py",
+    "nexus/core/storage/archive.py",
+    "nexus/core/storage/migrations/032_archive_sources.sql",
+    "nexus/node/migrations/003_receipt_archive.sql"
+  ],
+  "rollback_wheel_sha256": "50968eccd688496522af9931b58676d2a514108642d6a5f49446bab8a722bb0e",
+  "bundle_sha256": "5ef4688580954b04a349f924e5248828eb670f60fbe45bc299cf898f2da497b4",
+  "tests": {
+    "local_fixed_wheel_passed": 286,
+    "seconds": 193.61,
+    "log": "var/p81-release-20261023/windows-fixed-tests.log",
+    "linux_fixed_wheel": {
+      "passed": 279,
+      "skipped": 7,
+      "seconds": 104.83,
+      "log": "var/p81-release-20261023/linux-tests.log",
+      "skips": [
+        {
+          "test": "test_runtime_failure_rolls_back_only_to_approved_matching_baseline[False]",
+          "reason": "real Windows plugin process"
+        },
+        {
+          "test": "test_runtime_failure_rolls_back_only_to_approved_matching_baseline[True]",
+          "reason": "real Windows plugin process"
+        },
+        {
+          "test": "test_plugin_dispatch_reuses_receipts_and_does_not_repeat_effect",
+          "reason": "real Windows Node task and receipt"
+        },
+        {
+          "test": "test_real_host_shell_idempotency_and_conversation_job_ownership",
+          "reason": "real Windows process lifecycle"
+        },
+        {
+          "test": "test_programmatic_calls_and_file_plugin_preserve_actual_content",
+          "reason": "real Windows managed workers"
+        },
+        {
+          "test": "test_terminal_keeps_state_and_interrupt_preserves_shell",
+          "reason": "real Windows ConPTY"
+        },
+        {
+          "test": "test_default_endpoints_reuse_portaudio_com_apartment",
+          "reason": "Windows COM apartments"
+        }
+      ]
+    },
+    "production_copy_migration": {
+      "from_schema": 31,
+      "to_schema": 32,
+      "integrity_passed": true,
+      "history_preserved": true
+    },
+    "rollback_compatibility": {
+      "schema32_copy_read_passed": true,
+      "production_rollback_exercised": false
+    }
+  },
+  "node_compatibility": {
+    "only_changed_plugin": [
+      "builtin.goal"
+    ],
+    "node_runtime_plugins_unchanged": true,
+    "production_node_configuration": "preserve existing fingerprint matching deployed Node",
+    "windows_node_runtime": "not upgraded by cloud deployment"
+  },
+  "upload_performed": true,
+  "production_modified": true,
+  "review_rejection": "Upload of project code to the existing public server requires an explicit confirmation of the destination address; no alternate upload attempted.",
+  "destination": "core.example.com",
+  "deployed_at": "2026-10-23T19:36:35+08:00",
+  "observed_baseline_pid": 1332579,
+  "observed_baseline_schema": 31,
+  "deployment_model_calls_added": 0,
+  "review_resolution": "User explicitly authorized uploading and deploying this NEXUS release to core.example.com; proceeded through the normal approval route.",
+  "deployment": {
+    "release": "/opt/nexus/releases/autonomy-20261023-76b4788e",
+    "wheel_sha256": "76b4788e38ac8fed98e739d425d6aef728d10919f4d8a6b2f5f2ddbb08f82071",
+    "backup": "/var/backups/nexus/before-autonomy-20261023T113633Z",
+    "backup_sha256": "9b04d8c3939fd682121e81b0faa12149279595bf8c039f013659bdbadb16b4da",
+    "schema": 32,
+    "history": {
+      "tasks": {
+        "rows": 70,
+        "sha256": "c2f5cbd64c7614f0697267b3d31734c1996b69436b8acde31e1ab39fa78745b9"
+      },
+      "task_attempts": {
+        "rows": 68,
+        "sha256": "58bb6b663af7a88439ed38638c8e829a930f4673e8764c2c38697638aeb8caef"
+      },
+      "conversations": {
+        "rows": 58,
+        "sha256": "513af0915453f62a69a29e1dfbb8acc9ff226028c729d9f3cc47ed1359c3fbcd"
+      },
+      "chat_turns": {
+        "rows": 91,
+        "sha256": "6e6424b3e2569d3482fa36965e2bcf1b163f87211713d12bb7297956cfef70ba"
+      },
+      "model_calls": {
+        "rows": 158,
+        "sha256": "cb511711a73e01ede4a2cef9dfc8dea62125c7f7274183bbe5d5847a17e6f933"
+      },
+      "identities": {
+        "rows": 4,
+        "sha256": "b15a25f4df698201ccf239a46e8c00e1aed605cc676a85059ba4640ae7cb37af"
+      },
+      "grants": {
+        "rows": 32,
+        "sha256": "3672778f88c0572e4c25da6dc0201611d3236bfff091d5d368ec4ab1b30c6667"
+      },
+      "memory_entries": {
+        "rows": 4,
+        "sha256": "f035f604dcbc5d28b53517cbe7eb21ecd7dc0137b4af03dd154ef056aad26deb"
+      },
+      "extension_versions": {
+        "rows": 4,
+        "sha256": "f71ad709d3993d448c0140c028aa13271f31ffc6e3b195309bdd3a00167b89b6"
+      },
+      "chat_exchanges": {
+        "rows": 113,
+        "sha256": "c9d143e8dd50c246a8548bc2e646e558286c3b2e842b7268e7878f7888b4e1ef"
+      },
+      "skill_runs": {
+        "rows": 2,
+        "sha256": "970df1bd9cf483d616bc45d2d08f0d8b908b47ffa598d708f44f2ee40ffd957c"
+      },
+      "memory_consents": {
+        "rows": 4,
+        "sha256": "710b388ff7606c4eec20afc68be212ce5ca3f7044ba698e1d4c9652643a98f0f"
+      },
+      "memory_policies": {
+        "rows": 1,
+        "sha256": "17647a6e0f2fdb938668189ba66c870f3a761f8fbba84f75a553971385316146"
+      },
+      "memory_policy_events": {
+        "rows": 8,
+        "sha256": "08bf6d331e87fab51b746047a78fe688000ee2ec85c88f939629652417b46184"
+      },
+      "voice_sessions": {
+        "rows": 9,
+        "sha256": "449524ad47bd9894fd2a81e3af6310c5a49455e21a7c37d7f111437e308aacbc"
+      },
+      "voice_utterances": {
+        "rows": 13,
+        "sha256": "10164b995390ebbc2b80253f1edd6e0256e9decfb34cb5ad9f2441f98f80cabe"
+      },
+      "plugin_goals": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "plugin_authorities": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "plugin_decisions": {
+        "rows": 5,
+        "sha256": "a7fffd78e3d8236b7f408d031f537cf8ee19c52e686232f17480c8662e2382a8"
+      }
+    },
+    "historical_records_preserved": true,
+    "plugin_upgrade": "only builtin.goal 1.0.0 disabled and 1.1.0 enabled; other rows unchanged",
+    "runtime_resources_checked": 250,
+    "config_preserved": true,
+    "no_new_model_calls": true,
+    "main_pid": 1585133
+  },
+  "final_verification": {
+    "single_core_pid": 1585133,
+    "schema": 32,
+    "history_preserved_after_smoke": true,
+    "counts": {
+      "tasks": 71,
+      "task_attempts": 69,
+      "conversations": 59,
+      "chat_turns": 91,
+      "model_calls": 158,
+      "autonomy_watches": 1,
+      "autonomy_events": 1,
+      "cold_payloads": 0
+    },
+    "unknown_tasks_before": 3,
+    "unknown_tasks_after": 3,
+    "model_calls_added": 0,
+    "config_preserved": true,
+    "download_artifacts_preserved": {
+      "NEXUS-Android-0.1.0-debug.apk": "7307a9e3e07abef4cfbc64513cf234deb3dd695ed25944d48274a6493ff0d1e5"
+    },
+    "linux_skipped": [
+      {
+        "test": "test_runtime_failure_rolls_back_only_to_approved_matching_baseline[False]",
+        "reason": "real Windows plugin process"
+      },
+      {
+        "test": "test_runtime_failure_rolls_back_only_to_approved_matching_baseline[True]",
+        "reason": "real Windows plugin process"
+      },
+      {
+        "test": "test_plugin_dispatch_reuses_receipts_and_does_not_repeat_effect",
+        "reason": "real Windows Node task and receipt"
+      },
+      {
+        "test": "test_real_host_shell_idempotency_and_conversation_job_ownership",
+        "reason": "real Windows process lifecycle"
+      },
+      {
+        "test": "test_programmatic_calls_and_file_plugin_preserve_actual_content",
+        "reason": "real Windows managed workers"
+      },
+      {
+        "test": "test_terminal_keeps_state_and_interrupt_preserves_shell",
+        "reason": "real Windows ConPTY"
+      },
+      {
+        "test": "test_default_endpoints_reuse_portaudio_com_apartment",
+        "reason": "Windows COM apartments"
+      }
+    ]
+  },
+  "authenticated_smoke": {
+    "conversation_id": "2496dbf7-0fcf-494c-acb4-d1f1d794442c",
+    "watch_id": "75925013-0437-48f3-a4e6-fd32ccbe09ee",
+    "event_id": 1,
+    "dedup": true,
+    "conflict_rejected": true,
+    "limit_enforced": true,
+    "stopped_event_rejected": true,
+    "watch_paused": true,
+    "event_acknowledged": true,
+    "empty_conversation_archived": true,
+    "model_calls_added": 0
+  },
+  "public_https": {
+    "/": {
+      "status": 200,
+      "bytes": 22276
+    },
+    "/app": {
+      "status": 200,
+      "bytes": 7462
+    },
+    "apk": {
+      "status": 200,
+      "bytes": 11893209,
+      "sha256": "7307a9e3e07abef4cfbc64513cf234deb3dd695ed25944d48274a6493ff0d1e5"
+    },
+    "tls_verified": true
+  },
+  "real_node_probe": {
+    "task_id": "7be33887-58f3-4f42-bf9c-42da1a228bff",
+    "status": "succeeded",
+    "execution_outcome": "known",
+    "verification": "node_report_schema_checked",
+    "current_attempt_id": "641f6ec1-092a-4dff-a425-1f9986c25349",
+    "attempt_count": 1,
+    "execution_stopped": true
+  },
+  "probe_script_correction": "Probe initially expected execution_outcome=succeeded instead of the contract value known. Corrected the assertion and reread the same successful task; no second dispatch.",
+  "deployment_control": {
+    "paused_before": false,
+    "paused_after": false,
+    "online_nodes_at_deployment_verification": 1,
+    "model_calls_before": 158,
+    "model_calls_after": 158,
+    "unknown_cost_calls_preserved": 5
+  },
+  "resumed_read_only_check": {
+    "observed_at": "2026-10-24T09:45:46.715440+08:00",
+    "control": {
+      "paused": false,
+      "revision": 78,
+      "event_id": "78"
+    },
+    "models": {
+      "enabled": true,
+      "calls": 159,
+      "cost_microunits": null,
+      "unknown_cost_calls": 5,
+      "model_success_rate": null,
+      "chat_enabled": true,
+      "web_enabled": true,
+      "cost_limits_enabled": false,
+      "chat_max_output_tokens": 256000
+    },
+    "online_nodes": 0,
+    "active_voice_sessions": 0,
+    "health": {
+      "status": "degraded",
+      "observed_at": "2026-10-24T01:45:42.712509+00:00",
+      "workers": {
+        "harness": "running",
+        "chat": "running",
+        "language": "running",
+        "extensions": "running",
+        "skills": "running",
+        "plugins": "running",
+        "plugin_tests": "running"
+      },
+      "storage": {
+        "database_bytes": 5476352,
+        "reusable_bytes": 0,
+        "disk_free_bytes": 26046758912,
+        "hot_conversations": 58,
+        "hot_turns": 92,
+        "cold_bytes": 0,
+        "events": 1,
+        "schedule_events": 0,
+        "plugin_tests": 3
+      },
+      "unknown_tasks": 3,
+      "alerts": [
+        {
+          "alert_key": "sensors",
+          "severity": "warning",
+          "message": "部分观察任务已暂停；请查看订阅状态和执行记录。",
+          "active": 0,
+          "revision": 1,
+          "updated_at": "2026-10-23T11:36:37.525252+00:00"
+        },
+        {
+          "alert_key": "unknown",
+          "severity": "warning",
+          "message": "存在执行结果未知的任务；请先核对，不能直接重做。",
+          "active": 1,
+          "revision": 1,
+          "updated_at": "2026-10-23T11:36:37.524791+00:00"
+        },
+        {
+          "alert_key": "capacity",
+          "severity": "warning",
+          "message": "运行记录接近容量上限；请归档已结束会话或扩充受控存储。",
+          "active": 0,
+          "revision": 1,
+          "updated_at": "2026-10-23T11:36:37.523824+00:00"
+        },
+        {
+          "alert_key": "disk",
+          "severity": "error",
+          "message": "存储空间不足；已停止新执行，保留现有记录。",
+          "active": 0,
+          "revision": 1,
+          "updated_at": "2026-10-23T11:36:37.523038+00:00"
+        },
+        {
+          "alert_key": "workers",
+          "severity": "error",
+          "message": "后台执行服务已停止；新任务已阻止，需要检查运行日志。",
+          "active": 0,
+          "revision": 1,
+          "updated_at": "2026-10-23T11:36:37.520741+00:00"
+        }
+      ]
+    },
+    "core_release": "/opt/nexus/releases/autonomy-20261023-76b4788e",
+    "core_pid": 1585133,
+    "core_active": true,
+    "core_running": true,
+    "production_mutations": false,
+    "model_call_note": "159 total at next-day read-only check; deployment window ended at 158. This check made no model calls."
+  },
+  "limitations": [
+    "Frontend and Windows Node installers are not included; Node receipt compression requires a Node upgrade.",
+    "Full two-hour soak stopped at user request after 72m50s; no new soak started.",
+    "No paid-model long-goal, real runsc business-suite, human voice or Android physical-device validation in this deployment.",
+    "Health degraded reflects three pre-existing unknown tasks, preserved without rerunning.",
+    "No device is online at the resumed 2026-10-24 read-only check; Windows Node was online and its probe succeeded during deployment.",
+    "User acceptance remains pending."
+  ]
+}

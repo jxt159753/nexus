@@ -14,6 +14,7 @@ from nexus.contracts.commands import command_digest, command_identity
 from nexus.contracts.errors import ErrorCode, ProtocolError, create_error
 from nexus.contracts.messages import CommandExecute, CommandResult, CommandStatusResult
 from nexus.node.config import NodeConfig, local_directory
+from nexus.node.file_transfer import DownloadFailed
 from nexus.node.process import ExecutionStopped, ManagedWorker
 from nexus.node.receipts import RESULT, ReceiptStore
 from nexus.node.tools.registry import REGISTRY, validate_result
@@ -43,6 +44,7 @@ class NodeRuntime:
             self._lock.close()
             raise
         self._worker = ManagedWorker()
+        self.file_downloader = None
         self.plugins = None
         if self.config.plugins.enabled:
             from nexus.plugins.node_runtime import PluginRuntime
@@ -178,6 +180,18 @@ class NodeRuntime:
                 value = command.model_dump(mode='json',include={'session_id','task_id','attempt_id','tool','tool_version','command_digest'})
                 value.update(observed_at=self._now().isoformat(),outcome='succeeded',result=output.model_dump(mode='json'))
                 result = RESULT.validate_json(json.dumps(value))
+            elif command.tool == 'filesystem.receive':
+                if self.file_downloader is None:
+                    raise ValueError('File transfer connection unavailable')
+                try:
+                    with self.file_downloader(command, deadline, cancel):
+                        budget = deadline - time.monotonic()
+                        if budget <= 0:
+                            raise ExecutionStopped('timeout')
+                        raw = self._worker.run(WorkerRequest(command=command, config=self.config, job_name=job_name).model_dump_json().encode('utf-8'), job_name, budget, cancel)
+                        result = RESULT.validate_json(raw)
+                except DownloadFailed:
+                    result = self._failure(command, ErrorCode.RESULT_INVALID, '文件传输或保存校验未完成；请查看执行记录后重试。')
             else:
                 raw = self._worker.run(WorkerRequest(command=command, config=self.config, job_name=job_name).model_dump_json().encode("utf-8"), job_name, budget, cancel)
                 result = RESULT.validate_json(raw)

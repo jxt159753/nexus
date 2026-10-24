@@ -24,6 +24,7 @@ class MCPServer(StrictContract):
 class PluginNodeConfig(StrictContract):
     enabled: StrictBool=False
     allow_host_python: StrictBool=False
+    allow_managed_mcp: StrictBool=False
     pwsh: Path | None=None
     bash: Path | None=None
     git: Path | None=None
@@ -44,7 +45,9 @@ class PluginNodeConfig(StrictContract):
         features['builtin.shell']=[name for name in ('pwsh','bash') if getattr(self,name) and getattr(self,name).is_file()]
         if not features['builtin.shell']: features['builtin.terminal']=[]
         features['builtin.workspace']=[name for name in features['builtin.workspace'] if (name!='lsp' or self.lsp) and (name!='create_worktree' or self.git and self.git.is_file())]
-        if not self.mcp: features['builtin.mcp']=[]
+        if not self.mcp and not self.allow_managed_mcp: features['builtin.mcp']=[]
+        elif not self.allow_managed_mcp:
+            features['builtin.mcp']=['list_mcp_resources','list_mcp_resource_templates','read_mcp_resource']
         if not any(target.kind in {'edge','chrome'} for target in targets.values()): features['builtin.browser']=[]
         if self.allow_host_python: features['user.python']=['handle']
         return features
