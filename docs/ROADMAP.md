@@ -13,6 +13,8 @@
 
 用户此前的唤醒体验确认不等同于所有声学和长期稳定性矩阵通过。本次无真人问答、无新增付费模型调用；使用方法见[语音说明](realtime-voice.md)，脱敏验证见[本轮证据](assets/voice-resident-evidence.json)。
 
+GitHub：功能提交 `725f54e` 已推送至 `codex/resident-voice-wake`，建立[交付草稿 PR #3](https://github.com/jxt159753/nexus/pull/3)，尚未合并 main。前置提交保留已部署 Core schema039 / Windows 0.1.18 基线；本项独立提交，不包含未发布 P97、凭证、数据库或录音，共享开发分支与暂存区保持不变。
+
 
 <a id="p90-mcp-images-storage"></a>
 ## P90：截图回传、日志异常与服务器资源整理（2026-10-24）
