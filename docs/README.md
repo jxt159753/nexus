@@ -146,3 +146,5 @@ DSH GitHub 架构/Harness 对照、上下文投影、工具清单与按需能力
 - [失败后的自然语言反馈](decisions/0036-natural-failure-feedback.md)：网页失败继续、保留费用预留、仅解释的模型总结和不可调用时的自然语言兜底。
 
 - [DSH 上下文压缩验证](CONTEXT-COMPACTION-VERIFICATION.md)：固定版本、测试、上线与限制。
+
+- [Windows 常驻语音唤醒验证](assets/voice-resident-evidence.json)

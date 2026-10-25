@@ -1136,6 +1136,7 @@ export function renderSettings() {
 
   connection.append(actions);
   body.append(connection);
+  ui.renderVoiceSettings?.(body);
 
   const permissionSection = el("section", "settings-section");
   permissionSection.append(el("h2", "", "权限与扩展"));

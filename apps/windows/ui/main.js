@@ -57,7 +57,7 @@ import {
 
 import { initVisualization } from "./visualization.js";
 import { initUIExtensions } from "./ui-extensions.js";
-import { initVoice, stopVoice } from "./voice.js";
+import { initVoice, stopVoice, renderVoiceSettings } from "./voice.js";
 import {
   closePluginPage,
   openConversationPermission,
@@ -1099,6 +1099,7 @@ async function stopActive() {
 }
 
 bindUI({
+  renderVoiceSettings,
   openConversationSource,
   renameDevice,
   openChat,
@@ -1132,7 +1133,7 @@ bindAttachmentUI({
 ["chat-text", "dock-text"].forEach(id => $(id).addEventListener("input", saveConversationDraft));
 state.ready = false;
 bindEvents();
-initVoice({ refresh, openChat });
+initVoice({ refresh, openChat, renderSettings });
 uiExtensions = initUIExtensions(() => visualization);
 setUnauthorizedHandler(() => {
   if (!booting) showLogin("会话已过期，请重新登录");

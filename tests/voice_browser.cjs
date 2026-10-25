@@ -14,6 +14,10 @@ process.stdin.on("end", async () => {
     await page.addInitScript(({ nodeId }) => {
       window.__voiceCalls = [];
       window.__NEXUS_NATIVE__ = {
+        setCoreUrl: async () => {}, loadSession: async () => true, loadOwner: async () => null,
+        rememberOwner: async () => {}, rememberSession: async () => {},
+        forgetOwner: async () => {}, forgetSession: async () => {},
+        nodeStatus: async () => ({ running: true }), loadNode: async () => null,
         voiceStatus: async () => ({ available: true, running: !!window.__voiceRunning, node_id: nodeId }),
         voiceDevices: async () => [{ name: "模拟麦克风", input: true }, { name: "模拟耳机", output: true }],
         voiceStart: async (config) => {
@@ -27,6 +31,7 @@ process.stdin.on("end", async () => {
       };
     }, { nodeId: input.node_id });
     await page.goto(input.origin + "/app");
+    await page.locator("#core-url").fill(input.origin);
     await page.locator("#token").fill(input.owner_token);
     await page.locator("#login-form button[type=submit]").click();
     await page.locator("#dock-voice").waitFor({ state: "visible" });
@@ -49,14 +54,15 @@ process.stdin.on("end", async () => {
     await page.getByText("已打断", { exact: true }).waitFor();
     await page.locator("#voice-status").getByRole("button", { name: "结束语音", exact: true }).click();
     await page.locator("#voice-status").waitFor({ state: "hidden" });
-    await page.locator("#chat-wake").click();
-    await page.getByRole("heading", { name: "开启语音唤醒", exact: true }).waitFor();
+    await page.locator("#chat-voice").click();
+    await page.getByLabel(/本地语音唤醒：/).check();
     assert.equal(await page.getByLabel(/本地语音唤醒：/).isChecked(), true);
     assert.equal(await proactive.isDisabled(), false);
     assert.equal(await listen.isDisabled(), true);
     await page.getByRole("button", { name: "取消", exact: true }).click();
     assert.equal(await page.evaluate(() => window.__voiceCalls.length), 1);
-    await page.locator("#chat-wake").click();
+    await page.locator("#chat-voice").click();
+    await page.getByLabel(/本地语音唤醒：/).check();
     await page.getByRole("button", { name: "同意外发并开始语音", exact: true }).click();
     await page.getByText("本地唤醒待机", { exact: true }).waitFor();
     assert.equal(await page.evaluate(() => window.__voiceCalls[1].wake), true);

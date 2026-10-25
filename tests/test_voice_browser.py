@@ -13,7 +13,8 @@ from test_link_processes import stop, wait_for
 
 
 @pytest.mark.skipif(not os.environ.get("NEXUS_TEST_NODE"), reason="opt-in browser check")
-def test_voice_consent_and_control_browser(world, tmp_path):
+@pytest.mark.parametrize("script", ["voice_browser.cjs", "voice_resident_browser.cjs"])
+def test_voice_consent_and_control_browser(world, tmp_path, script):
     root = Path(__file__).resolve().parents[1]
     with socket.socket() as reserved:
         reserved.bind(("127.0.0.1", 0))
@@ -40,7 +41,7 @@ features=["capture","playback","wake"]
             core = subprocess.Popen([sys.executable, "-B", "-m", "nexus.core", "--config", str(config)],
                                     cwd=root, stdout=log, stderr=log, env=env)
             wait_for(lambda: client.get("/").status_code == 200)
-            result = subprocess.run([os.environ["NEXUS_TEST_NODE"], str(root / "tests/voice_browser.cjs")],
+            result = subprocess.run([os.environ["NEXUS_TEST_NODE"], str(root / "tests" / script)],
                 input=json.dumps({"origin": origin, "node_id": str(world.node_id),
                                   "owner_token": world.owner_token.get_secret_value(),
                                   "screenshot": str(tmp_path / "voice-390.png")}),
