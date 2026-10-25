@@ -1,5 +1,6 @@
 """Small verified raster snapshots; Core's main process imports no decoder."""
 
+from nexus.contracts.host_access import HostAccess
 import base64
 import hashlib
 import struct
@@ -16,7 +17,7 @@ MAX_IMAGE_SIDE = 1024
 SOURCE_MEDIA = {"PNG": "image/png", "JPEG": "image/jpeg", "GIF": "image/gif", "WEBP": "image/webp"}
 
 
-class ImageReadArguments(StrictContract):
+class ImageReadArguments(HostAccess):
     root_id: Literal["workspace"]
     path: StrictStr = Field(min_length=1, max_length=240)
     max_dimension: StrictInt = Field(default=1024, ge=128, le=MAX_IMAGE_SIDE)

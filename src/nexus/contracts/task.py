@@ -1,3 +1,4 @@
+from nexus.contracts.host_access import HostAccess
 from nexus.contracts.file_transfer import FileReceiveArguments
 from nexus.plugins.contracts import PluginNodeArguments
 
@@ -25,7 +26,7 @@ class SystemInfoArguments(StrictContract):
     pass
 
 
-class ListDirectoryArguments(StrictContract):
+class ListDirectoryArguments(HostAccess):
     root_id: Literal["workspace"]
     limit: Annotated[StrictInt, Field(ge=1, le=200)]
 

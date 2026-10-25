@@ -69,7 +69,9 @@ class PluginHTTP:
         async with self.service.database.transaction(write=False) as conn:
             await self.service.chat.owner(conn,principal)
             rows=await conn.execute_fetchall('SELECT * FROM plugin_versions WHERE owner_id=? ORDER BY rowid DESC LIMIT 256',(str(principal.identity_id),))
-            return {'enabled':self.service.config.enabled,'plugins':[public_version(row) for row in rows]}
+            from nexus.core.plugins.ui_extension_management import catalog
+            ui_plugins = await catalog(self.service.ui_extensions, conn, principal)
+            return {'enabled':self.service.config.enabled,'plugins':[public_version(row) for row in rows], 'ui_plugins': ui_plugins}
 
     async def detail(self,version_id:UUID,request:Request):
         principal=await self.guards.owner_http(request)

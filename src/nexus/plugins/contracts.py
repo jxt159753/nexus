@@ -1,5 +1,6 @@
 """Versioned plugin releases are data until an approved executor receives them."""
 
+from nexus.contracts.host_access import HostAccess
 from typing import Any, Annotated, Literal
 from uuid import UUID
 
@@ -74,7 +75,7 @@ class PluginInspectArguments(StrictContract):
     plugin_id: PluginId | None=None
 
 
-class PluginExecuteArguments(StrictContract):
+class PluginExecuteArguments(HostAccess):
     plugin_id: PluginId
     tool: ToolId
     input: dict[str,Any]=Field(default_factory=dict)
@@ -100,6 +101,7 @@ class PluginNodeArguments(PluginExecuteArguments):
         value=handler(self)
         # Preserve the canonical identity of pre-MCP commands/receipts.
         if self.mcp_binding is None: value.pop('mcp_binding',None)
+        if self.access_root is None: value.pop('access_root',None)
         return value
 
 

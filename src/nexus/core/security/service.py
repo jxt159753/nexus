@@ -67,6 +67,12 @@ async def assert_owner(conn: aiosqlite.Connection, principal: Principal, now: da
         raise AccessDenied()
 
 
+async def has_grant(conn, identity, node_id, tool, version, root):
+    if await one(conn, "SELECT 1 FROM grants WHERE identity_id=? AND tool=? AND tool_version=? AND root_id=?", (str(identity), tool, version, root)):
+        return True
+    return bool(await one(conn, "SELECT 1 FROM device_owner_grants WHERE owner_id=? AND node_id=? AND tool=? AND tool_version=? AND root_id=?", (str(identity), str(node_id), tool, version, root)))
+
+
 class SecurityService:
     def __init__(self, database: Database):
         self.database = database
@@ -127,6 +133,8 @@ class SecurityService:
                 rows = await conn.execute_fetchall("SELECT tool, tool_version, root_id FROM grants WHERE identity_id=?", (str(identity),))
                 granted.append({(f"{row['tool']}@{row['tool_version']}", row['root_id']) for row in rows})
             shared = granted[0] & granted[1]
+            scoped = await conn.execute_fetchall("SELECT tool,tool_version,root_id FROM device_owner_grants WHERE owner_id=? AND node_id=?", (str(owner_id), str(principal.identity_id)))
+            shared |= {(f"{row['tool']}@{row['tool_version']}", row['root_id']) for row in scoped} & granted[1]
             tools = frozenset(key for key in scope.tools & scope.local_tools if (
                 key in TOOL_ARGUMENT_MODELS
                 and (key, TOOL_RESOURCE[key.split("@")[0]]) in shared
@@ -199,6 +207,8 @@ class SecurityService:
             else:
                 async with conn.execute("DELETE FROM grants WHERE identity_id=? AND tool=? AND root_id=?", (str(identity_id), tool, root_id)) as cursor:
                     changed = cursor.rowcount
+                async with conn.execute("DELETE FROM device_owner_grants WHERE (owner_id=? OR node_id=?) AND tool=? AND root_id=?", (str(identity_id), str(identity_id), tool, root_id)) as cursor:
+                    changed += cursor.rowcount
             if changed:
                 await conn.execute("UPDATE policy_state SET version=version+1")
                 await audit(conn, None, None, "grant.changed", utc_now(), subject_id=str(identity_id))
@@ -230,14 +240,16 @@ class SecurityService:
             raise AccessDenied("POLICY_DENIED")
         if task.action.tool.startswith("interaction.") and scope.interaction_digests.get(task.action.arguments.target_id)!=task.action.arguments.template_digest:
             raise AccessDenied("POLICY_DENIED")
+        if getattr(task.action.arguments, "access_root", None) is not None:
+            from nexus.core.security.work import require_full_task
+            await require_full_task(conn, task, scope, now)
         root = TOOL_RESOURCE[task.action.tool]
         if getattr(task.action.arguments, "root_id", root) != root:
             raise AccessDenied("POLICY_DENIED")
         if root and (root not in scope.roots or root not in scope.local_roots):
             raise AccessDenied("POLICY_DENIED")
         for identity in (task.owner_id, task.node_id):
-            row = await one(conn, "SELECT grant_id FROM grants WHERE identity_id=? AND tool=? AND tool_version=? AND root_id=?", (str(identity), task.action.tool, task.action.tool_version, root))
-            if row is None:
+            if not await has_grant(conn, identity, task.node_id, task.action.tool, task.action.tool_version, root):
                 raise AccessDenied("POLICY_DENIED")
         return (await one(conn, "SELECT version FROM policy_state WHERE singleton=1"))[0]
 

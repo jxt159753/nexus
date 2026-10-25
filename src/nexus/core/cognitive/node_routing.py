@@ -82,7 +82,7 @@ async def directory(chat, conn, principal):
                 # Current Skill profiles cannot execute Android-only tools.
                 continue
             # These run entirely in Core and have no device-specific inputs.
-            common = original in {'get_current_time','web_search','web_fetch','plugin_install'}
+            common = original in {'conversation_route','get_current_time','web_search','web_fetch','plugin_install','inspect_ui_extension','submit_ui_extension'}
             if common and original in shared:
                 continue
             if common:

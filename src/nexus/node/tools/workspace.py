@@ -146,7 +146,7 @@ def replacement(args, root):
 
 def preview_edit(args, root):
     content,count = replacement(args,root)
-    result = preview_write(FilePreviewArguments(root_id=args.root_id,path=args.path,content=content),root)
+    result = preview_write(FilePreviewArguments(root_id=args.root_id,path=args.path,content=content,access_root=args.access_root),root)
     if result.previous_sha256 != args.expected_sha256:
         raise PermissionError("file changed during preview")
     return FileEditPreviewResult(**result.model_dump(),replacements=count,bytes_written=len(content.encode()))
@@ -156,6 +156,6 @@ def edit_file(args, root):
     content,count = replacement(args,root)
     if hashlib.sha256(content.encode()).hexdigest() != args.content_sha256 or len(content.encode()) != args.bytes_written:
         raise PermissionError("edit preview content mismatch")
-    fields = {key:getattr(args,key) for key in ("root_id","path","expected_sha256","preview_task_id","preview_digest")}
+    fields = {key:getattr(args,key) for key in ("root_id","path","expected_sha256","preview_task_id","preview_digest","access_root")}
     result = write_file(FileWriteArguments(**fields,content=content),root)
     return FileEditResult(**result.model_dump(),replacements=count)

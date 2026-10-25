@@ -57,6 +57,7 @@ import {
   submitPluginGeneration,
   waitPluginTest,
 } from "./plugins.js";
+import { uiPluginRow } from "./plugin-ui.js";
 
 const $ = (id) => document.getElementById(id);
 let activeTab = "permissions";
@@ -557,8 +558,8 @@ function pluginRow(item, conversationSelectNode) {
 
 function renderPluginsTab(body) {
   body.append(section("插件注册表",
-    el("p", "", pluginState.enabled ? "服务端已启用原生插件注册表。" : "服务端未启用原生插件；目录与操作保持不可用。"),
-    el("p", "hint", "这里没有插件市场，也没有子代理、Agent Team 或 Ralph 入口。插件管理只使用 Core 的固定版本注册表。"),
+    el("p", "", pluginState.enabled ? "统一管理工具插件和自写的可视化插件。" : "服务端插件功能未启用；保留已有版本记录。"),
+    el("p", "hint", "可视化插件按所属会话和授权客户端运行；工具插件沿用各自的设备权限。"),
   ));
   const selectWrap = el("div", "plugin-toolbar");
   const select = conversationSelect(() => {});
@@ -570,9 +571,10 @@ function renderPluginsTab(body) {
   })));
   body.append(selectWrap);
   const list = el("div", "plugin-list");
-  if (!pluginState.list.length) {
+  if (!pluginState.list.length && !pluginState.uiList.length) {
     list.append(el("p", "hint", pluginState.enabled ? "当前没有已注册的插件版本。" : "插件功能未启用。"));
   }
+  for (const item of pluginState.uiList) list.append(uiPluginRow(item, renderPluginPage));
   for (const item of pluginState.list) list.append(pluginRow(item, select));
   body.append(list);
 }

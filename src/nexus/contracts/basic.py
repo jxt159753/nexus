@@ -1,5 +1,6 @@
 """Bounded, explicit workspace operations; no arbitrary paths or shell strings."""
 
+from nexus.contracts.host_access import HostAccess
 import hashlib
 from typing import Annotated, Literal, get_args
 from uuid import UUID
@@ -30,7 +31,7 @@ def relative_path(value: str) -> str:
     return value
 
 
-class FileReadArguments(StrictContract):
+class FileReadArguments(HostAccess):
     root_id: Literal["workspace"]
     path: StrictStr = Field(min_length=1, max_length=240)
     max_bytes: StrictInt = Field(default=8192, ge=1, le=8192)
@@ -71,7 +72,7 @@ def glob_matches(path: str, pattern: str) -> bool:
     return match(0, 0)
 
 
-class FileGlobArguments(StrictContract):
+class FileGlobArguments(HostAccess):
     root_id: Literal["workspace"]
     path: StrictStr = Field(default=".", min_length=1, max_length=240)
     pattern: StrictStr = Field(min_length=1, max_length=100)
@@ -86,7 +87,7 @@ class FileGlobArguments(StrictContract):
         return self
 
 
-class FileGrepArguments(StrictContract):
+class FileGrepArguments(HostAccess):
     root_id: Literal["workspace"]
     path: StrictStr = Field(default=".", min_length=1, max_length=240)
     pattern: StrictStr = Field(min_length=1, max_length=200, description="逐行查找的字面文本，不是正则表达式。")
@@ -105,7 +106,7 @@ class FileGrepArguments(StrictContract):
         return self
 
 
-class FileSearchArguments(StrictContract):
+class FileSearchArguments(HostAccess):
     root_id: Literal["workspace"]
     pattern: StrictStr = Field(min_length=1, max_length=100)
     limit: StrictInt = Field(default=50, ge=1, le=100)
@@ -118,7 +119,7 @@ class FileSearchArguments(StrictContract):
         return self
 
 
-class FilePreviewArguments(StrictContract):
+class FilePreviewArguments(HostAccess):
     root_id: Literal["workspace"]
     path: StrictStr = Field(min_length=1, max_length=240)
     content: StrictStr = Field(max_length=12000)
@@ -137,7 +138,7 @@ class FileWriteArguments(FilePreviewArguments):
     preview_digest: CommandDigest
 
 
-class FileEditPreviewArguments(StrictContract):
+class FileEditPreviewArguments(HostAccess):
     root_id: Literal["workspace"]
     path: StrictStr = Field(min_length=1, max_length=240)
     old_string: StrictStr = Field(min_length=1, max_length=12000)
@@ -160,7 +161,7 @@ class FileEditArguments(FileEditPreviewArguments):
     bytes_written: StrictInt = Field(ge=0, le=12000)
 
 
-class CommandRunArguments(StrictContract):
+class CommandRunArguments(HostAccess):
     root_id: Literal["workspace"]
     command_id: CommandId
     template_digest: CommandDigest
@@ -170,6 +171,9 @@ def text_digest(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def write_digest(root_id, path, previous, content_sha256):
+def write_digest(root_id, path, previous, content_sha256, access_root=None):
     import json
-    return hashlib.sha256(json.dumps([root_id, path, previous, content_sha256], separators=(",", ":")).encode()).hexdigest()
+    scope = [root_id, path, previous, content_sha256]
+    if access_root is not None:
+        scope.append(access_root)
+    return hashlib.sha256(json.dumps(scope, separators=(",", ":")).encode()).hexdigest()

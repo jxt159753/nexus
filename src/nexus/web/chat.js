@@ -1,12 +1,23 @@
 "use strict";
 const chatState = {conversation:null, conversations:new Map(), turns:new Map(), previews:new Map(), actionConsents:new Set(), confirming:null, active:null, retry:null, createRequest:null, before:null, listBefore:null, latest:true, loading:false, enabled:false, epoch:0};
 const chatPresentationState = new Map();
+const chatDrafts = new Map(), chatNavigations = new Set();
+let chatSentRequest = null;
+async function chatOpenSource(id) {
+  if (chatAttachmentSelection().length) throw new Error("请先发送或移除未发送附件，再打开来源会话。文字草稿会保留。");
+  const value = await api(`/api/v1/chat/conversations/${id}/turns`);
+  chatState.conversations.set(id, value.conversation);
+  if (![...$("chat-conversation").options].some(option => option.value === id)) $("chat-conversation").append(new Option(value.conversation.title,id));
+  $("chat-conversation").value = id;
+  await chatSelect(id);
+}
 const chatLabels = {queued:"等待回复",generating:"正在回复",completed:"已完成",incomplete:"达到输出上限，回复未完整结束",stopping:"正在停止",stopped:"已停止",interrupted:"服务中断，未自动重发",failed:"回复失败",expired:"请求已过期"};
 function chatNodes(nodes) {
   chatWorkState.nodes=new Map(nodes.map(node=>[node.node_id,node]));
 
 }
 function chatReset() {
+  chatDrafts.clear(); chatNavigations.clear(); chatSentRequest = null;
   chatWorkReset();
   chatMemoryReset(); chatReferenceReset();
   chatState.epoch++; chatState.conversation=null; chatState.conversations.clear(); chatState.turns.clear(); chatState.previews.clear(); chatState.actionConsents.clear(); chatState.confirming=null; chatState.active=null; chatState.retry=null; chatState.createRequest=null; chatState.before=null; chatState.listBefore=null; chatState.latest=true;
@@ -35,9 +46,10 @@ async function chatList(older=false) {
 }
 async function chatSelect(id) {
   if (chatState.conversation?.conversation_id!==id) {
+    chatDrafts.set(chatState.conversation?.conversation_id || "", $("chat-text").value);
     chatWorkReset();
     chatMemoryReset(); chatReferenceReset();
-    chatState.epoch++; chatState.turns.clear(); chatState.previews.clear(); chatState.actionConsents.clear(); chatState.retry=null; chatState.before=null; chatState.latest=true; $("chat-context").checked=true; $("chat-text").value="";
+    chatState.epoch++; chatState.turns.clear(); chatState.previews.clear(); chatState.actionConsents.clear(); chatState.retry=null; chatState.before=null; chatState.latest=true; $("chat-context").checked=true; $("chat-text").value=chatDrafts.get(id) || "";
     chatSkillsReset();
   }
   chatState.conversation=chatState.conversations.get(id);
@@ -82,6 +94,12 @@ async function chatHistory(older=false) {
   $("chat-latest").hidden=chatState.latest;
   chatRender();
   if (wasActive && !chatState.active) await usage();
+  const routed = ordered.find(turn => turn.request_id === chatSentRequest && turn.presentation?.phase === "completed" && turn.presentation?.navigation);
+  const navigation = routed?.presentation.navigation;
+  if (navigation && !chatNavigations.has(navigation.step_id)) {
+    chatNavigations.add(navigation.step_id);
+    await chatOpenSource(navigation.conversation_id);
+  }
 }
 function chatContent(text) {
   const fragment=document.createDocumentFragment();
@@ -175,6 +193,13 @@ function chatRender() {
         const slot=el("div");answer.append(slot);
         import("./app/chat-files.js").then(({renderChatFiles})=>{if(slot.isConnected)slot.append(renderChatFiles(presentation.files,api,()=>crypto.randomUUID()));});
       }
+      for (const source of presentation?.conversations || []) {
+        const sourceCard = el("div", "", "card");
+        const open = el("button", "打开会话", "quiet");
+        open.onclick = action(() => chatOpenSource(source.conversation_id));
+        sourceCard.append(el("strong",source.title),el("p",[source.project_name,source.created_at?.slice(0,10),source.archived ? "已归档" : ""].filter(Boolean).join(" · "),"hint"),open);
+        answer.append(sourceCard);
+      }
       if (presentation) {
         if (presentation.final_text!==null) answer.append(el("strong",presentation.phase==="completed" ? "最终回答" : "本轮反馈"),chatContent(presentation.final_text));
         answer.append(chatPresentationPanel(turn,presentation));
@@ -260,7 +285,7 @@ function chatRender() {
   for (const id of ["chat-skill-load","chat-skills-catalog"]) $(id).hidden=working;
   $("chat-skills").parentElement.hidden=working;
   const imageNote=working && chatWorkImageAvailable() ? " 图片工具已由服务器返回：配置工作区内的图片可能生成最多 1024px / 8 KiB 的有界快照并随本轮结果发送给 DeepSeek；可能继续缩小或使用有损 JPEG，GIF/WebP 只取首帧，透明区域显示白底。点击发送即本轮明确同意，历史选择不代替本轮同意。" : "";
-  $("chat-outbound-notice").textContent=working ? "发送即同意外发本轮输入、所选上下文、可用能力目录及实际工具结果；网页搜索词和公开页面网址会发送给 DeepSeek。每轮最多 4 个动作、5 次工作模型交换；勾选压缩时最多额外一次摘要调用，共用原费用上限；网页每次有结果收费 $0.00075，合计共用 $0.05 和每日 $1。"+imageNote : "点击“发送给 DeepSeek”即同意外发本次输入及所选上下文和流程目录。勾选压缩时最多额外一次摘要调用，共用原费用上限。单步工具可在确认卡允许自动回传；多步流程成功后先预览结果，再同意解读。每天 $1、每轮共用 $0.05，普通聊天 1 次、含结果解读最多 2 次调用。"+imageNote;
+  $("chat-outbound-notice").textContent=working ? "发送即同意外发本轮输入、所选上下文、可用能力目录、实际工具结果及按问题查到的本人其他会话摘录与项目记录；网页搜索词和公开页面网址会发送给 DeepSeek。每轮最多 4 个动作、5 次工作模型交换；勾选压缩时最多额外一次摘要调用，共用原费用上限；网页每次有结果收费 $0.00075，合计共用 $0.05 和每日 $1。"+imageNote : "点击“发送给 DeepSeek”即同意外发本次输入及所选上下文和流程目录。勾选压缩时最多额外一次摘要调用，共用原费用上限。单步工具可在确认卡允许自动回传；多步流程成功后先预览结果，再同意解读。每天 $1、每轮共用 $0.05，普通聊天 1 次、含结果解读最多 2 次调用。"+imageNote;
   $("chat-context-info").textContent=flowRunning ? "流程正在执行，请在上方查看步骤、审批或取消整个流程。完成后可预览结果并追问。" : waiting ? "等待工具结果并自动回答，完成后即可追问。停止自动回传不会取消工具；取消执行请使用任务卡。" : chatState.active ? "可选择纠正当前工作或排队后续任务；纠正在已派发操作结束后生效，不会扩大权限。" : "上下文保留近期原文和所选资料；同意压缩时按 token 估算与请求容量生成旧历史摘要，原始记录保留。可用 /compact 手动压缩。";
 }
 function initChat() {
@@ -307,6 +332,7 @@ function initChat() {
     const signature=JSON.stringify([conversation.conversation_id,$("chat-text").value,$("chat-context").checked,allowTools,nodeId,allowSkills,skillsDigest,memories,work,allowCompaction,compactOnly]);
     if (chatState.retry?.signature!==signature) chatState.retry={signature,payload:{request_id:crypto.randomUUID(),expected_revision:conversation.revision,text:$("chat-text").value,include_context:$("chat-context").checked,allow_compaction:allowCompaction,compact_only:compactOnly,allow_model:true,enqueue:!!chatState.active,allow_tools:allowTools,node_id:nodeId,allow_skills:allowSkills,skills_digest:skillsDigest,...memories,...work}};
     await api(`/api/v1/chat/conversations/${conversation.conversation_id}/turns`,{method:"POST",body:JSON.stringify(chatState.retry.payload)});
+    chatSentRequest = chatState.retry.payload.request_id;
     chatState.latest=true; await chatHistory();
     $("chat-skills").checked=false;
     } catch(error) {

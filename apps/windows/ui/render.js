@@ -19,7 +19,6 @@ import {
   pendingPermissions,
   previewResult,
   projectName,
-  selectConversation,
   setPref,
   state,
   taskDetail,
@@ -49,6 +48,7 @@ const presentationUi = new Map();
 
 export const ui = {
   openChat: () => {},
+  openConversationSource: async () => {},
   closeChat: () => {},
   openSettings: () => {},
   openScope: () => {},
@@ -95,6 +95,12 @@ export function notify(message, error = false) {
 export function errorText(error) {
   const code = error instanceof ApiError ? error.code : error?.message;
   const labels = {
+    UI_EXTENSION_POLICY_REQUIRED: "请在手势面板授权当前会话的插件开发",
+    UI_EXTENSION_CLIENT_UNAVAILABLE: "请保持已授权的客户端在线",
+    UI_EXTENSION_POLICY_CHANGED: "插件授权已变化，请重新检查",
+    UI_EXTENSION_SCOPE_MISMATCH: "插件名称不在本会话授权范围内",
+    UI_EXTENSION_EVIDENCE_MISMATCH: "插件验证记录与当前版本不一致",
+    UI_EXTENSION_LEASE_EXPIRED: "插件验证已过期，旧版本保持不变",
     AUTH_REQUIRED: "会话已过期，请重新登录",
     BUSY: "当前繁忙，请稍后再试",
     IDEMPOTENCY_CONFLICT: "状态已经变化，请刷新后重试",
@@ -796,6 +802,13 @@ function presentationState(turn, presentation) {
 
 function renderPresentationBody(assistant, turn, presentation) {
   if(presentation.files?.length) assistant.append(renderChatFiles(presentation.files,api,uuid));
+  for (const source of presentation.conversations || []) {
+    const card = el("div", "process-panel");
+    card.append(el("strong", "", source.title || "会话记录"));
+    card.append(el("p", "hint", [source.project_name, source.created_at ? formatDate(source.created_at) : "", source.archived ? "已归档" : ""].filter(Boolean).join(" · ")));
+    const open = button("打开会话", "quiet", () => runAction(() => ui.openConversationSource(source.conversation_id, source.turn_id), open));
+    card.append(open); assistant.append(card);
+  }
   const status = el("div", "status-line");
   if (presentation.phase !== "completed") status.append(presentationBadge(presentation));
   if (turn.cost_status === "unknown") status.append(el("span", "hint", "部分费用待核对"));
@@ -1045,10 +1058,7 @@ export function renderConversations() {
     const project = conversation.project_id ? projectName(conversation.project_id) || "项目会话" : "";
     item.append(el("small", "", `${formatDate(conversation.created_at)}${project ? " · " + project : ""}${conversation.archived ? " · 已归档" : ""}`));
     item.addEventListener("click", () => runAction(async () => {
-      if (conversation.conversation_id !== state.conversation?.conversation_id) leaveConversation();
-      await selectConversation(conversation.conversation_id);
-      ui.openChat();
-      ui.refresh(true);
+      await ui.openConversationSource(conversation.conversation_id);
     }, item));
     list.append(item);
   }

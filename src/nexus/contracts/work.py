@@ -1,5 +1,7 @@
 """Explicit conversation grants and native, bounded work calls."""
 
+from nexus.contracts.conversation_routes import ConversationRouteProposal
+from nexus.contracts.host_access import HostAccess
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -14,6 +16,7 @@ from nexus.contracts.language import SystemProposal, DirectoryProposal
 from nexus.contracts.web import WebSearchArguments, WebFetchArguments
 from nexus.plugins.contracts import PluginInspectProposal, PluginExecuteProposal, PluginInstallProposal
 from nexus.contracts.extensions import SkillGeneration
+from nexus.contracts.ui_extensions import UIExtensionInspectProposal, UIExtensionSubmitProposal
 
 
 class WorkGrantCreate(StrictContract):
@@ -53,7 +56,7 @@ class WriteProposal(StrictContract):
     arguments: FilePreviewArguments
 
 
-class WorkCommandArguments(StrictContract):
+class WorkCommandArguments(HostAccess):
     root_id: Literal["workspace"]
     command_id: CommandId
 
@@ -193,7 +196,7 @@ class SendFileProposal(StrictContract):
     arguments: SendFileArguments
 
 
-WORK_ACTION = Annotated[SendFileProposal | AndroidDeviceStatusProposal | AndroidNotificationDigestProposal | SystemProposal | DirectoryProposal | ReadProposal | SearchProposal | WriteProposal | CommandProposal | StatusProposal | SkillProposal | ToolProposal | CapabilityProposal | SkillCreateProposal | WebSearchProposal | WebFetchProposal | LinesProposal | GlobProposal | GrepProposal | EditProposal | ObserveProposal | InteractProposal | ImageProposal | TimeProposal | JobListProposal | JobOutputProposal | PluginInspectProposal | PluginExecuteProposal | PluginInstallProposal, Field(discriminator="intent")]
+WORK_ACTION = Annotated[ConversationRouteProposal | UIExtensionInspectProposal | UIExtensionSubmitProposal | SendFileProposal | AndroidDeviceStatusProposal | AndroidNotificationDigestProposal | SystemProposal | DirectoryProposal | ReadProposal | SearchProposal | WriteProposal | CommandProposal | StatusProposal | SkillProposal | ToolProposal | CapabilityProposal | SkillCreateProposal | WebSearchProposal | WebFetchProposal | LinesProposal | GlobProposal | GrepProposal | EditProposal | ObserveProposal | InteractProposal | ImageProposal | TimeProposal | JobListProposal | JobOutputProposal | PluginInspectProposal | PluginExecuteProposal | PluginInstallProposal, Field(discriminator="intent")]
 
 
 class NodeAction(StrictContract):

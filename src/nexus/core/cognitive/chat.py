@@ -87,6 +87,8 @@ class ChatService:
         self.journal = chat_journal.ChatJournal(self)
         from nexus.core.plugins.service import PluginService
         self.plugins = PluginService(self)
+        from nexus.core.security.devices import DeviceRegistry
+        self.devices = DeviceRegistry(self)
 
     async def snapshot(self, conn, row: sqlite3.Row, *, detail: bool = False) -> dict:
         from nexus.core.storage.archive import hydrate
@@ -94,6 +96,10 @@ class ChatService:
         value = public_turn(row, detail=detail)
         value["work_steps"] = await self.work.steps(conn, value["turn_id"])
         value["presentation"] = await chat_presentation.presentation(conn, value)
+        change = await one(conn, "SELECT result_json FROM device_chat_changes WHERE turn_id=?", (value["turn_id"],))
+        value["device_change"] = json.loads(change["result_json"]) if change else None
+        if value["device_change"] and value["device_change"].get("node_id"):
+            value["device_change"]["online"] = (await self.harness.link.node_status(UUID(value["device_change"]["node_id"])))["online"]
         return value
 
     async def conversation(self, conn, principal: Principal, conversation_id: UUID | str) -> sqlite3.Row:
@@ -155,6 +161,17 @@ class ChatService:
             await audit(conn, str(principal.identity_id), None, "chat.updated", utc_now())
             return dict(await one(conn, "SELECT * FROM conversations WHERE conversation_id=?", (str(conversation_id),)))
 
+    async def activity(self, principal: Principal) -> dict:
+        """Owner-wide display facts, independent of the client's selected chat."""
+        async with self.database.transaction(write=False) as conn:
+            await self.owner(conn, principal)
+            rows = await conn.execute_fetchall(
+                f"SELECT turn_id,conversation_id,json_extract(request_json,'$.client_node_id') AS node_id "
+                f"FROM chat_turns WHERE owner_id=? AND {ACTIVE} ORDER BY rowid",
+                (str(principal.identity_id),),
+            )
+            return {"turns": [dict(row) for row in rows]}
+
     async def history(self, principal: Principal, conversation_id: UUID | str, before: int = 2**63-1) -> dict:
         async with self.database.transaction(write=False) as conn:
             conversation = await self.conversation(conn, principal, conversation_id)
@@ -203,9 +220,12 @@ class ChatService:
             await audit(conn, row["owner_id"], None, "chat.skill_previewed", utc_now())
             return {"plan": plan, "proposal_digest": digest}
 
-    async def submit(self, principal: Principal, conversation_id: UUID | str, value: ChatSubmission) -> dict:
+    async def submit(self, principal: Principal, conversation_id: UUID | str, value: ChatSubmission, *, verified_client_id: UUID | None = None) -> dict:
         # Confirmation and the next message cannot interleave task association.
         async with self.harness.operation:
+            managed = await self.devices.command(principal, conversation_id, value, verified_client_id)
+            if managed is not None:
+                return managed
             return await self._submit(principal, conversation_id, value)
 
     async def _submit(self, principal: Principal, conversation_id: UUID | str, value: ChatSubmission) -> dict:

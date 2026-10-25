@@ -105,6 +105,7 @@ class ToolCapability(StrictContract):
 
 
 class NodeHello(StrictContract):
+    mcp_execution_timeout_seconds: StrictInt = Field(default=10, ge=1, le=60)
     plugin_digest: CommandDigest | None=None
     plugin_tools: dict[PluginId,list[ToolId]]=Field(default_factory=dict,max_length=32)
     node_id: UUID
@@ -226,7 +227,13 @@ class InteractExecute(CommandExecuteBase, InteractCall):
 
 
 class PluginNodeExecute(CommandExecuteBase, PluginNodeCall):
-    pass
+    execution_timeout_seconds: StrictInt = Field(ge=1, le=60)
+
+    @model_validator(mode="after")
+    def check_mcp_timeout(self) -> Self:
+        if self.execution_timeout_seconds > 10 and self.arguments.plugin_id != "builtin.mcp":
+            raise ValueError("extended execution timeout is only available for MCP")
+        return self
 
 
 class AndroidDeviceStatusExecute(CommandExecuteBase, AndroidDeviceStatusCall):

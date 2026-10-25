@@ -79,6 +79,17 @@ async def task_step(conn, task_id):
     return row[0] if row else None
 
 
+async def require_full_task(conn, task, scope, now):
+    """An approval alone never grants access outside the configured workspace."""
+    identifier = await task_step(conn, task.task_id)
+    if identifier is not None:
+        _, grant = await allowed_step(conn, identifier, now, scope=scope)
+        if (grant['permission_mode'] == 'full' and grant['owner_id'] == str(task.owner_id)
+                and grant['node_id'] == str(task.node_id)):
+            return
+    raise AccessDenied('HOST_ACCESS_REQUIRES_FULL')
+
+
 async def check_task(conn, task, scope, now):
     native_mode=None
     if task.action.tool=='plugin.call':

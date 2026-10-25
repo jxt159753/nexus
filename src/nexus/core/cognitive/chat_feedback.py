@@ -13,6 +13,11 @@ from nexus.core.storage.database import audit, one, timestamp
 
 
 REASONS = {
+    "HOST_ACCESS_REQUIRES_FULL": "当前为普通模式，文件工具只能访问配置的工作区；如需访问工作区外目录，请由你切换到完全模式后重新发起任务。",
+    "UI_EXTENSION_POLICY_REQUIRED": "当前会话尚未授权界面插件开发，请在手势面板开启后继续。",
+    "UI_EXTENSION_CLIENT_UNAVAILABLE": "已授权的客户端没有连接，无法在本机验证和接入插件。",
+    "UI_EXTENSION_SCOPE_MISMATCH": "候选插件不在本会话授权的名称范围内。",
+    "UI_EXTENSION_POLICY_CHANGED": "界面插件授权已变化，当前候选未继续发布。",
     "WEB_TIMEOUT": "读取网页时等待超时，没能取得这次请求的内容。",
     "WEB_OUTCOME_UNKNOWN": "网页连接中断，没能取得完整内容。",
     "WEB_RESPONSE_INVALID": "网页服务返回的内容无法解析。",

@@ -72,7 +72,9 @@ class FileTransferHTTP:
             for node_id, policy in self.harness.link.config.nodes.items():
                 granted = 'filesystem.receive@1' in policy.tools and 'workspace' in policy.roots
                 for identity in (principal.identity_id,node_id):
-                    granted = granted and bool(await one(conn,"SELECT 1 FROM grants g JOIN identities i USING(identity_id) WHERE g.identity_id=? AND tool='filesystem.receive' AND root_id='workspace' AND i.revoked_at IS NULL",(str(identity),)))
+                    from nexus.core.security.service import has_grant
+                    active = await one(conn, "SELECT 1 FROM identities WHERE identity_id=? AND revoked_at IS NULL", (str(identity),))
+                    granted = granted and bool(active) and await has_grant(conn, identity, node_id, 'filesystem.receive', 1, 'workspace')
                 connection = self.harness.link.connections.get(node_id)
                 online = bool(connection and connection.ready)
                 supported = bool(connection and 'filesystem.receive@1' in connection.scope.tools & connection.scope.local_tools

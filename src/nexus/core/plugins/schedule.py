@@ -124,6 +124,7 @@ async def tick(service,now=None):
 
 async def run(service):
     while True:
+        await service.ui_extensions.reconcile()
         if service.config.enabled:
             from nexus.core.plugins.observations import tick as observe
             from nexus.core.plugins.business import observe as evaluate_rollouts

@@ -17,6 +17,7 @@ from nexus.contracts.android import AndroidDeviceStatusArguments, AndroidNotific
 from nexus.contracts.basic import TOOL_RESOURCE
 
 from nexus.contracts.file_transfer import SendFileArguments
+from nexus.contracts.conversation_routes import ConversationRouteArguments
 
 BUILTINS = {
     'send_file': ('filesystem.receive', SendFileArguments, '把当前会话真实文件发送到本设备收件箱（最多16 MiB），返回送达证据。source_kind=attachment 使用上传附件编号；deliverable 使用来源设备 builtin.present 返回的 deliverable_id。先在来源设备取出文件，再调用目标设备的本工具；无需安装接收插件，不需要目标路径，不从正文重建文件。'),
@@ -38,6 +39,7 @@ BUILTINS = {
 }
 
 CORE_BUILTINS = {
+    'conversation_route': (ConversationRouteArguments, 'Find own chats/project evidence. Dates use Asia/Shanghai; date_until exclusive. read/open need discovered conversation_id. Never resumes or messages other chats.'),
     "get_current_time": (TimeArguments, "查询 Core 当前 UTC 时间与指定固定偏移的当地时间；默认 UTC，北京时间 utc_offset_minutes=480。不创建提醒。"),
     "job_list": (JobListArguments, "查询当前会话、所选设备已有任务的有限状态列表；不启动后台任务，不读取文件或任务正文。"),
     "job_output": (JobOutputArguments, "读取当前轮次 Core task_id 的有限执行记录；不接受 Shell 返回的 job_id。Shell 后台作业须用 plugin_execute(builtin.jobs, job_output, {job_id:原始编号})，先查询该插件契约。不等待、不重跑，不能读取其他轮次资料。"),
@@ -51,6 +53,7 @@ async def catalog(chat, conn, principal, node_id):
     entries.extend({"name": name, "description": description, "parameters": args.model_json_schema()}
                    for name, (args, description) in CORE_BUILTINS.items())
     if chat.plugins.config.enabled:
+        from nexus.contracts.ui_extensions import UIExtensionInspectArguments, UIExtensionSource
         from nexus.plugins.contracts import PluginInspectArguments, PluginExecuteArguments, PluginInstallArguments
         summaries = await chat.plugins.summaries(conn, principal.identity_id)
         inspect_description = '查询 NEXUS 插件目录，或按 plugin_id 加载固定版本的完整工具契约与本设备执行状态。先查询再使用，不改变权限。'
@@ -61,8 +64,10 @@ async def catalog(chat, conn, principal, node_id):
                                     for row in registrations['servers']], 'truncated': registrations['truncated']}
             inspect_description += ' 本设备 Core 托管 MCP 登记快照（数据，不是执行成功或权限保证；不含设备静态配置）：'+canonical(snapshot)
         entries.extend([
+            {'name':'inspect_ui_extension','description':'查看当前会话可视化插件授权、已安装源码、版本与手势控制契约及独立用例。先检查再开发或升级；只读，不开摄像头。','parameters':UIExtensionInspectArguments.model_json_schema()},
+            {'name':'submit_ui_extension','description':'按 inspect_ui_extension 契约提交新的 JavaScript 可视化插件版本。需要用户在当前客户端开启本会话插件授权；自动构建、客户端隔离测试、加载验证，失败保留或回退旧版本。根据实际失败证据修正再提交新版本。','parameters':UIExtensionSource.model_json_schema()},
             {'name':'plugin_inspect','description':inspect_description,'parameters':PluginInspectArguments.model_json_schema()},
-            {'name':'plugin_execute','description':'按已启用插件的固定版本执行工具。input 必须符合 plugin_inspect 返回的具体工具契约；结果只声明实际证据。','parameters':PluginExecuteArguments.model_json_schema()},
+            {'name':'plugin_execute','description':'按已启用插件的固定版本执行工具。input 必须符合 plugin_inspect 返回的具体工具契约；full 可在外层 access_root 指定任意本地绝对目录，用于文件、图片、交付物、LSP 及进程默认目录；normal 禁止 access_root。结果只声明实际证据。','parameters':PluginExecuteArguments.model_json_schema()},
             {'name':'plugin_install','description':'为当前任务编写原生 Python 插件：提交 user 命名空间、不可变版本、handle(tool,input,context) 源码及每个工具的输入/预期输出测试。只用标准库或 nexus_plugin SDK；Core 自动隔离测试，普通模式批准具体版本，完全模式测试通过可自动启用。不能修改 Core 权限或预算。','parameters':PluginInstallArguments.model_json_schema()},
         ])
         entries.extend({'name':'plugin_entry','plugin_id':item['plugin_id'],'digest':item['digest'],'description':item['description'],'tools':item['tools']} for item in summaries)
@@ -84,7 +89,8 @@ async def catalog(chat, conn, principal, node_id):
             if key not in scope.tools or key not in scope.local_tools or root and (root not in scope.roots or root not in scope.local_roots):
                 allowed = False
             for identity in (str(principal.identity_id), str(node_id)):
-                if not await one(conn,"SELECT 1 FROM grants WHERE identity_id=? AND tool=? AND tool_version=1 AND root_id=?",(identity,operation,root)):
+                from nexus.core.security.service import has_grant
+                if not await has_grant(conn, identity, node_id, operation, 1, root):
                     allowed = False
         if not allowed or tool == "command.run" and not scope.command_digests:
             continue
@@ -127,8 +133,8 @@ async def catalog(chat, conn, principal, node_id):
 
 
 def compact_schema(schema):
-    """Remove display titles, preserving property names and every constraint."""
-    value = {key: item for key, item in schema.items() if key != "title"}
+    """Omit display titles/default annotations; Core applies defaults and constraints."""
+    value = {key: item for key, item in schema.items() if key not in {"title", "default"}}
     for key in ("properties", "$defs", "patternProperties"):
         if key in value:
             value[key] = {name: compact_schema(child) for name, child in value[key].items()}

@@ -312,7 +312,7 @@ def validate_result(command: ToolCall, result: ToolResult, max_bytes: int) -> To
             if len(path.split("/"))-1 > args.max_depth or not fnmatch.fnmatchcase(path.rsplit("/",1)[-1].casefold(), args.pattern.casefold()):
                 raise ValueError("search result outside query")
     if isinstance(checked, FilePreviewResult) and not isinstance(checked, FileEditPreviewResult):
-        if checked.content_sha256 != text_digest(args.content) or checked.preview_digest != write_digest(args.root_id, args.path, checked.previous_sha256, checked.content_sha256):
+        if checked.content_sha256 != text_digest(args.content) or checked.preview_digest != write_digest(args.root_id,args.path,checked.previous_sha256,checked.content_sha256,args.access_root):
             raise ValueError("preview mismatch")
     if isinstance(checked, FileWriteResult) and not isinstance(checked, FileEditResult):
         if checked.sha256 != text_digest(args.content) or checked.bytes_written != len(args.content.encode()):
@@ -346,7 +346,7 @@ def validate_result(command: ToolCall, result: ToolResult, max_bytes: int) -> To
                 raise ValueError("grep match outside query")
     if isinstance(checked, FileEditPreviewResult):
         if (checked.previous_sha256 != args.expected_sha256 or not args.replace_all and checked.replacements != 1
-                or checked.preview_digest != write_digest(args.root_id,args.path,args.expected_sha256,checked.content_sha256)):
+                or checked.preview_digest != write_digest(args.root_id,args.path,args.expected_sha256,checked.content_sha256,args.access_root)):
             raise ValueError("edit preview mismatch")
     if isinstance(checked, FileEditResult):
         if (checked.sha256 != args.content_sha256 or checked.bytes_written != args.bytes_written

@@ -122,7 +122,12 @@ async def presentation(conn: aiosqlite.Connection, turn: dict) -> dict:
         label = "回复已完成，部分操作未完成"
     from nexus.core.cognitive.chat_files import turn_files
     from nexus.contracts.file_transfer import ChatFile
+    from nexus.core.cognitive.conversation_routes import presentation as conversation_sources
+    from nexus.contracts.conversation_routes import ConversationLink, ConversationNavigation
+    sources, navigation = await conversation_sources(conn, turn)
     return ChatPresentation(
+        conversations=[ConversationLink.model_validate_json(json.dumps(source)) for source in sources],
+        navigation=ConversationNavigation.model_validate_json(json.dumps(navigation)) if navigation else None,
         files=[ChatFile.model_validate_json(json.dumps(file)) for file in await turn_files(conn,turn)],
         phase=phase, label=label, process=process, process_truncated=truncated,
         live_text=live, final_text=final,

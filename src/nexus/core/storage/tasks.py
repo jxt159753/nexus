@@ -177,6 +177,7 @@ class TaskRepository:
                     raise Conflict("WRITE_PREVIEW_REQUIRED")
                 data = json.loads(preview["result_json"])
                 if (json.loads(preview["action_json"])["tool"] != ("filesystem.write_preview" if request.intent == "write_file" else "filesystem.edit_preview") or preview["project_id"] != (str(request.project_id) if request.project_id else None)
+                        or json.loads(preview["action_json"])["arguments"].get("access_root") != request.arguments.access_root
                         or data["root_id"] != request.arguments.root_id or data["path"] != request.arguments.path
                         or data["content_sha256"] != (text_digest(request.arguments.content) if request.intent == "write_file" else request.arguments.content_sha256) or data["previous_sha256"] != request.arguments.expected_sha256
                         or data["preview_digest"] != request.arguments.preview_digest):
