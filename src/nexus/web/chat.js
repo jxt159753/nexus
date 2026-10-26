@@ -147,20 +147,27 @@ function chatResultPreview(turn, card, canContinue) {
   box.append(load); if (value) box.append(send); card.append(box);
 }
 function chatPresentationPanel(turn,p) {
+  const collapse=p.collapse_process && !!p.final_text;
   let ui=chatPresentationState.get(turn.turn_id);
   if (!ui) {
-    ui={open:!(p.phase==="completed" && p.collapse_process && p.final_text!==null),manual:false,phase:p.phase};
+    ui={open:!collapse,collapse};
     chatPresentationState.set(turn.turn_id,ui);
-  } else if (ui.phase!==p.phase) {
-    if (p.phase==="completed" && !ui.manual) ui.open=!(p.collapse_process && p.final_text!==null);
-    ui.phase=p.phase;
+  } else {
+    if (collapse && !ui.collapse) ui.open=false;
+    ui.collapse=collapse;
   }
   if (p.phase==="awaiting_input") ui.open=true;
-  const details=el("details","chat-process");
+  const details=el("details",undefined,"chat-process");
   details.open=ui.open;
-  const summary=el("summary",ui.open?"收起处理过程":"查看处理过程");
+  const closedLabel=`查看处理过程${turn.work_steps?.length ? ` · ${turn.work_steps.length} 步` : ""}`;
+  const summary=el("summary",ui.open?"收起处理过程":closedLabel);
   details.append(summary);
-  details.addEventListener("toggle",()=>{ui.open=details.open;ui.manual=true;summary.textContent=details.open?"收起处理过程":"查看处理过程";});
+  summary.addEventListener("click",event=>{
+    event.preventDefault();
+    if(p.phase==="awaiting_input") return;
+    ui.open=!ui.open;details.open=ui.open;
+    summary.textContent=ui.open?"收起处理过程":closedLabel;
+  });
   for (const item of p.process || []) {
     const box=el("div",undefined,"chat-process-text"); box.append(chatContent(item.text || "")); details.append(box);
     if (item.truncated) details.append(el("p","这条摘要已裁剪，完整内容保留在 Core 记录中。","hint"));
@@ -221,9 +228,10 @@ function chatRender() {
       const failureHints={MODEL_RESPONSE_INVALID:"模型返回的格式无法校验，本轮已停止。",MODEL_TOOL_CALL_LIMIT:"模型提出的动作超过本轮剩余额度，未执行这批动作。",MODEL_REQUEST_FAILED:"模型连接或响应解析失败，本轮已停止。",MODEL_TIMEOUT:"等待模型响应超时，本轮已停止。",MODEL_OUTCOME_UNKNOWN:"未收到完整模型响应或用量，实际费用无法确认；这不表示设备已经执行。"};
       if (!presentation?.final_text && failureHints[turn.error_code]) answer.append(el("p",failureHints[turn.error_code],"hint"));
       if (!presentation?.final_text && turn.error_code?.startsWith("WEB_")) answer.append(el("p","这次网页请求没有取得可用内容；已有资料仍然保留。","hint"));
-      if (turn.work_grant_id) answer.append(chatWorkCards(turn));
+      if (turn.work_grant_id) (answer.querySelector(".chat-process") || answer).append(chatWorkCards(turn));
       if (turn.allow_skills && turn.status==="completed" && !turn.proposal) answer.append(el("p","本轮没有选出可执行流程，未创建设备执行。可核对可用能力或补充目标。","hint"));
-      if (turn.skill_plan) answer.append(chatSkillCard(turn,!chatState.active && turn===turns.at(-1)));
+      const actionContainer=presentation?.collapse_process ? answer.querySelector(".chat-process") : answer;
+      if (turn.skill_plan) actionContainer.append(chatSkillCard(turn,!chatState.active && turn===turns.at(-1)));
       else if (turn.proposal) {
         const card=el("section",undefined,"chat-action");
         card.append(el("h3",turn.proposal.intent==="get_system_info" ? "读取系统信息" : "列出 workspace 目录"),el("pre",JSON.stringify({node_id:turn.node_id,action:turn.proposal,tool_version:1,expires_at:turn.expires_at},null,2)));
@@ -250,7 +258,7 @@ function chatRender() {
           card.append(el("p","确认后仍检查权限；目录另需审批。勾选即同意发送本次白名单结果及原上下文，最多再调用一次，共用本轮 $0.05；未勾选可执行后预览确认。","hint"),buttons);
         } else if (!turn.task_id) card.append(el("p",turn.action_status==="rejected" ? "你已拒绝这个动作。" : "动作已过期或会话已归档，请重新提出请求。","hint"));
         if (turn.result_supported && turn.phase==="reply" && turn.status==="completed" && task?.task.status==="succeeded" && turn.auto_result_status!=="waiting" && !chatState.conversation?.archived) chatResultPreview(turn,card,!chatState.active && turn===turns.at(-1));
-        answer.append(card);
+        actionContainer.append(card);
       }
       if (!presentation && turn.phase==="summary") answer.append(el("strong","最终回答"),chatContent(turn.response_text || (turn.status==="queued" ? "等待模型解读结果…" : turn.status==="generating" ? "正在根据结果生成回答…" : "本次解读未完成；工具执行结果已保留。")));
       if (turn.memory_references?.length) {

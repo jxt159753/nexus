@@ -114,7 +114,7 @@ async def prepare(conn, config, row, messages, options):
     end = next((i for i, ids in enumerate(sources) if not ids), len(sources))
     if end == 0:
         return None
-    retain = 0 if manual else min(config.chat_input_tokens, config.chat_context_window_tokens-config.chat_output_limit(), config.chat_input_bytes//4) * config.chat_compaction_retain_percent // 100
+    retain = 0 if manual else min(config.chat_input_limit(config.chat_output_limit()), config.chat_input_bytes//4) * config.chat_compaction_retain_percent // 100
     kept, cutoff = 0, end
     if retain:
         for i in range(end-1, -1, -1):

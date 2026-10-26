@@ -56,18 +56,19 @@ async def catalog(chat, conn, principal, node_id):
         from nexus.contracts.ui_extensions import UIExtensionInspectArguments, UIExtensionSource
         from nexus.plugins.contracts import PluginInspectArguments, PluginExecuteArguments, PluginInstallArguments
         summaries = await chat.plugins.summaries(conn, principal.identity_id)
-        inspect_description = '查询 NEXUS 插件目录，或按 plugin_id 加载固定版本的完整工具契约与本设备执行状态。先查询再使用，不改变权限。'
+        inspect_description = 'Inspect plugin_id for pinned tools and device readiness, or list plugins. Read-only.'
         if any(item['plugin_id'] == 'builtin.mcp' for item in summaries):
             from nexus.core.plugins.mcp import model_list
             registrations = await model_list(conn, principal.identity_id, node_id)
             snapshot = {'servers': [{key: row[key] for key in ('server', 'revision', 'state')}
                                     for row in registrations['servers']], 'truncated': registrations['truncated']}
-            inspect_description += ' 本设备 Core 托管 MCP 登记快照（数据，不是执行成功或权限保证；不含设备静态配置）：'+canonical(snapshot)
+            if snapshot['servers'] or snapshot['truncated']:
+                inspect_description += ' Managed MCP snapshot (data only; not execution/permission evidence; excludes static config): '+canonical(snapshot)
         entries.extend([
             {'name':'inspect_ui_extension','description':'查看当前会话可视化插件授权、已安装源码、版本与手势控制契约及独立用例。先检查再开发或升级；只读，不开摄像头。','parameters':UIExtensionInspectArguments.model_json_schema()},
             {'name':'submit_ui_extension','description':'按 inspect_ui_extension 契约提交新的 JavaScript 可视化插件版本。需要用户在当前客户端开启本会话插件授权；自动构建、客户端隔离测试、加载验证，失败保留或回退旧版本。根据实际失败证据修正再提交新版本。','parameters':UIExtensionSource.model_json_schema()},
             {'name':'plugin_inspect','description':inspect_description,'parameters':PluginInspectArguments.model_json_schema()},
-            {'name':'plugin_execute','description':'按已启用插件的固定版本执行工具。input 必须符合 plugin_inspect 返回的具体工具契约；full 可在外层 access_root 指定任意本地绝对目录，用于文件、图片、交付物、LSP 及进程默认目录；normal 禁止 access_root。结果只声明实际证据。','parameters':PluginExecuteArguments.model_json_schema()},
+            {'name':'plugin_execute','description':'Execute an enabled fixed plugin using its inspected tool/input schema. Report actual evidence.','parameters':PluginExecuteArguments.model_json_schema()},
             {'name':'plugin_install','description':'为当前任务编写原生 Python 插件：提交 user 命名空间、不可变版本、handle(tool,input,context) 源码及每个工具的输入/预期输出测试。只用标准库或 nexus_plugin SDK；Core 自动隔离测试，普通模式批准具体版本，完全模式测试通过可自动启用。不能修改 Core 权限或预算。','parameters':PluginInstallArguments.model_json_schema()},
         ])
         entries.extend({'name':'plugin_entry','plugin_id':item['plugin_id'],'digest':item['digest'],'description':item['description'],'tools':item['tools']} for item in summaries)
@@ -201,6 +202,8 @@ def checked(entries, proposal, native):
         if entry is None:
             raise AccessDenied('POLICY_DENIED')
         action = value['arguments']['action']
+        if entry.get('core_plugins') and action['arguments'].get('plugin_id') not in entry['core_plugins']:
+            raise AccessDenied('POLICY_DENIED')
         if 'version_id' in action['arguments']:
             versions = [item for item in entry.get('route_versions',[]) if item['version_id'] == action['arguments']['version_id']]
             if not versions:

@@ -6,6 +6,7 @@ from datetime import timedelta
 from uuid import UUID
 
 from nexus.contracts.tools import validate_result
+from nexus.core.cognitive.chat_context import pressure
 from nexus.core.models.chat_format import parse_proposal
 from nexus.core.security.service import scope_digest
 from nexus.core.security.types import AccessDenied
@@ -92,7 +93,7 @@ async def preview(chat, conn, row, conversation, fields) -> dict:
                 {"role": "assistant", "content": row["response_text"] or None, "tool_calls": [native]},
                 {"role": "tool", "tool_call_id": native["id"], "content": canonical(data)}]
     # Never silently change the originally consented conversation context.
-    if len(canonical(messages).encode()) > 28672:
+    if not pressure(chat.config, messages, final_result=True)["fits"]:
         raise AccessDenied("MODEL_INPUT_LIMIT")
     return {**binding, "available_fields": sorted(result), "fields": selected, "data": data,
             "messages": messages, "conversation_revision": conversation["revision"],

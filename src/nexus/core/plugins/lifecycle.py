@@ -105,7 +105,8 @@ async def tick(service):
     chat=service.chat
     async with service.database.transaction(write=False) as conn:
         if (await one(conn,'SELECT paused FROM system_state WHERE singleton=1'))[0]: return
-        authorities=await conn.execute_fetchall("SELECT a.*,c.owner_id,c.archived,c.revision FROM plugin_authorities a JOIN conversations c USING(conversation_id) LEFT JOIN goal_plans p ON p.goal_id=a.authority_id WHERE a.state='active' OR (a.state='interrupted' AND p.resume_after_restart=1) ORDER BY coalesce(p.priority,0) DESC,a.rowid LIMIT 100")
+        authorities=await conn.execute_fetchall("SELECT a.*,c.owner_id,c.archived,c.revision FROM plugin_authorities a JOIN conversations c USING(conversation_id) LEFT JOIN goal_plans p ON p.goal_id=a.authority_id LEFT JOIN plugin_goals g ON g.goal_id=a.authority_id LEFT JOIN plugin_schedules s ON s.schedule_id=a.authority_id WHERE a.state='active' OR (a.state='interrupted' AND (coalesce(p.resume_after_restart,g.resume_after_restart,0)=1 OR s.resume_after_restart=1)) ORDER BY coalesce(p.priority,0) DESC,a.rowid LIMIT 100")
+    await report_results(service)
     for authority in authorities:
         try:
             if authority['state']=='interrupted':
@@ -116,20 +117,28 @@ async def tick(service):
                 await conn.execute("UPDATE plugin_authorities SET state='paused' WHERE authority_id=?",(authority['authority_id'],))
                 if authority['kind']=='goal': await conn.execute("UPDATE plugin_goals SET status='paused' WHERE goal_id=? AND status='active'",(authority['authority_id'],))
                 await conn.execute('UPDATE goal_plans SET last_reason=? WHERE goal_id=?',(getattr(exc,'code',str(exc))[:500],authority['authority_id']))
+                from nexus.core.plugins.notifications import publish
+                await publish(conn,authority['owner_id'],authority['conversation_id'],'blocked:'+authority['authority_id']+':'+authority['last_turn_id'],
+                              '任务已暂停，需要处理','后续执行已暂停，已有结果保留。请打开来源会话查看原因：'+getattr(exc,'code',str(exc))[:300])
 
 
 async def resume_after_restart(service,authority):
     from nexus.core.plugins.goals import settled
     async with service.chat.harness.operation,service.database.transaction() as conn:
         await allowed(conn,authority,service.chat,require_active=False)
+        if authority['archived']: raise AccessDenied('CONVERSATION_ARCHIVED')
         goal=await one(conn,'SELECT * FROM plugin_goals WHERE goal_id=?',(authority['authority_id'],))
-        if goal is None or goal['expires_at']<=timestamp(utc_now()) or service.chat.config.call_limits_enabled and goal['rounds']>=goal['max_rounds']:
-            raise AccessDenied('PLUGIN_GOAL_LIMIT')
+        schedule=await one(conn,'SELECT * FROM plugin_schedules WHERE schedule_id=?',(authority['authority_id'],))
+        if goal is not None:
+            if goal['status']!='paused' or not goal['run_until_stopped'] and (goal['expires_at']<=timestamp(utc_now()) or service.chat.config.call_limits_enabled and goal['rounds']>=goal['max_rounds']):
+                raise AccessDenied('PLUGIN_GOAL_LIMIT')
+        elif schedule is None or schedule['deleted'] or schedule['paused']:
+            raise AccessDenied('PLUGIN_AUTONOMY_PAUSED')
         await previous_round(conn,authority)
-        await settled(conn,goal['goal_id'])
+        if goal: await settled(conn,goal['goal_id'])
         await budget(conn,service.chat,authority['last_turn_id'],service.chat.config.model_reservation())
         await conn.execute("UPDATE plugin_authorities SET state='active' WHERE authority_id=? AND state='interrupted'",(authority['authority_id'],))
-        await conn.execute("UPDATE plugin_goals SET status='active' WHERE goal_id=? AND status='paused'",(goal['goal_id'],))
+        if goal: await conn.execute("UPDATE plugin_goals SET status='active' WHERE goal_id=? AND status='paused'",(goal['goal_id'],))
 
 
 async def advance(service,authority):
@@ -144,7 +153,7 @@ async def advance(service,authority):
         if authority['kind']=='goal':
             goal=await one(conn,'SELECT * FROM plugin_goals WHERE goal_id=?',(authority['authority_id'],))
             if goal['status']!='active': return
-            if (chat.config.call_limits_enabled and goal['rounds']>=goal['max_rounds']) or goal['expires_at']<=timestamp(now): raise AccessDenied('PLUGIN_GOAL_LIMIT')
+            if not goal['run_until_stopped'] and ((chat.config.call_limits_enabled and goal['rounds']>=goal['max_rounds']) or goal['expires_at']<=timestamp(now)): raise AccessDenied('PLUGIN_GOAL_LIMIT')
             waiting=await one(conn,'SELECT waiting_for_event,waiting_watch_id FROM goal_plans WHERE goal_id=?',(goal['goal_id'],))
             if waiting and waiting[0]:
                 watch=await one(conn,'SELECT * FROM autonomy_watches WHERE watch_id=?',(waiting['waiting_watch_id'],))
@@ -163,8 +172,11 @@ async def advance(service,authority):
         else:
             schedule=await one(conn,'SELECT * FROM plugin_schedules WHERE schedule_id=?',(authority['authority_id'],))
             if schedule['deleted']: return
-            await conn.execute("UPDATE plugin_schedule_events SET status='missed' WHERE schedule_id=? AND status='due' AND due_at<? AND NOT EXISTS(SELECT 1 FROM plugin_wakeups w WHERE w.wakeup_id=plugin_schedule_events.event_id)",
-                (schedule['schedule_id'],timestamp(now-timedelta(seconds=300))))
+            if schedule['run_until_stopped']:
+                await conn.execute("UPDATE plugin_schedule_events SET status='missed' WHERE schedule_id=? AND status='due' AND due_at<(SELECT max(due_at) FROM plugin_schedule_events WHERE schedule_id=? AND status='due') AND NOT EXISTS(SELECT 1 FROM plugin_wakeups w WHERE w.wakeup_id=plugin_schedule_events.event_id)",(schedule['schedule_id'],schedule['schedule_id']))
+            else:
+                await conn.execute("UPDATE plugin_schedule_events SET status='missed' WHERE schedule_id=? AND status='due' AND due_at<? AND NOT EXISTS(SELECT 1 FROM plugin_wakeups w WHERE w.wakeup_id=plugin_schedule_events.event_id)",
+                    (schedule['schedule_id'],timestamp(now-timedelta(seconds=300))))
             event=await one(conn,"SELECT * FROM plugin_schedule_events e WHERE e.schedule_id=? AND e.status='due' AND NOT EXISTS(SELECT 1 FROM plugin_wakeups w WHERE w.wakeup_id=e.event_id) ORDER BY e.rowid LIMIT 1",(schedule['schedule_id'],))
             if event is None: return
             wakeup=event['event_id'];text='执行已授权定时任务：'+schedule['prompt']
@@ -181,7 +193,7 @@ async def advance(service,authority):
     grant=await chat.work.grant(principal,authority['conversation_id'],WorkGrantCreate(request_id=uuid5(NAMESPACE_URL,wakeup+':grant'),node_id=UUID(authority['node_id']),consent=True,profile=authority['profile']))
     async with service.database.transaction() as conn:
         await allowed(conn,authority,chat)
-        if authority['kind']=='schedule' and event['due_at']<timestamp(utc_now()-timedelta(seconds=300)):
+        if authority['kind']=='schedule' and not schedule['run_until_stopped'] and event['due_at']<timestamp(utc_now()-timedelta(seconds=300)):
             await conn.execute("UPDATE plugin_schedule_events SET status='missed' WHERE event_id=? AND NOT EXISTS(SELECT 1 FROM plugin_wakeups WHERE wakeup_id=?)",(wakeup,wakeup))
             return
         conversation=await chat.conversation(conn,principal,authority['conversation_id'])
@@ -198,3 +210,28 @@ async def advance(service,authority):
         if authority['kind']=='goal': await conn.execute('UPDATE plugin_goals SET rounds=rounds+1 WHERE goal_id=?',(authority['authority_id'],))
         if goal_step_id:
             await conn.execute("UPDATE goal_steps SET status='running',turn_id=? WHERE goal_id=? AND step_id=? AND status IN ('pending','running')",(result['turn_id'],authority['authority_id'],goal_step_id))
+
+
+async def report_results(service):
+    from nexus.core.plugins.notifications import publish
+    async with service.database.transaction() as conn:
+        rows=await conn.execute_fetchall('''SELECT w.wakeup_id,t.*,s.title,s.targets_json FROM plugin_wakeups w
+            JOIN chat_turns t USING(turn_id) JOIN plugin_authorities a USING(authority_id)
+            LEFT JOIN plugin_schedules s ON s.schedule_id=a.authority_id
+            LEFT JOIN plugin_goals g ON g.goal_id=a.authority_id
+            WHERE t.status IN ('completed','failed','stopped') AND t.work_status=''
+              AND (a.kind='schedule' OR (g.status IN ('complete','blocked','paused') AND w.turn_id=a.last_turn_id))
+              AND NOT EXISTS(SELECT 1 FROM reminders r WHERE r.owner_id=t.owner_id AND r.source_key='result:'||w.wakeup_id)
+            ORDER BY w.created_at LIMIT 20''')
+        # A verified goal may finish in its initial turn without a wakeup.
+        rows += await conn.execute_fetchall('''SELECT a.authority_id||':root' AS wakeup_id,t.*,NULL AS title,NULL AS targets_json
+            FROM plugin_authorities a JOIN plugin_goals g ON g.goal_id=a.authority_id JOIN chat_turns t ON t.turn_id=a.root_turn_id
+            WHERE a.kind='goal' AND a.last_turn_id=a.root_turn_id AND g.status='complete'
+              AND t.status='completed' AND t.work_status=''
+              AND NOT EXISTS(SELECT 1 FROM reminders r WHERE r.owner_id=t.owner_id AND r.source_key='result:'||a.authority_id||':root') LIMIT 20''')
+        for row in rows:
+            targets=json.loads(row['targets_json']) if row['targets_json'] else []
+            available={item[0] for item in await conn.execute_fetchall('SELECT client_id FROM reminder_clients WHERE owner_id=? AND enabled=1',(row['owner_id'],))}
+            content=row['response_text'] or ('本轮已结束，请打开会话查看执行记录。' if not row['error_code'] else '本轮未完成，请打开会话查看已有结果和原因。')
+            await publish(conn,row['owner_id'],row['conversation_id'],'result:'+row['wakeup_id'],row['title'] or '长期任务进展',content,
+                          [target for target in targets if target in available] if targets else None)

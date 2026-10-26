@@ -131,6 +131,7 @@ async def presentation(conn: aiosqlite.Connection, turn: dict) -> dict:
         files=[ChatFile.model_validate_json(json.dumps(file)) for file in await turn_files(conn,turn)],
         phase=phase, label=label, process=process, process_truncated=truncated,
         live_text=live, final_text=final,
-        collapse_process=phase == "completed" and bool(final) and not failed and not turn.get("error_code")
-                        and bool(process or turn["work_steps"] or turn["action_status"] == "submitted"),
+        collapse_process=phase in {"completed", "stopped", "incomplete", "interrupted", "failed", "expired"}
+                        and not unsettled and bool(final)
+                        and bool(process or live or turn["work_steps"] or turn["action_status"] == "submitted"),
     ).model_dump(mode="json")

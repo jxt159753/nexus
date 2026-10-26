@@ -176,6 +176,8 @@ def create_app(config: CoreConfig) -> FastAPI:
     app.include_router(UIExtensionHTTP(chat.plugins.ui_extensions, guards).router)
     from nexus.core.plugins.autonomy_http import AutonomyHTTP
     app.include_router(AutonomyHTTP(chat.plugins, guards).router)
+    from nexus.core.plugins.notifications import NotificationHTTP
+    app.include_router(NotificationHTTP(chat.plugins, guards).router)
     from nexus.core.plugins.mcp_http import MCPHTTP
     app.include_router(MCPHTTP(chat.plugins, guards).router)
     app.include_router(voice_link.router)

@@ -891,8 +891,8 @@ function goalStatusLabel(status) {
 function scheduleStatus(row, now) {
   if (row.deleted) return "已删除";
   if (row.paused) return "已暂停";
-  if (new Date(row.expires_at) <= now) return "已过期";
-  if (row.runs >= row.max_runs) return "已达次数上限";
+  if (!row.run_until_stopped && new Date(row.expires_at) <= now) return "已过期";
+  if (!row.run_until_stopped && row.runs >= row.max_runs) return "已达次数上限";
   return "进行中";
 }
 
@@ -911,7 +911,7 @@ function scheduleDisplay(row) {
 function renderAutomationTab(body) {
   body.append(section("目标与提醒",
     el("p", "", "只展示 Core 中真实存在的计划、目标、提醒和触发事件；页面不自己计时，也不会自动创建替代目标。"),
-    el("p", "hint", "所有时间先显示 Asia/Shanghai，并保留服务器原始 UTC/规则时区。默认提醒只写会话事件、不调用模型；execute=true 的定时任务和目标由 Core 有界续跑并共用原费用上限。"),
+    el("p", "hint", "所有时间先显示 Asia/Shanghai，并保留服务器原始 UTC/规则时区。提醒写入跨设备收件箱、不调用模型；execute=true 才执行工作并提醒结果。持续任务可暂停或停止，重启后先核对已有执行。"),
   ));
   if (!state.conversation) {
     body.append(el("p", "", "请先打开一个会话，再查看该会话的目标与提醒。"));
@@ -971,7 +971,7 @@ function renderAutomationContent(body, conversationId) {
     const head = el("div", "plugin-row-head");
     head.append(el("strong", "", goal.objective), badge(goalStatusLabel(goal.status), goal.status === "active" ? "success" : goal.status === "complete" ? "muted" : "pending"));
     box.append(head);
-    box.append(el("p", "hint", `轮次 ${goal.rounds}/${goal.max_rounds} · 截止 ${formatShanghai(goal.expires_at)} · 原始 ${originalTime(goal.expires_at)}`));
+    box.append(el("p", "hint", goal.run_until_stopped ? `已运行 ${goal.rounds} 轮 · 无结束日期` : `轮次 ${goal.rounds}/${goal.max_rounds} · 截止 ${formatShanghai(goal.expires_at)}`));
     if (goal.completion_verified) box.append(el("p", "hint", "完成声明已记录；具体业务证据仍需查执行记录。"));
     const actions = el("div", "actions");
     if (goal.status !== "complete" && goal.status !== "blocked") {
@@ -1006,7 +1006,7 @@ function renderAutomationContent(body, conversationId) {
     box.append(head);
     box.append(el("p", "hint", `${schedule.prompt || ""}`));
     box.append(el("p", "hint", `下次：${formatShanghai(schedule.next_at)} · 原始 ${originalTime(schedule.next_at)}`));
-    box.append(el("p", "hint", `次数 ${schedule.runs}/${schedule.max_runs} · 截止 ${formatShanghai(schedule.expires_at)} · 原始 ${originalTime(schedule.expires_at)}`));
+    box.append(el("p", "hint", schedule.run_until_stopped ? `已触发 ${schedule.runs} 次 · 持续到手动停止` : `次数 ${schedule.runs}/${schedule.max_runs} · 截止 ${formatShanghai(schedule.expires_at)}`));
     box.append(el("p", "hint", scheduleDisplay(schedule)));
     const actions = el("div", "actions");
     const key = requestKey("schedule", conversationId, schedule.schedule_id, schedule.paused ? "resume" : "pause", schedule.runs);

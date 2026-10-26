@@ -92,17 +92,19 @@ RELEASES={item.manifest.plugin_id:item for item in [
         tool('exit_plan_mode','提交计划供用户决定是否继续执行。',{'plan':text(6000)},('plan',),'manage')]),
     release('present','交付文件','把真实工作区文件登记为认证可下载交付物。','node',[
         tool('present','呈现已存在文件，保留摘要、实际内容和大小限制。',{'files':array(obj({'path':text(240),'description':text(500)},('path',)),4)},('files',),'read')]),
-    release('goal','持续目标','Core 管理有期限、有执行预算的目标状态。','core',[
-        tool('create_goal','创建当前会话目标。',{'objective':text(2000),'max_rounds':integer(1,20),'duration_minutes':integer(1,1440)},('objective',),'manage'),
+    release('goal','持续目标','Core 持久管理长期目标、验收证据、暂停和恢复。','core',[
+        tool('create_goal','创建长期目标。默认无结束日期，可暂停/停止；达成验收条件后完成。反复周期工作使用schedule_create，禁止空转。',{'objective':text(2000),'max_rounds':integer(1,20),'duration_minutes':integer(1,1440),'run_until_stopped':boolean(),'resume_after_restart':boolean()},('objective',),'manage'),
         tool('get_goal','查询当前会话目标、固定验收条件、依赖计划、检查点摘要与真实任务证据。传step_id读取该步骤最近的完整检查点及未完成事项。',{'step_id':text(40)}),
         tool('goal_wait','等待owner已配置的文件/设备/任务观察变化；不变时不调用模型。',{'goal_id':text(36),'watch_id':text(36),'reason':text(500)},('goal_id','watch_id','reason'),'manage'),
         tool('goal_plan','保存或重规划目标的依赖步骤。首次定义验收，之后不得放宽条件/约束或改动已完成步骤；最多3次重规划。断言path使用JSON Pointer，arguments检查工具参数，assertions检查持久任务结果。',{'goal_id':text(36),'plan':GOAL_PLAN},('goal_id','plan'),'manage'),
         tool('goal_checkpoint','保存步骤进度、未完成事项和真实task_id；成功必须满足该步骤的全部验收断言。',{'goal_id':text(36),'checkpoint':obj({'expected_revision':integer(1,1000),'step_id':text(40),'status':choice('succeeded','failed','blocked'),'evidence':array(obj({'criterion_id':text(40),'task_id':text(36)},('criterion_id','task_id')),12),'note':text(1000),'remaining':array(text(1000),8)},('expected_revision','step_id','status'))},('goal_id','checkpoint'),'manage'),
         tool('update_goal','更新目标状态，不把模型完成声明当作任务证据。',{'goal_id':text(36),'status':choice('active','paused','complete','blocked')},('goal_id','status'),'manage')]),
-    release('schedule','提醒与周期任务','有截止、次数及原费用上限的 Core 调度。','core',[
-        tool('schedule_create','创建提醒；execute=true 才在原会话唤醒有界任务。支持延时、绝对时间、周期、日/周和 cron，连续执行共用原根请求费用上限。',{'title':text(100),'prompt':text(2000),'execute':boolean(),'after_seconds':integer(1,604800),'at':text(100),'every_seconds':integer(60,604800),'daily':text(8),'weekdays':array(integer(1,7),7),'cron':text(100),'time_zone':text(100),'max_runs':integer(1,100),'duration_days':integer(1,30)},('prompt',),'manage'),
+    release('schedule','提醒与周期任务','Core 持久调度一次性提醒和持续周期工作，按本人设备投递结果。','core',[
+        tool('schedule_create','创建通用定时工作或提醒。execute=true到点执行任务并通知结果；false只显示提醒。周期默认持续直到用户停止，不隐设次数/期限。targets省略则发给所有已启用提醒的客户端，可先查notification_targets。',{'title':text(100),'prompt':text(2000),'execute':boolean(),'after_seconds':integer(1,604800),'at':text(100),'every_seconds':integer(60,604800),'daily':text(8),'weekdays':array(integer(1,7),7),'cron':text(100),'time_zone':text(100),'max_runs':integer(1,100),'duration_days':integer(1,30),'run_until_stopped':boolean(),'resume_after_restart':boolean(),'targets':array(text(36),32)},('prompt',),'manage'),
         tool('schedule_list','列出本会话提醒。'),
-        tool('schedule_update','修改或暂停提醒。',{'schedule_id':text(36),'title':text(100),'prompt':text(2000),'paused':boolean(),'at':text(100),'every_seconds':integer(60,604800)},('schedule_id',),'manage'),
+        tool('schedule_update','修改或暂停提醒。',{'schedule_id':text(36),'title':text(100),'prompt':text(2000),'paused':boolean(),'at':text(100),'every_seconds':integer(60,604800),'run_until_stopped':boolean(),'resume_after_restart':boolean()},('schedule_id',),'manage'),
+        tool('notification_targets','列出已由用户启用提醒的客户端及其名称。'),
+        tool('notify','向本人指定客户端显示提醒；省略targets则发送到所有已启用客户端。仅保存提醒，不证明用户已读。',{'title':text(100),'body':text(2000),'targets':array(text(36),32)},('title','body'),'execute'),
         tool('schedule_delete','停止并删除提醒的后续派发，保留触发记录。',{'schedule_id':text(36)},('schedule_id',),'manage')]),
     release('workflow','工具编排','有界工具步骤和程序化调用；不创建子代理。','node',[
         tool('workflow','依次调用固定插件版本的有限步骤；任何失败停止。',{'steps':array(obj({'plugin_id':text(64),'tool':text(64),'input':obj(extra=True)},('plugin_id','tool','input')),8)},('steps',),'execute'),
@@ -117,7 +119,8 @@ for _tool in RELEASES['builtin.browser'].manifest.tools:
     _tool.input_schema['properties']['page_id']=text(128)
 
 RELEASES['builtin.mcp'].manifest.version='1.1.0'
-RELEASES['builtin.goal'].manifest.version='1.1.0'
+RELEASES['builtin.goal'].manifest.version='1.2.0'
+RELEASES['builtin.schedule'].manifest.version='1.1.0'
 
 
 def definition(plugin_id, name):

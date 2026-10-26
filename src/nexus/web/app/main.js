@@ -1,3 +1,4 @@
+import { openReminderCenter } from "./reminders.js";
 "use strict";
 
 import {
@@ -990,6 +991,7 @@ function bindEvents() {
     if ($("settings").hidden) openSettings(); else closeSettings();
   });
   $("settings-close").addEventListener("click", closeSettings);
+  $("notifications-button").addEventListener("click", () => openReminderCenter(openConversationSource));
   $("plugins-button").addEventListener("click", () => {
     if ($("plugin-view").hidden) openPlugins("permissions"); else closePluginPage();
   });

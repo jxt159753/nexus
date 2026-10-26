@@ -782,19 +782,14 @@ function presentationBadge(presentation) {
 }
 
 function presentationState(turn, presentation) {
+  const collapse = presentation.collapse_process && !!presentation.final_text;
   let value = presentationUi.get(turn.turn_id);
   if (!value) {
-    value = {
-      open: !(presentation.phase === "completed" && presentation.collapse_process && presentation.final_text !== null),
-      manual: false,
-      phase: presentation.phase,
-    };
+    value = { open: !collapse, collapse };
     presentationUi.set(turn.turn_id, value);
-  } else if (value.phase !== presentation.phase) {
-    if (presentation.phase === "completed" && !value.manual) {
-      value.open = !(presentation.collapse_process && presentation.final_text !== null);
-    }
-    value.phase = presentation.phase;
+  } else {
+    if (collapse && !value.collapse) value.open = false;
+    value.collapse = collapse;
   }
   if (presentation.phase === "awaiting_input") value.open = true;
   return value;
@@ -810,7 +805,7 @@ function renderPresentationBody(assistant, turn, presentation) {
     card.append(open); assistant.append(card);
   }
   const status = el("div", "status-line");
-  if (presentation.phase !== "completed") status.append(presentationBadge(presentation));
+  if (presentation.phase !== "completed" || turn.error_code || turn.work_steps?.some(step => ["failed", "stopped"].includes(step.status))) status.append(presentationBadge(presentation));
   if (turn.cost_status === "unknown") status.append(el("span", "hint", "部分费用待核对"));
   if (turn.context_truncated) status.append(el("span", "hint", "较早的内容未全部带入本次回复"));
   if (status.childElementCount) assistant.append(status);
@@ -834,17 +829,17 @@ function renderPresentationBody(assistant, turn, presentation) {
     const ui = presentationState(turn, presentation);
     const body = el("div", "process-body");
     body.hidden = !ui.open;
-    const toggle = button(ui.open ? "收起处理过程" : "查看处理过程", "process-toggle");
+    const closedLabel = `查看处理过程${steps.length ? ` · ${steps.length} 步` : ""}`;
+    const toggle = button(ui.open ? "收起处理过程" : closedLabel, "process-toggle");
     toggle.setAttribute("aria-expanded", String(ui.open));
     toggle.hidden = presentation.phase === "awaiting_input";
     toggle.disabled = presentation.phase === "awaiting_input";
     const head = el("div", "process-head");
-    head.append(el("span", "process-title", "处理过程"), toggle);
+    head.append(toggle);
     toggle.addEventListener("click", () => {
       ui.open = !ui.open;
-      ui.manual = true;
       body.hidden = !ui.open;
-      toggle.textContent = ui.open ? "收起处理过程" : "查看处理过程";
+      toggle.textContent = ui.open ? "收起处理过程" : closedLabel;
       toggle.setAttribute("aria-expanded", String(ui.open));
     });
 

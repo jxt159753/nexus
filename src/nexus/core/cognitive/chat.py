@@ -13,7 +13,7 @@ from nexus.contracts.extensions import digest_value
 from nexus.core.cognitive import chat_skills, chat_journal, chat_compaction, chat_presentation
 from nexus.core.cognitive.chat_work import WorkService
 from nexus.core.cognitive.attachments import AttachmentService
-from nexus.core.cognitive.chat_context import request_size, history_message, pressure, prune_tools
+from nexus.core.cognitive.chat_context import history_message, pressure, prune_tools
 from nexus.core.memory import context as memory_context
 from nexus.core.memory import automatic as auto_memory
 from nexus.core.memory.service import project_owned
@@ -269,7 +269,10 @@ class ChatService:
             total = await one(conn, "SELECT count(*),coalesce(sum(length(CAST(context_json AS BLOB))+length(CAST(response_text AS BLOB))+length(CAST(request_json AS BLOB))+coalesce(length(CAST(result_preview_json AS BLOB)),0)+coalesce(length(CAST(initial_response_text AS BLOB)),0)+coalesce(length(CAST(auto_result_json AS BLOB)),0)+length(CAST(skill_catalog_json AS BLOB))+coalesce(length(CAST(skill_plan_json AS BLOB)),0)),0) FROM chat_turns")
             count = (await one(conn, "SELECT count(*) FROM chat_turns WHERE conversation_id=?", (str(conversation_id),)))[0]
             hot_count=(await one(conn,'SELECT count(*) FROM chat_turns t JOIN conversations c USING(conversation_id) WHERE c.cold_archived=0'))[0]
-            if recent[0] >= 10 or hot_count >= 10000 or total[1] + 2*CHAT_MAX_TEXT_BYTES >= 268000000 or count >= 200:
+            # Only a prepared Core continuation can outlive the interactive
+            # conversation count. It still consumes real storage and rate limits.
+            continuation = await one(conn, "SELECT 1 FROM plugin_wakeups w JOIN plugin_authorities a USING(authority_id) WHERE w.status='prepared' AND a.state='active' AND a.conversation_id=? AND json_extract(w.request_json,'$.request_id')=?", (str(conversation_id),str(value.request_id)))
+            if recent[0] >= 10 or total[1] + self.config.chat_input_bytes + 2*CHAT_MAX_TEXT_BYTES >= 268000000 or not continuation and (hot_count >= 10000 or count >= 200):
                 raise Conflict("BUSY")
             messages = [{"role": "user", "content": value.text}]
             attachments = None
@@ -324,13 +327,13 @@ class ChatService:
                         history_summary.append({"turn_id":row["turn_id"],"user_excerpt":row["text"][:160],"assistant_excerpt":row["response_text"][:240]})
                         continue
                     candidate = [{"role": "user", "content": row["text"]}, {"role": "assistant", "content": row["response_text"]}, *messages]
-                    if len(canonical(candidate).encode()) > 24576 or request_size(self.config,candidate,**options) > self.config.chat_input_bytes:
+                    if not pressure(self.config,candidate,**options)["fits"]:
                         break
                     messages, selected = candidate, selected+1
             if history_summary:
                 while history_summary:
                     candidate=[history_message(history_summary),*messages]
-                    if request_size(self.config,candidate,**options)<=self.config.chat_input_bytes:
+                    if pressure(self.config,candidate,**options)["fits"]:
                         messages=candidate
                         break
                     history_summary.pop()
@@ -742,7 +745,7 @@ class ChatService:
                 error=code
             if failure.usage is not None:
                 incoming,outgoing=failure.usage
-                if type(incoming) is int and type(outgoing) is int and 0<incoming<=32768 and 0<=outgoing<=self.config.chat_max_output_tokens:
+                if type(incoming) is int and type(outgoing) is int and 0<incoming<=self.config.chat_input_limit() and 0<=outgoing<=self.config.chat_max_output_tokens and incoming+outgoing<=self.config.chat_context_window_tokens:
                     input_tokens,output_tokens,reported_model=incoming,outgoing,failure.model or MODEL
                     cost=(incoming*self.config.input_price+outgoing*self.config.output_price+999999)//1000000
         if reply is not None:
