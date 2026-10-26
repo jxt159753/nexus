@@ -148,3 +148,5 @@ DSH GitHub 架构/Harness 对照、上下文投影、工具清单与按需能力
 - [DSH 上下文压缩验证](CONTEXT-COMPACTION-VERIFICATION.md)：固定版本、测试、上线与限制。
 
 - [Windows 常驻语音唤醒验证](assets/voice-resident-evidence.json)
+
+- [语音内容选择与中间说明减量](assets/voice-output-evidence.json)

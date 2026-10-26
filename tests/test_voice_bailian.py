@@ -1,5 +1,6 @@
 import asyncio
 import json
+import pytest
 
 from websockets.asyncio.server import serve
 
@@ -94,3 +95,42 @@ def test_bailian_asr_protocol(monkeypatch):
     partial, final = asyncio.run(scenario())
     assert partial == ["你好"]
     assert final == ["你好，NEXUS。"]
+
+
+@pytest.mark.parametrize("pending_text", [True, False])
+def test_tts_silence_waits_for_work_but_still_times_out_after_finish(monkeypatch, pending_text):
+    async def scenario():
+        sent = []
+        original_wait = asyncio.wait_for
+        async def short_audio_wait(awaitable, timeout):
+            return await original_wait(awaitable, .02 if timeout == 45 else timeout)
+        monkeypatch.setattr(bailian.asyncio, "wait_for", short_audio_wait)
+        async def handler(ws):
+            await ws.recv()
+            await ws.send(json.dumps({"header":{"event":"task-started"}}))
+            sent.append(json.loads(await ws.recv())["payload"]["input"]["text"])
+            await ws.send(b"\x00\x00")
+            if pending_text:
+                sent.append(json.loads(await ws.recv())["payload"]["input"]["text"])
+            assert json.loads(await ws.recv())["header"]["action"] == "finish-task"
+            if pending_text:
+                await ws.send(b"\x01\x00")
+                await ws.send(json.dumps({"header":{"event":"task-finished"}}))
+            await ws.wait_closed()
+        async def texts():
+            yield "已找到问题。"
+            if pending_text:
+                await asyncio.sleep(.09)  # Several receiver idle periods, no new speech.
+                yield "修复完成。"
+        async with serve(handler, "127.0.0.1", 0) as server:
+            port = server.sockets[0].getsockname()[1]
+            monkeypatch.setattr(bailian, "_endpoint", lambda _: f"ws://127.0.0.1:{port}/")
+            provider = bailian.BailianTtsProvider(config(), api_key="test")
+            if pending_text:
+                chunks = [chunk async for chunk in provider.stream(texts(), "voice-test")]
+                assert chunks == [b"\x00\x00", b"\x01\x00"]
+                assert sent == ["已找到问题。", "修复完成。"]
+            else:
+                with pytest.raises(bailian.ProviderUnavailable, match="TTS stream failed"):
+                    _ = [chunk async for chunk in provider.stream(texts(), "voice-test")]
+    asyncio.run(scenario())

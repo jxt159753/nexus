@@ -29,6 +29,7 @@ class ModelReply:
     rejected_calls: tuple[dict, ...] = ()
     validation_errors: tuple[dict, ...] = ()
     memory_candidates: tuple[dict, ...] = ()
+    public_progress: bool = False
 
 
 class DecisionModel(Protocol):

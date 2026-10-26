@@ -186,6 +186,7 @@ class ChatProgressText(StrictContract):
     id: StrictStr
     text: StrictStr = Field(max_length=1200)
     truncated: StrictBool = False
+    substantive: StrictBool = False
 
 
 from nexus.contracts.file_transfer import ChatFile

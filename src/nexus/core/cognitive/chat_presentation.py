@@ -93,7 +93,7 @@ async def presentation(conn: aiosqlite.Connection, turn: dict) -> dict:
         "responding", "stopping", "stopped", "incomplete", "interrupted", "failed", "expired"
     } else ""
     exchanges = await conn.execute_fetchall("""
-        SELECT e.call_id,e.response_json,e.partial_text FROM chat_exchanges e WHERE e.turn_id=?
+        SELECT e.call_id,e.response_json,e.partial_text,e.outcome FROM chat_exchanges e WHERE e.turn_id=?
         AND e.finished_at IS NOT NULL AND NOT EXISTS (
             SELECT 1 FROM chat_compactions c WHERE c.call_id=e.call_id
         ) AND NOT EXISTS (SELECT 1 FROM model_calls m WHERE m.call_id=e.call_id AND m.web_step_id IS NOT NULL)
@@ -105,7 +105,9 @@ async def presentation(conn: aiosqlite.Connection, turn: dict) -> dict:
         text = reply["content"] if reply else exchange["partial_text"]
         if not text or index == 0 and text in {final, live}:
             continue
-        process.append(ChatProgressText(id=exchange["call_id"], text=text[:1200], truncated=len(text) > 1200))
+        process.append(ChatProgressText(id=exchange["call_id"], text=text[:1200], truncated=len(text) > 1200,
+            substantive=bool(reply and reply.get("public_progress") and reply.get("complete")
+                             and reply.get("work_calls") and exchange["outcome"] == "completed")))
     if not exchanges and turn["initial_response_text"]:
         text = turn["initial_response_text"]
         process.append(ChatProgressText(id="initial", text=text[:1200], truncated=len(text) > 1200))

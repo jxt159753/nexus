@@ -52,7 +52,7 @@ def skill_tool(catalog: list[dict]) -> dict:
 
 class ChatText:
     """Stream prose while keeping bounded reserved metadata out of public output."""
-    def __init__(self, generate_title: bool, receive: Callable[[str], Awaitable[None]], *, auto_memory=False):
+    def __init__(self, generate_title: bool, receive: Callable[[str], Awaitable[None]], *, auto_memory=False, allow_progress=False):
         self.pending = self.title_requested = generate_title
         self.auto_memory = auto_memory
         self.metadata_buffer = ""
@@ -63,6 +63,9 @@ class ChatText:
         self.title = None
         self.parts = []
         self.receive = receive
+        self.progress_pending = allow_progress
+        self.progress_buffer = ""
+        self.public_progress = False
 
     @staticmethod
     def _object_end(text):
@@ -172,6 +175,16 @@ class ChatText:
                 pass
             self.pending=False
             self.buffer=""
+        if self.progress_pending:
+            self.progress_buffer += value
+            probe = self.progress_buffer.lstrip()
+            marker = "NEXUS_PROGRESS:"
+            if marker.startswith(probe) and not final:
+                return
+            self.public_progress = probe.startswith(marker)
+            value = probe[len(marker):].lstrip() if self.public_progress else self.progress_buffer
+            self.progress_pending = False
+            self.progress_buffer = ""
         if value:
             self.parts.append(value)
             await self.receive(value)

@@ -99,10 +99,10 @@ When no function is supplied, give a final answer using available evidence; exha
 Never claim long-term memory was saved. Capability availability comes from the current catalog and execution evidence."""
         if allow_tools and work_catalog and not final_result and not compact:
             system += WORK_EXECUTION_GUIDANCE
-        system += """\nFor multi-step work, keep public updates brief: important findings, a material change of approach or a meaningful long wait.
-Continue routine preparation and recovery without narrating every call or interrupting for approval. Do not output private chain-of-thought.
-When finishing tool work, answer naturally with actual results, relevant validation and remaining limitations.
-Distinguish successful, failed, not-started and unknown operations using the supplied evidence.
+        system += """\nTool-call prose is empty by default; omit plans, routine status and tool counts.
+Only a new verified finding or user-visible milestone in long work merits one short sentence prefixed NEXUS_PROGRESS:.
+Never mark a plan, question or final answer as progress. Keep tool arguments/evidence complete; no private reasoning.
+Final answers give actual results, relevant validation, needed questions and important failures; distinguish unknown effects.
 Do not call a function just to end the reply; Core manages lifecycle."""
         if config.call_limits_enabled:
             system += f"\nRemaining native actions in this request: {work_limit if allow_tools else 0}. Every inspection also consumes an action."
@@ -251,7 +251,8 @@ class DeepSeekChatProvider:
     async def invoke(self, messages: list[dict], on_delta: Callable[[str], Awaitable[None]], *, generate_title: bool = False, allow_tools: bool = False, final_result: bool = False, skill_catalog: list[dict] | None = None, work_catalog: list[dict] | None = None, work_limit: int = 4, compact: bool = False, auto_memory: bool = False, output_budget_microunits: int | None = None) -> ModelReply:
         body = request_body(self.config, messages, generate_title=generate_title, allow_tools=allow_tools, final_result=final_result, skill_catalog=skill_catalog, work_catalog=work_catalog, work_limit=work_limit, compact=compact, auto_memory=auto_memory, output_budget_microunits=output_budget_microunits)
         output_limit = self.config.chat_output_limit(output_budget_microunits, compact=compact)
-        text, usage, finish, reported_model = ChatText(generate_title,on_delta,auto_memory=auto_memory), None, None, None
+        text, usage, finish, reported_model = ChatText(generate_title,on_delta,auto_memory=auto_memory,
+            allow_progress=work_catalog is not None and allow_tools), None, None, None
         calls_by_index: dict[int,dict] = {}
         output_bytes = 0
         validated_usage = None
@@ -423,7 +424,8 @@ class DeepSeekChatProvider:
                     # One invalid argument rejects the whole batch before any effect.
                     return ModelReply("".join(text.parts), incoming, outgoing, True, reported_model, finish, text.title,
                                       rejected_calls=tuple(native_calls), validation_errors=tuple(validation_errors))
-            return ModelReply("".join(text.parts), incoming, outgoing, finish in {"stop","tool_calls"}, reported_model, finish, text.title, proposal, native,tuple(work_calls), memory_candidates=text.memories)
+            return ModelReply("".join(text.parts), incoming, outgoing, finish in {"stop","tool_calls"}, reported_model, finish, text.title, proposal, native,tuple(work_calls), memory_candidates=text.memories,
+                              public_progress=text.public_progress and bool(work_calls))
         except ProviderFailure as exc:
             if validated_usage:
                 exc.usage,exc.model=validated_usage,reported_model

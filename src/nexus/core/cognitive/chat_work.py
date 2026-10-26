@@ -252,7 +252,8 @@ class WorkService:
         for index,(proposal,native) in enumerate(checked,1):
             proposal, routed = await node_routing.bind_step(conn,row,proposal,now)
             await conn.execute("INSERT INTO chat_work_steps(step_id,turn_id,step_index,proposal_json,native_json,status,created_at,routed_grant_id) VALUES(?,?,?,?,?,'pending',?,?)",(str(uuid4()),row["turn_id"],count+index,canonical(proposal),canonical(native),timestamp(now),routed))
-        messages.append({"role":"assistant","content":reply.content or None,"tool_calls":[native for _,native in checked]})
+        # Routine commentary stays in the journal, not every subsequent model input.
+        messages.append({"role":"assistant","content":reply.content if reply.public_progress else None,"tool_calls":[native for _,native in checked]})
         await conn.execute("UPDATE chat_turns SET work_status='waiting',work_messages_json=? WHERE turn_id=?",(canonical(messages),row["turn_id"]))
 
     async def rejected(self,conn,row,reply,now):
@@ -266,7 +267,7 @@ class WorkService:
         old_ids={call["id"] for message in messages for call in message.get("tool_calls",[])}
         if len(set(identifiers)) != len(identifiers) or old_ids.intersection(identifiers):
             raise AccessDenied("MODEL_RESPONSE_INVALID")
-        messages.append({"role":"assistant","content":reply.content or None,"tool_calls":list(reply.rejected_calls)})
+        messages.append({"role":"assistant","content":None,"tool_calls":list(reply.rejected_calls)})
         for index,native in enumerate(reply.rejected_calls):
             evidence={"status":"failed","phase":"arguments","execution_outcome":"not_started","batch_executed":False,
                       "error_code":"INVALID_TOOL_ARGUMENTS","errors":[item for item in reply.validation_errors if item["index"]==index],
