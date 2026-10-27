@@ -1,0 +1,72 @@
+{
+  "date": "2026-10-27",
+  "repository": "https://github.com/jxt159753/nexus",
+  "visibility": "private",
+  "pull_request": "https://github.com/jxt159753/nexus/pull/4",
+  "draft": true,
+  "history": {
+    "commits_verified": 50,
+    "unique_checkpoint_trees_verified": 24,
+    "changed_text_paths": 9,
+    "removed_patch_files": 2,
+    "topology_and_dates_preserved": true,
+    "after_blobs": 1818,
+    "after_findings": 0,
+    "private_email_replaced_with_github_noreply": true
+  },
+  "candidate": {
+    "source_commit": "eaa263c889366e37881485e3ee3692778e1d9c67",
+    "files": 947,
+    "fixed_core_resources": 317,
+    "windows_version": "0.1.32",
+    "android_version": "0.1.16",
+    "local_ci_tests_passed": 47,
+    "real_model_calls": 0,
+    "git_hygiene_findings": 0,
+    "gitleaks_findings": 0,
+    "gitleaks_false_positives_verified": 5,
+    "scanned_reachable_objects": 2083
+  },
+  "push": {
+    "atomic": true,
+    "leases_checked": true,
+    "existing_branches_updated": 2,
+    "new_branches": 1,
+    "remote_sha_verified": true
+  },
+  "fresh_clone": {
+    "commits": 48,
+    "blobs": 1741,
+    "findings": 0,
+    "gitleaks_findings": 0
+  },
+  "github_ci": [
+    {
+      "id": 40459584465,
+      "head_sha": "eaa263c889366e37881485e3ee3692778e1d9c67",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "pull_request",
+      "url": "https://github.com/jxt159753/nexus/actions/runs/40459584465"
+    },
+    {
+      "id": 40459537104,
+      "head_sha": "eaa263c889366e37881485e3ee3692778e1d9c67",
+      "status": "completed",
+      "conclusion": "success",
+      "event": "push",
+      "url": "https://github.com/jxt159753/nexus/actions/runs/40459537104"
+    }
+  ],
+  "remaining": {
+    "readonly_merged_pr_refs": [
+      "refs/pull/1/head",
+      "refs/pull/2/head"
+    ],
+    "old_commits_still_accessible": 4,
+    "support_request_prepared": true,
+    "support_request_sent": false,
+    "original_workspace_git_sync": "awaiting explicit confirmation",
+    "private_backups_retained": true
+  }
+}
