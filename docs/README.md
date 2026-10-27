@@ -160,3 +160,5 @@ DSH GitHub 架构/Harness 对照、上下文投影、工具清单与按需能力
 - [DSH 上下文压缩验证](CONTEXT-COMPACTION-VERIFICATION.md)：固定版本、测试、上线与限制。
 
 - [full 模式宿主目录访问](decisions/0046-full-mode-host-roots.md)：full 的文件/插件访问根、normal 原边界及旧回执兼容；状态见路线图 P91。
+
+- [语音执行状态与提前停止修复证据](assets/voice-execution-state-evidence.json)

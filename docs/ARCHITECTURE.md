@@ -140,6 +140,8 @@ flowchart LR
 - 2026-10-18 用户明确批准自有 Ubuntu 云端单活 Core、无域名 IP 直连 HTTPS/WSS、正式证书和自动续期。实际迁移保留原身份及权威历史，Windows 仍只运行 Node；不引入第二 Core 或新工具。网络不再依赖 Tailscale，CA 只负责签发和续期；决策见 [ADR 0008](decisions/0008-self-hosted-core-ip-tls.md)，结果见 ROADMAP 和部署说明。
 - 当前不依赖 Redis、Celery、Kafka、容器编排、向量数据库或独立调度微服务。新增基础设施须证明实际需求、维护成本与迁移方案，按重要依赖或架构变更评估；早期 MVP 排除清单不构成永久禁令。
 
+Core启动在创建事件循环前调用 `configure_transport()`。非Windows的CPython3.12使用进程内传输兼容修正：缓冲输出关闭时保留写回调，待 `connection_lost` 完成后释放，并让 `writelines` 复用带连接状态检查的 `write` 路径。修正对应上游[gh-115514](https://github.com/python/cpython/issues/115514)与[gh-136234](https://github.com/python/cpython/issues/136234)，按受影响实现特征避免重复包装；不修改系统Python、不屏蔽事件循环异常。更换解释器版本时重新验证真实套接字背压、重入写入和关闭流程；本次复现及上线证据见[ROADMAP P111](ROADMAP.md#p111-server-cpu)。
+
 FastAPI 支持 WebSocket 依赖认证；其内存连接列表示例也明确仅适用于存活的单进程。NEXUS 因此将任务事实放入数据库，内存只保留可重建的连接与唤醒信号。[FastAPI 官方文档](https://fastapi.tiangolo.com/advanced/websockets/)
 
 ## 4. 模块职责与接口
@@ -977,6 +979,8 @@ Provider 与聊天准入共用请求组装代码，按实际发送的 system、�
 接口与 DSH 适配要求见[聊天工作](chat-work.md#在会话中创建插件或-skill)，技术验证/部署状态见 [P77](ROADMAP.md#p77-chat-creation)。该小项不实施下面的持续自迭代、源码改写、自动发布/回滚或 Skill 策略批准。
 
 ### 19.8 Windows 语音入口
+
+工具在 `dispatching / running / verifying` 阶段的 `execution_outcome=unknown` 表示尚待回执与校验，展示为执行中，语音继续等待。实际恢复对账或执行结束后仍未知才展示未知结果，并沿用停止／不重放规则；不能仅凭暂未得到结果就结束语音并取消原工作。修复与验证见 [P112](ROADMAP.md#p112-voice-execution-state)。
 
 Core 区分工具过程文本与可播报答复：工具调用期间不朗读未完成生成文本；完成的结果、确认问题和重要错误可播报。长任务仅采用原模型交换明确标记的实质进展，并检查已完成工具证据及提示间隔，不增加模型调用。普通工具前言不进入后续工作上下文，原始日志和工具证据保留。此策略共用于接入 Core 的语音客户端，当前状态见 [P103](ROADMAP.md#p103-voice-output)。
 
