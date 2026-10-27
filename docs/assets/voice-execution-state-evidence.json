@@ -1,0 +1,55 @@
+{
+  "task": "P112",
+  "date": "2026-10-27",
+  "status": "deployed; technical checks passed; human retest pending",
+  "release": "voice-result-fix-20261027-9e3b8193",
+  "baseline": "server-cpu-20261027-6394fd36",
+  "wheel_sha256": "9e3b81939ef525c193bc9aa0a5eb51f3236b37439df51c6432dcd7593c6bb321",
+  "changed_runtime_files": [
+    "nexus/core/cognitive/chat_presentation.py"
+  ],
+  "runtime_resources_verified": 317,
+  "cause": "Normal dispatching/running/verifying tasks temporarily carry unknown outcome. Presentation misclassified them as exceptional unknown, causing voice recovery_required and cancellation of the original chat.",
+  "fix": "Keep normal in-flight task phases working; retain genuine recovery and terminal unknown handling.",
+  "validation": {
+    "baseline_regression": {
+      "failed_as_expected": 2,
+      "passed": 1
+    },
+    "windows": {
+      "passed": 86,
+      "seconds": 47.13
+    },
+    "linux": {
+      "passed": 85,
+      "platform_skipped": 1,
+      "seconds": 71.95
+    },
+    "real_task_receipt_and_verification": true,
+    "synthetic_asr_tts": true,
+    "final_reply_then_listening": true,
+    "single_attempt": true,
+    "schema": 44,
+    "history_tables_preserved": 54,
+    "historical_records_preserved": true,
+    "config_preserved": true,
+    "single_active_core": true,
+    "paused": false,
+    "model_calls_before": 773,
+    "model_calls_after": 773,
+    "new_model_calls": 0,
+    "old_work_replayed": false
+  },
+  "server_cleanup": {
+    "sha256": "d0cfa5f8759941e758fc19e0d9cda426ca592192e86a4f12ecac00b62dd8913e",
+    "bytes": 33456717,
+    "archived_files": 1412,
+    "temporary_server_data_removed": true,
+    "active_release_and_previous_release_and_backup_preserved": true
+  },
+  "publication_branch": "codex/voice-execution-state",
+  "not_tested": [
+    "Post-fix human microphone session or paid voice provider call."
+  ],
+  "client_update_required": false
+}

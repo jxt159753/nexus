@@ -46,7 +46,10 @@ async def execution_state(conn: aiosqlite.Connection, turn: dict) -> tuple[bool,
                  or any(skill["status"] in {"running", "cancelling"} for skill in skills)
                  or any(tool["status"] in {"dispatching", "unknown"}
                         or tool["execution_status"] in {"prepared", "sent", "unknown"} for tool in tools))
-    unknown = (any(task["execution_outcome"] == "unknown" for task in tasks)
+    # Dispatch keeps the outcome unknown until verification commits. Those
+    # active phases are ordinary work; recovery or ended unknown effects are not.
+    unknown = (any(task["execution_outcome"] == "unknown"
+                   and task["status"] not in {"dispatching", "running", "verifying"} for task in tasks)
                or any(skill["status"] == "unknown" for skill in skills)
                or any(tool["status"] == "unknown" for tool in tools)
                or any((step["result"] or {}).get("execution_outcome") == "unknown" for step in turn["work_steps"]))

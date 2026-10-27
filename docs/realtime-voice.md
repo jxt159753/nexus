@@ -1,6 +1,6 @@
 # NEXUS Windows 实时语音
 
-本文件说明当前实现和使用方法。批准、部署、验证及未完成项只在 ROADMAP 的 [P63](ROADMAP.md#p63实时语音扩展选型确认待配置实施)、[P98](ROADMAP.md#p98-resident-voice) 和 [P103](ROADMAP.md#p103-voice-output) 更新；开发自检与用户验收分别记录。早期离线 ASR/TTS、MP3 和自动重连设想已由 [ADR 0030](decisions/0030-bailian-voice-core-media.md) 和 [ADR 0038](decisions/0038-windows-voice-loop.md) 替代，不能据旧提案配置当前程序。
+本文件说明当前实现和使用方法。批准、部署、验证及未完成项只在 ROADMAP 的 [P63](ROADMAP.md#p63实时语音扩展选型确认待配置实施)、[P98](ROADMAP.md#p98-resident-voice)、[P103](ROADMAP.md#p103-voice-output) 和 [P112](ROADMAP.md#p112-voice-execution-state) 更新；开发自检与用户验收分别记录。早期离线 ASR/TTS、MP3 和自动重连设想已由 [ADR 0030](decisions/0030-bailian-voice-core-media.md) 和 [ADR 0038](decisions/0038-windows-voice-loop.md) 替代，不能据旧提案配置当前程序。
 
 ## 1. 使用
 
@@ -57,7 +57,7 @@ Windows App 原生桥从 Windows 凭据管理器读取既有 Node 身份，启�
 
 ASR按音频秒、TTS按文本字符预留，分别记录估计及unknown，不伪装为供应商精确账单。默认每日1800秒ASR、20000字符TTS；LLM仍进入原model_calls。关闭金额限额不取消次数、音频配额、权限、超时及审计。失败和未知请求不自动重复外发。
 
-Core启动将旧活动会话标记interrupted、未决音频预留保留unknown。全局暂停/取消、owner会话失效、Node撤销、期限耗尽均停止语音。当前聊天自然语言错误说明沿用文字链路，未知执行解释后结束语音，先对账再执行。
+Core启动将旧活动会话标记interrupted、未决音频预留保留unknown。全局暂停/取消、owner会话失效、Node撤销、期限耗尽均停止语音。当前聊天自然语言错误说明沿用文字链路，实际恢复对账或结束后仍未知的执行解释后结束语音，先对账再执行。工具正常派发、执行和校验期间暂记的unknown只表示等待结果，继续等待真实回执，不触发该结束流程。
 
 ## 6. Windows 构建和配置
 
