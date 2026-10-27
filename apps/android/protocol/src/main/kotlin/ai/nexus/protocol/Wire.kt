@@ -77,6 +77,7 @@ fun identity(command: Execute, nodeId: String): String {
     fields["node_id"] = str(UUID.fromString(nodeId).toString())
     fields["expires_at"] = str(utc(Instant.parse(command.expires_at)))
     if (command.tool == NOTIFICATIONS && "limit" !in command.arguments) fields["arguments"] = obj("limit" to JsonPrimitive(10))
+    if (command.tool in PHONE_TOOLS) fields["arguments"] = phoneArguments(command.tool, command.arguments)
     return canonical(JsonObject(fields))
 }
 
@@ -122,6 +123,7 @@ fun parseExecute(payload: JsonObject, nodeId: String, sessionId: String): Execut
             require(parts[2].isNotEmpty() && parts[2] !in setOf(".","..") && !parts[2].endsWith('.') && !parts[2].endsWith(' '))
             require(parts[2].none{it.code<32 || it.code==127 || it in "\\:*?<>|\""})
         }
+        in PHONE_TOOLS -> phoneArguments(command.tool, command.arguments)
         else -> error("Unsupported Android tool")
     }
     require(sha256(identity(command, nodeId)) == command.command_digest)

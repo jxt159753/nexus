@@ -1,12 +1,23 @@
 "use strict";
 const chatState = {conversation:null, conversations:new Map(), turns:new Map(), previews:new Map(), actionConsents:new Set(), confirming:null, active:null, retry:null, createRequest:null, before:null, listBefore:null, latest:true, loading:false, enabled:false, epoch:0};
 const chatPresentationState = new Map();
+const chatDrafts = new Map(), chatNavigations = new Set();
+let chatSentRequest = null;
+async function chatOpenSource(id) {
+  if (chatAttachmentSelection().length) throw new Error("请先发送或移除未发送附件，再打开来源会话。文字草稿会保留。");
+  const value = await api(`/api/v1/chat/conversations/${id}/turns`);
+  chatState.conversations.set(id, value.conversation);
+  if (![...$("chat-conversation").options].some(option => option.value === id)) $("chat-conversation").append(new Option(value.conversation.title,id));
+  $("chat-conversation").value = id;
+  await chatSelect(id);
+}
 const chatLabels = {queued:"等待回复",generating:"正在回复",completed:"已完成",incomplete:"达到输出上限，回复未完整结束",stopping:"正在停止",stopped:"已停止",interrupted:"服务中断，未自动重发",failed:"回复失败",expired:"请求已过期"};
 function chatNodes(nodes) {
   chatWorkState.nodes=new Map(nodes.map(node=>[node.node_id,node]));
 
 }
 function chatReset() {
+  chatDrafts.clear(); chatNavigations.clear(); chatSentRequest = null;
   chatWorkReset();
   chatMemoryReset(); chatReferenceReset();
   chatState.epoch++; chatState.conversation=null; chatState.conversations.clear(); chatState.turns.clear(); chatState.previews.clear(); chatState.actionConsents.clear(); chatState.confirming=null; chatState.active=null; chatState.retry=null; chatState.createRequest=null; chatState.before=null; chatState.listBefore=null; chatState.latest=true;
@@ -35,9 +46,10 @@ async function chatList(older=false) {
 }
 async function chatSelect(id) {
   if (chatState.conversation?.conversation_id!==id) {
+    chatDrafts.set(chatState.conversation?.conversation_id || "", $("chat-text").value);
     chatWorkReset();
     chatMemoryReset(); chatReferenceReset();
-    chatState.epoch++; chatState.turns.clear(); chatState.previews.clear(); chatState.actionConsents.clear(); chatState.retry=null; chatState.before=null; chatState.latest=true; $("chat-context").checked=true; $("chat-text").value="";
+    chatState.epoch++; chatState.turns.clear(); chatState.previews.clear(); chatState.actionConsents.clear(); chatState.retry=null; chatState.before=null; chatState.latest=true; $("chat-context").checked=true; $("chat-text").value=chatDrafts.get(id) || "";
     chatSkillsReset();
   }
   chatState.conversation=chatState.conversations.get(id);
@@ -82,6 +94,12 @@ async function chatHistory(older=false) {
   $("chat-latest").hidden=chatState.latest;
   chatRender();
   if (wasActive && !chatState.active) await usage();
+  const routed = ordered.find(turn => turn.request_id === chatSentRequest && turn.presentation?.phase === "completed" && turn.presentation?.navigation);
+  const navigation = routed?.presentation.navigation;
+  if (navigation && !chatNavigations.has(navigation.step_id)) {
+    chatNavigations.add(navigation.step_id);
+    await chatOpenSource(navigation.conversation_id);
+  }
 }
 function chatContent(text) {
   const fragment=document.createDocumentFragment();
@@ -129,20 +147,27 @@ function chatResultPreview(turn, card, canContinue) {
   box.append(load); if (value) box.append(send); card.append(box);
 }
 function chatPresentationPanel(turn,p) {
+  const collapse=p.collapse_process && !!p.final_text;
   let ui=chatPresentationState.get(turn.turn_id);
   if (!ui) {
-    ui={open:!(p.phase==="completed" && p.collapse_process && p.final_text!==null),manual:false,phase:p.phase};
+    ui={open:!collapse,collapse};
     chatPresentationState.set(turn.turn_id,ui);
-  } else if (ui.phase!==p.phase) {
-    if (p.phase==="completed" && !ui.manual) ui.open=!(p.collapse_process && p.final_text!==null);
-    ui.phase=p.phase;
+  } else {
+    if (collapse && !ui.collapse) ui.open=false;
+    ui.collapse=collapse;
   }
   if (p.phase==="awaiting_input") ui.open=true;
-  const details=el("details","chat-process");
+  const details=el("details",undefined,"chat-process");
   details.open=ui.open;
-  const summary=el("summary",ui.open?"收起处理过程":"查看处理过程");
+  const closedLabel=`查看处理过程${turn.work_steps?.length ? ` · ${turn.work_steps.length} 步` : ""}`;
+  const summary=el("summary",ui.open?"收起处理过程":closedLabel);
   details.append(summary);
-  details.addEventListener("toggle",()=>{ui.open=details.open;ui.manual=true;summary.textContent=details.open?"收起处理过程":"查看处理过程";});
+  summary.addEventListener("click",event=>{
+    event.preventDefault();
+    if(p.phase==="awaiting_input") return;
+    ui.open=!ui.open;details.open=ui.open;
+    summary.textContent=ui.open?"收起处理过程":closedLabel;
+  });
   for (const item of p.process || []) {
     const box=el("div",undefined,"chat-process-text"); box.append(chatContent(item.text || "")); details.append(box);
     if (item.truncated) details.append(el("p","这条摘要已裁剪，完整内容保留在 Core 记录中。","hint"));
@@ -175,6 +200,13 @@ function chatRender() {
         const slot=el("div");answer.append(slot);
         import("./app/chat-files.js").then(({renderChatFiles})=>{if(slot.isConnected)slot.append(renderChatFiles(presentation.files,api,()=>crypto.randomUUID()));});
       }
+      for (const source of presentation?.conversations || []) {
+        const sourceCard = el("div", "", "card");
+        const open = el("button", "打开会话", "quiet");
+        open.onclick = action(() => chatOpenSource(source.conversation_id));
+        sourceCard.append(el("strong",source.title),el("p",[source.project_name,source.created_at?.slice(0,10),source.archived ? "已归档" : ""].filter(Boolean).join(" · "),"hint"),open);
+        answer.append(sourceCard);
+      }
       if (presentation) {
         if (presentation.final_text!==null) answer.append(el("strong",presentation.phase==="completed" ? "最终回答" : "本轮反馈"),chatContent(presentation.final_text));
         answer.append(chatPresentationPanel(turn,presentation));
@@ -196,9 +228,10 @@ function chatRender() {
       const failureHints={MODEL_RESPONSE_INVALID:"模型返回的格式无法校验，本轮已停止。",MODEL_TOOL_CALL_LIMIT:"模型提出的动作超过本轮剩余额度，未执行这批动作。",MODEL_REQUEST_FAILED:"模型连接或响应解析失败，本轮已停止。",MODEL_TIMEOUT:"等待模型响应超时，本轮已停止。",MODEL_OUTCOME_UNKNOWN:"未收到完整模型响应或用量，实际费用无法确认；这不表示设备已经执行。"};
       if (!presentation?.final_text && failureHints[turn.error_code]) answer.append(el("p",failureHints[turn.error_code],"hint"));
       if (!presentation?.final_text && turn.error_code?.startsWith("WEB_")) answer.append(el("p","这次网页请求没有取得可用内容；已有资料仍然保留。","hint"));
-      if (turn.work_grant_id) answer.append(chatWorkCards(turn));
+      if (turn.work_grant_id) (answer.querySelector(".chat-process") || answer).append(chatWorkCards(turn));
       if (turn.allow_skills && turn.status==="completed" && !turn.proposal) answer.append(el("p","本轮没有选出可执行流程，未创建设备执行。可核对可用能力或补充目标。","hint"));
-      if (turn.skill_plan) answer.append(chatSkillCard(turn,!chatState.active && turn===turns.at(-1)));
+      const actionContainer=presentation?.collapse_process ? answer.querySelector(".chat-process") : answer;
+      if (turn.skill_plan) actionContainer.append(chatSkillCard(turn,!chatState.active && turn===turns.at(-1)));
       else if (turn.proposal) {
         const card=el("section",undefined,"chat-action");
         card.append(el("h3",turn.proposal.intent==="get_system_info" ? "读取系统信息" : "列出 workspace 目录"),el("pre",JSON.stringify({node_id:turn.node_id,action:turn.proposal,tool_version:1,expires_at:turn.expires_at},null,2)));
@@ -225,7 +258,7 @@ function chatRender() {
           card.append(el("p","确认后仍检查权限；目录另需审批。勾选即同意发送本次白名单结果及原上下文，最多再调用一次，共用本轮 $0.05；未勾选可执行后预览确认。","hint"),buttons);
         } else if (!turn.task_id) card.append(el("p",turn.action_status==="rejected" ? "你已拒绝这个动作。" : "动作已过期或会话已归档，请重新提出请求。","hint"));
         if (turn.result_supported && turn.phase==="reply" && turn.status==="completed" && task?.task.status==="succeeded" && turn.auto_result_status!=="waiting" && !chatState.conversation?.archived) chatResultPreview(turn,card,!chatState.active && turn===turns.at(-1));
-        answer.append(card);
+        actionContainer.append(card);
       }
       if (!presentation && turn.phase==="summary") answer.append(el("strong","最终回答"),chatContent(turn.response_text || (turn.status==="queued" ? "等待模型解读结果…" : turn.status==="generating" ? "正在根据结果生成回答…" : "本次解读未完成；工具执行结果已保留。")));
       if (turn.memory_references?.length) {
@@ -260,7 +293,7 @@ function chatRender() {
   for (const id of ["chat-skill-load","chat-skills-catalog"]) $(id).hidden=working;
   $("chat-skills").parentElement.hidden=working;
   const imageNote=working && chatWorkImageAvailable() ? " 图片工具已由服务器返回：配置工作区内的图片可能生成最多 1024px / 8 KiB 的有界快照并随本轮结果发送给 DeepSeek；可能继续缩小或使用有损 JPEG，GIF/WebP 只取首帧，透明区域显示白底。点击发送即本轮明确同意，历史选择不代替本轮同意。" : "";
-  $("chat-outbound-notice").textContent=working ? "发送即同意外发本轮输入、所选上下文、可用能力目录及实际工具结果；网页搜索词和公开页面网址会发送给 DeepSeek。每轮最多 4 个动作、5 次工作模型交换；勾选压缩时最多额外一次摘要调用，共用原费用上限；网页每次有结果收费 $0.00075，合计共用 $0.05 和每日 $1。"+imageNote : "点击“发送给 DeepSeek”即同意外发本次输入及所选上下文和流程目录。勾选压缩时最多额外一次摘要调用，共用原费用上限。单步工具可在确认卡允许自动回传；多步流程成功后先预览结果，再同意解读。每天 $1、每轮共用 $0.05，普通聊天 1 次、含结果解读最多 2 次调用。"+imageNote;
+  $("chat-outbound-notice").textContent=working ? "发送即同意外发本轮输入、所选上下文、可用能力目录、实际工具结果及按问题查到的本人其他会话摘录与项目记录；网页搜索词和公开页面网址会发送给 DeepSeek。每轮最多 4 个动作、5 次工作模型交换；勾选压缩时最多额外一次摘要调用，共用原费用上限；网页每次有结果收费 $0.00075，合计共用 $0.05 和每日 $1。"+imageNote : "点击“发送给 DeepSeek”即同意外发本次输入及所选上下文和流程目录。勾选压缩时最多额外一次摘要调用，共用原费用上限。单步工具可在确认卡允许自动回传；多步流程成功后先预览结果，再同意解读。每天 $1、每轮共用 $0.05，普通聊天 1 次、含结果解读最多 2 次调用。"+imageNote;
   $("chat-context-info").textContent=flowRunning ? "流程正在执行，请在上方查看步骤、审批或取消整个流程。完成后可预览结果并追问。" : waiting ? "等待工具结果并自动回答，完成后即可追问。停止自动回传不会取消工具；取消执行请使用任务卡。" : chatState.active ? "可选择纠正当前工作或排队后续任务；纠正在已派发操作结束后生效，不会扩大权限。" : "上下文保留近期原文和所选资料；同意压缩时按 token 估算与请求容量生成旧历史摘要，原始记录保留。可用 /compact 手动压缩。";
 }
 function initChat() {
@@ -307,6 +340,7 @@ function initChat() {
     const signature=JSON.stringify([conversation.conversation_id,$("chat-text").value,$("chat-context").checked,allowTools,nodeId,allowSkills,skillsDigest,memories,work,allowCompaction,compactOnly]);
     if (chatState.retry?.signature!==signature) chatState.retry={signature,payload:{request_id:crypto.randomUUID(),expected_revision:conversation.revision,text:$("chat-text").value,include_context:$("chat-context").checked,allow_compaction:allowCompaction,compact_only:compactOnly,allow_model:true,enqueue:!!chatState.active,allow_tools:allowTools,node_id:nodeId,allow_skills:allowSkills,skills_digest:skillsDigest,...memories,...work}};
     await api(`/api/v1/chat/conversations/${conversation.conversation_id}/turns`,{method:"POST",body:JSON.stringify(chatState.retry.payload)});
+    chatSentRequest = chatState.retry.payload.request_id;
     chatState.latest=true; await chatHistory();
     $("chat-skills").checked=false;
     } catch(error) {

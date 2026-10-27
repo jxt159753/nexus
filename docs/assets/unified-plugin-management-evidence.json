@@ -1,0 +1,226 @@
+{
+  "date": "2026-10-25",
+  "scope": "P92 unified plugin management",
+  "status": "deployed and installed; technical verification complete; user acceptance pending",
+  "production": {
+    "release": "/opt/nexus/releases/unified-plugins-20261025-372a82bc",
+    "wheel_sha256": "372a82bced818546f328052d328b722dc1a3a2082ee0bc4e818c8f4d799c903f",
+    "backup": "/var/backups/nexus/before-unified-plugins-20261025T042448Z",
+    "backup_sha256": "f26a848e6332e7a3b6fe7f34cbc52e276d7809bd1855682adead1704041d43e4",
+    "schema": 38,
+    "historical_records_preserved": true,
+    "runtime_resources_checked": 292,
+    "new_grants": 0,
+    "no_new_model_calls": true,
+    "main_pid": 3250935,
+    "historical_tables_preserved": 39,
+    "single_core": true,
+    "paused": false,
+    "permission_defaults_preserved": [
+      "full",
+      2
+    ],
+    "permission_history_preserved": true,
+    "calls_total": 306,
+    "real_model_calls_this_task": 0,
+    "unknown_costs_preserved": 6,
+    "configuration_sha256": "7b850a6082144841ca4a664dfc6deee474452526e464cdeb4a3cd31b929aa2ce"
+  },
+  "artifacts": {
+    "baseline_wheel_sha256": "41cb7b35e6d9b00b01d486093af876d7f84d1663880e5232fd5b40e31ec71faa",
+    "wheel_sha256": "372a82bced818546f328052d328b722dc1a3a2082ee0bc4e818c8f4d799c903f",
+    "installer": {
+      "filename": "NEXUS_0.1.15_x64-setup.exe",
+      "sha256": "823abd4c1f829e0dc34d033dfb72c9e88f730d744f47ae9d6cde1ec4a8e8fc3c",
+      "bytes": 116433888
+    },
+    "changed_runtime": [
+      "nexus/contracts/ui_extensions.py",
+      "nexus/web/app/plugin-page.js",
+      "nexus/web/app/plugin-ui.js",
+      "nexus/web/app/plugins.js",
+      "nexus/web/app/ui-extensions.js",
+      "nexus/core/plugins/http.py",
+      "nexus/core/plugins/ui_extensions.py",
+      "nexus/core/plugins/ui_extension_http.py",
+      "nexus/core/plugins/ui_extension_management.py",
+      "nexus/core/storage/migrations/038_ui_extension_history.sql"
+    ],
+    "runtime_count": 292,
+    "compatible_rollback_sha256": "367da0d413eb51a91dbc0c864256b48b6b1d075569b31e43b4de61d39137152b"
+  },
+  "tests": {
+    "windows_fixed": {
+      "passed": 99,
+      "skipped": [
+        {
+          "test": "test_frozen_host_files_and_actual_managed_worker",
+          "reason": "fixed Windows Node required"
+        }
+      ],
+      "failed": 0
+    },
+    "linux_fixed": {
+      "passed": 90,
+      "skipped": [
+        {
+          "test": "test_real_host_shell_idempotency_and_conversation_job_ownership",
+          "reason": "real Windows process lifecycle"
+        },
+        {
+          "test": "test_programmatic_calls_and_file_plugin_preserve_actual_content",
+          "reason": "real Windows managed workers"
+        },
+        {
+          "test": "test_terminal_keeps_state_and_interrupt_preserves_shell",
+          "reason": "real Windows ConPTY"
+        },
+        {
+          "test": "test_full_host_files_present_shell_and_nested_calls_do_not_leak_root",
+          "reason": "actual managed Windows plugin processes"
+        },
+        {
+          "test": "test_frozen_host_files_and_actual_managed_worker",
+          "reason": "fixed Windows Node required"
+        }
+      ],
+      "failed": 0
+    },
+    "batches_overlap_do_not_add": true,
+    "native_webview": "155.0.4283.62",
+    "native_management": {
+      "passed": true,
+      "chosen": "1.0.4",
+      "versionCount": 5,
+      "historyVisible": true,
+      "enableReady": true,
+      "disableConfirmed": true,
+      "originalStateRestored": true,
+      "cameraOpened": false
+    },
+    "public_downloads": {
+      "/static/downloads/NEXUS_0.1.15_x64-setup.exe": {
+        "sha256": "823abd4c1f829e0dc34d033dfb72c9e88f730d744f47ae9d6cde1ec4a8e8fc3c",
+        "bytes": 116433888,
+        "status": 200,
+        "cache_control": "no-store",
+        "csp": "default-src 'self'; script-src 'self' 'sha256-UaO1DKdOZTH3g72w3U/IhBu3y5cxME0JyJYosMMMerQ=' 'sha256-jH4JDM+p01kuu6ou/A4MgTq6B9+X7dUZGHEdH52L4GY='; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
+      },
+      "/static/app/plugins.js": {
+        "sha256": "26e31c23227801a8de76a2964e9dc395984bed09ee4974f0091926ee0a196fd9",
+        "bytes": 13584,
+        "status": 200,
+        "cache_control": "no-store",
+        "csp": "default-src 'self'; script-src 'self' 'sha256-UaO1DKdOZTH3g72w3U/IhBu3y5cxME0JyJYosMMMerQ=' 'sha256-jH4JDM+p01kuu6ou/A4MgTq6B9+X7dUZGHEdH52L4GY='; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
+      },
+      "/static/app/plugin-page.js": {
+        "sha256": "f91c62b6f8d89cdf1d68c5ce68cf6882de4d5974d47a7f7aed22c98bfeb5800b",
+        "bytes": 51988,
+        "status": 200,
+        "cache_control": "no-store",
+        "csp": "default-src 'self'; script-src 'self' 'sha256-UaO1DKdOZTH3g72w3U/IhBu3y5cxME0JyJYosMMMerQ=' 'sha256-jH4JDM+p01kuu6ou/A4MgTq6B9+X7dUZGHEdH52L4GY='; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
+      },
+      "/static/app/plugin-ui.js": {
+        "sha256": "7f8dee8249c3fd98d0e374094c8bc64a3298911f9b740e033198fa39b525096b",
+        "bytes": 8176,
+        "status": 200,
+        "cache_control": "no-store",
+        "csp": "default-src 'self'; script-src 'self' 'sha256-UaO1DKdOZTH3g72w3U/IhBu3y5cxME0JyJYosMMMerQ=' 'sha256-jH4JDM+p01kuu6ou/A4MgTq6B9+X7dUZGHEdH52L4GY='; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
+      },
+      "/static/app/ui-extensions.js": {
+        "sha256": "cf0474779b835063e8806694cb70928121802d938a575b73b813d57bce1b3c51",
+        "bytes": 12631,
+        "status": 200,
+        "cache_control": "no-store",
+        "csp": "default-src 'self'; script-src 'self' 'sha256-UaO1DKdOZTH3g72w3U/IhBu3y5cxME0JyJYosMMMerQ=' 'sha256-jH4JDM+p01kuu6ou/A4MgTq6B9+X7dUZGHEdH52L4GY='; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
+      }
+    }
+  },
+  "management": {
+    "tool_rows": 23,
+    "visualization_rows": 1,
+    "versions": [
+      {
+        "version": "1.0.4",
+        "status": "accepted",
+        "test_passed": true
+      },
+      {
+        "version": "1.0.3",
+        "status": "failed",
+        "test_passed": false
+      },
+      {
+        "version": "1.0.2",
+        "status": "rolled_back",
+        "test_passed": true
+      },
+      {
+        "version": "1.0.1",
+        "status": "accepted",
+        "test_passed": true
+      },
+      {
+        "version": "1.0.0",
+        "status": "accepted",
+        "test_passed": true
+      }
+    ],
+    "original_development_authorized": true,
+    "original_active_version": null,
+    "final_development_authorized": true,
+    "final_active_version": null,
+    "old_history": "migration snapshots explicitly labeled, without invented event times",
+    "new_control_events": [
+      "disabled",
+      "enabled",
+      "history_snapshot",
+      "policy_enabled",
+      "ready"
+    ]
+  },
+  "desktop": {
+    "version": "0.1.15",
+    "databases": {
+      "node\\plugins.sqlite3": {
+        "preserved": true,
+        "tables": 4
+      },
+      "node\\receipts.sqlite3": {
+        "preserved": true,
+        "tables": 5
+      },
+      "node-manual\\receipts.sqlite3": {
+        "preserved": true,
+        "tables": 4
+      }
+    },
+    "configuration_preserved": true,
+    "installed_hashes": {
+      "nexus-windows.exe": "a969e6236a691b1bf5982f36ab125791653cfaf2a911b6fec03de035ce9aa69f",
+      "binaries/nexus-node.exe": "35108720450332014e03e6c815a69b3271e59e9de73c94bb09b40555be2a91ed",
+      "binaries/nexus-voice.exe": "5c13916a66bd1dafbc02c5ce6aec4996cdd93436511b8a44d38906919dbb6879"
+    },
+    "normal_restart": {
+      "debugging": false,
+      "version": "0.1.15",
+      "pid": 52596
+    }
+  },
+  "temporary_debug_port_closed": true,
+  "windows_node_identity_preserved_and_online": true,
+  "server_archive": {
+    "sha256": "a604c95ef38b0287ec4010979c43596ca0da7959085e5d7aefa8367786822b40",
+    "bytes": 15018470
+  },
+  "server_cleanup": {
+    "temporary_server_materials_removed": true,
+    "runtime_rollback_backups_retained": true
+  },
+  "notes": [
+    "Initial API test fixture omitted built-in registration; corrected fixture setup. Query validation correctly returns 422; test expectation corrected.",
+    "The working tree contains unrelated autonomy UI. Only this task delta was applied to the actual published frontend; none of those unpublished changes were included.",
+    "Standalone and installed executable differ only by the normal Tauri UNK-to-NSS bundle marker.",
+    "No real camera capture, new model call, Android install or production Core rollback was performed."
+  ]
+}

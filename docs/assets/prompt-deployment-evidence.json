@@ -1,0 +1,42 @@
+{
+  "task": "P100 unified execution Prompt",
+  "status": "deployed",
+  "authorization": "2026-10-26 用户明确要求部署上线，暂时不用测试。",
+  "checked_at_beijing": "2026-10-26T10:56:43.495777+08:00",
+  "release": "/opt/nexus/releases/prompt-20261026-a92856fa",
+  "baseline_python": "/opt/nexus/releases/chat-collapse-20261026-2fc13726/venv/bin/python",
+  "wheel_sha256": "a92856fa2241fbec675a8506f77dd7d8f40b42b4222819b0b82c50a6d4476062",
+  "changed_resources": [
+    "nexus/core/models/chat.py"
+  ],
+  "resource_count": 300,
+  "backup": "/var/backups/nexus/before-prompt-20261026T025434Z",
+  "backup_sha256": "3961b72b5591c2467f0fa3c602bb2ff813d6cf87cbe66bcd5203b6bb334c84bf",
+  "schema": 40,
+  "main_pid": 126520,
+  "single_core": true,
+  "paused": false,
+  "history_tables_preserved": 52,
+  "preserved_counts": {
+    "tasks": 236,
+    "conversations": 94,
+    "chat_turns": 163,
+    "model_calls": 456,
+    "identities": 5,
+    "grants": 37
+  },
+  "configuration_unchanged": true,
+  "online_nodes": 2,
+  "no_new_model_calls": true,
+  "tests_run_this_deployment": false,
+  "real_model_test_run": false,
+  "staging_archived_locally_and_removed": [
+    "/var/tmp/nexus-prompt-20261026-979ff474",
+    "/var/tmp/nexus-prompt-20261026-a92856fa"
+  ],
+  "notes": [
+    "First candidate rejected before installation because another release changed the live baseline; rebased on the deployed chat-collapse package.",
+    "Retained live MCP screenshot guidance and all other live resources; excluded unshipped personality/voice work.",
+    "Performed only packaging, backup, history/resource consistency and startup-status checks; no regression or functional/model tests."
+  ]
+}

@@ -4,7 +4,7 @@ from uuid import UUID
 
 from nexus.contracts.messages import ApprovalRequired, ClientSynced, ControlUpdated, TaskUpdated
 from nexus.core.storage.database import Database, one, timestamp, utc_now
-from nexus.core.storage.tasks import load_task, task_record
+from nexus.core.storage.tasks import TERMINAL, load_task, task_record
 
 
 class ClientEvents:
@@ -48,5 +48,10 @@ class ClientEvents:
         async with self.database.transaction(write=False) as conn:
             rows = await conn.execute_fetchall("SELECT rowid AS cursor,* FROM tasks WHERE owner_id=? AND rowid<? ORDER BY rowid DESC LIMIT 21", (str(owner_id), before))
             tasks = [task_record(row) for row in rows[:20]]
+            # A recent-history page can omit an older task that is still running.
+            active = await conn.execute_fetchall(
+                "SELECT * FROM tasks WHERE owner_id=? AND status NOT IN (?,?,?,?) ORDER BY rowid",
+                (str(owner_id), *sorted(TERMINAL)),
+            )
             state = await one(conn, "SELECT paused,revision FROM system_state WHERE singleton=1")
-            return {"tasks": tasks, "next_before": str(rows[min(len(rows),20)-1]["cursor"]) if rows else str(before), "has_more": len(rows) > 20, "control": {"paused": bool(state["paused"]), "revision": state["revision"]}}
+            return {"tasks": tasks, "active_tasks": [task_record(row) for row in active], "next_before": str(rows[min(len(rows),20)-1]["cursor"]) if rows else str(before), "has_more": len(rows) > 20, "control": {"paused": bool(state["paused"]), "revision": state["revision"]}}

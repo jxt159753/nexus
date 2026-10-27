@@ -88,12 +88,12 @@ def preview_write(args, root):
         old_hash, old_text = previous(path)
         diff = "".join(difflib.unified_diff(old_text.splitlines(keepends=True), args.content.splitlines(keepends=True), fromfile="before/"+args.path, tofile="after/"+args.path))
         digest = text_digest(args.content)
-        return FilePreviewResult(root_id=args.root_id, path=args.path, previous_sha256=old_hash, content_sha256=digest, preview_digest=write_digest(args.root_id,args.path,old_hash,digest), diff=diff[:16000], truncated=len(diff)>16000)
+        return FilePreviewResult(root_id=args.root_id, path=args.path, previous_sha256=old_hash, content_sha256=digest, preview_digest=write_digest(args.root_id,args.path,old_hash,digest,args.access_root), diff=diff[:16000], truncated=len(diff)>16000)
 
 
 def write_file(args, root):
     digest = text_digest(args.content)
-    if args.preview_digest != write_digest(args.root_id,args.path,args.expected_sha256,digest):
+    if args.preview_digest != write_digest(args.root_id,args.path,args.expected_sha256,digest,args.access_root):
         raise PermissionError("preview binding mismatch")
     with guarded_path(root, args.path) as path:
         if previous(path)[0] != args.expected_sha256:

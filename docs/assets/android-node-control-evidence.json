@@ -1,0 +1,84 @@
+{
+  "recorded_at": "2026-10-26T03:38:45.120614+00:00",
+  "status": "local_candidate_not_deployed",
+  "apk": {
+    "path": "var/android-node/release/NEXUS-Android-0.1.10-node-candidate-debug.apk",
+    "bytes": 12279524,
+    "sha256": "d567d0739288801c20e3e8a09042101403794799079c40c10c84d7221ae33fa5",
+    "version": "0.1.10",
+    "version_code": 11,
+    "signing": "existing_debug_key"
+  },
+  "core": {
+    "schema": 42,
+    "broad_regression": {
+      "passed": 140,
+      "skipped": 1,
+      "seconds": 64.66,
+      "log": "var/android-node/pytest-final-7.log"
+    },
+    "final_phone_regression": {
+      "passed": 24,
+      "seconds": 14.97,
+      "log": "var/android-node/pytest-delivery-9.log"
+    }
+  },
+  "android": {
+    "unit_tests": 10,
+    "lint": {
+      "errors": 0,
+      "warnings": 23,
+      "hints": 1
+    },
+    "build_log": "var/android-node/build-delivery.log",
+    "instrumentation": {
+      "passed": 4,
+      "seconds": 133.779,
+      "log": "var/android-node/instrument-final.log",
+      "scope": [
+        "authenticated_core_node_link",
+        "ui_read_password_redaction_unicode_boundary",
+        "click_and_set_text",
+        "stale_ui_digest_rejected",
+        "persisted_SAF_grant",
+        "create_overwrite_backup_readback",
+        "stale_preview_rejected",
+        "revoked_tree_rejected",
+        "local_accessibility_switch_reduces_capability",
+        "encrypted_vault",
+        "receipt_restart_unknown_and_duplicate_refusal",
+        "real_android_status"
+      ]
+    },
+    "emulator": {
+      "api": "37.2",
+      "architecture": "x86_64",
+      "page_size": 16384,
+      "serial": "emulator-5580",
+      "isolated": true
+    },
+    "final_apk_ui": {
+      "passed": 1,
+      "log": "var/android-node/instrument-ui3.log",
+      "checks": [
+        "scrollable_permissions",
+        "directory_picker_entry_visible"
+      ]
+    }
+  },
+  "limitations": [
+    "No production deployment or physical phone installation.",
+    "No real model calls.",
+    "RedMagic background retention and OEM compatibility remain unverified.",
+    "Core schema42 and Android must be updated together.",
+    "Final APK adds only the 1 MiB page-offset boundary fix after the four native tests; final protocol and Core tests verify that boundary.",
+    "Debug local candidate includes existing workspace Android features; not a production-isolated release bundle."
+  ],
+  "resolved_findings": [
+    "Standalone test APK components converted from Kotlin to framework-only Java.",
+    "New test identity requires fresh emulator data; existing receipt identity isolation retained.",
+    "Test waits for capability re-registration before approval after permission changes.",
+    "Shared phone-access Vault reads/writes protected by process and file locks after observed AtomicFile concurrent-write loss.",
+    "UI text truncation preserves Unicode code points."
+  ]
+}

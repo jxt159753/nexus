@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 from nexus.contracts.extensions import canonical, digest_value
 from nexus.core.models.chat import request_body
-from nexus.core.models.config import CHAT_MAX_TEXT_BYTES
+from nexus.core.models.config import CHAT_MAX_INPUT_BYTES, CHAT_MAX_TEXT_BYTES
 from nexus.core.memory import context as memory_context
 from nexus.core.security import work as permissions
 from nexus.core.security.types import AccessDenied
@@ -41,8 +41,9 @@ WHERE t.status='queued' AND t.recovery_required=0 AND NOT EXISTS(
 async def capacity(conn):
     size = await one(conn,"SELECT coalesce(sum(length(CAST(request_body AS BLOB))+length(CAST(partial_text AS BLOB))+coalesce(length(CAST(response_json AS BLOB)),0)),0) FROM chat_exchanges")
     compact = await one(conn,"SELECT coalesce(sum(length(CAST(source_messages_json AS BLOB))+length(CAST(summary_text AS BLOB))),0) FROM chat_compactions")
-    # JSON escaping can expand response text sixfold; partial_text is separate.
-    return size[0]+compact[0]+7*CHAT_MAX_TEXT_BYTES+262144 <= 268435456
+    # Reserve both the request and compaction source, plus escaped response and
+    # partial text, before starting an exchange with the enlarged input window.
+    return size[0]+compact[0]+2*CHAT_MAX_INPUT_BYTES+7*CHAT_MAX_TEXT_BYTES+262144 <= 268435456
 
 
 async def begin(conn, config, row, call_id, messages, options, now):

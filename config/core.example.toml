@@ -7,6 +7,7 @@ port = 8000
 local_http = true
 # The Windows app loads its bundled UI from this secure Tauri origin.
 origins = ['http://127.0.0.1:8000', 'https://tauri.localhost']
+mcp_execution_timeout_seconds = 60 # MCP only; negotiated with Node, maximum 60 seconds
 
 # Optional M2. Keep disabled until DEEPSEEK_API_KEY is safely set on Core.
 [models]
@@ -15,13 +16,13 @@ call_limits_enabled = false # no daily, work-turn, grant-operation, goal-round o
 chat_enabled = false # M3: explicitly enable after configuring Core's existing DeepSeek key
 chat_max_output_tokens = 256000 # provider/request ceiling; amount fitting applies only when cost_limits_enabled=true
 chat_images_enabled = false # Enable only after the UI discloses image result transmission
-chat_input_bytes = 32768 # complete serialized request; owner may configure up to 65536
+chat_input_bytes = 8388608 # complete serialized request; 8 MiB transport ceiling, token window also checked
 chat_work_max_actions = 4 # used only when call_limits_enabled=true; transport batches remain bounded
 chat_context_window_tokens = 1000000
-chat_input_tokens = 32768
+chat_input_tokens = 1000000 # actual input also reserves output from the 1M combined window
 chat_compaction_threshold_percent = 80
 chat_compaction_retain_percent = 16
-chat_compaction_headroom_tokens = 512
+chat_compaction_headroom_tokens = 65536 # DSH default; pressure threshold also respects output reservation
 web_enabled = false # DeepSeek Search/Fetch; reuse Core key and shared usage audit
 web_request_cost_microunits = 750 # USD 0.00075 per billable request; review with price_valid_until
 enabled = false

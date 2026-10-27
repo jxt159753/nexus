@@ -34,6 +34,10 @@ def execute_tool(command: CommandExecute, config: NodeConfig) -> ToolResult:
         root = config.roots.get(command.arguments.root_id)
         if root is None:
             raise PermissionError("resource not configured")
+        if getattr(command.arguments, "access_root", None) is not None:
+            from pathlib import Path
+            from nexus.node.config import local_directory
+            root = local_directory(Path(command.arguments.access_root))
         if command.tool == "filesystem.receive":
             from nexus.node.tools.receive import receive_file
             result = receive_file(command, config)

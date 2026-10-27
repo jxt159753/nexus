@@ -117,6 +117,7 @@ class CoreConfig(StrictContract):
     max_message_bytes: StrictInt = Field(default=MAX_MESSAGE_BYTES, ge=1024, le=MAX_MESSAGE_BYTES)
     max_result_bytes: StrictInt = Field(default=MAX_RESULT_BYTES, ge=128, le=MAX_RESULT_BYTES)
     execution_timeout_seconds: StrictInt = Field(default=10, ge=1, le=10)
+    mcp_execution_timeout_seconds: StrictInt = Field(default=60, ge=1, le=60)
     models: ModelConfig = Field(default_factory=ModelConfig)
     extensions: ExtensionConfig = Field(default_factory=ExtensionConfig)
     plugins: PluginConfig = Field(default_factory=PluginConfig)

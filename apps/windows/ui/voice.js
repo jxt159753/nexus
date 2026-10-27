@@ -2,6 +2,7 @@
 
 import { api, createConversation, state } from "./api.js";
 import { button, closeSheet, el, notify, openSheet } from "./render.js";
+import { gameModeActive } from "./game-mode.js";
 
 const LABEL = { stopped: "语音已结束", activating: "正在连接语音", standby: "本地唤醒待机",
   listening: "正在听你说", thinking: "正在思考", speaking: "正在回答", interrupted: "已打断", error: "语音不可用" };
@@ -11,6 +12,79 @@ let latest = "stopped";
 let native = null;
 let hooks = {};
 let timer = null;
+let residentRequested = false;
+let residentSignature = "";
+let suspendedScope = "";
+let residentMessage = "";
+
+function wakeKey() {
+  return `nexus.voice.wake.v1:${localStorage.getItem("nexus.coreUrl") || location.origin}:${state.session?.owner_id || ""}`;
+}
+
+function wakeEnabled() {
+  return !!native?.voiceWake && localStorage.getItem(wakeKey()) !== "false";
+}
+
+function currentScope() {
+  return `${state.session?.owner_id || ""}:${state.conversation?.conversation_id || ""}`;
+}
+
+async function setWakeEnabled(enabled) {
+  try {
+    localStorage.setItem(wakeKey(), String(enabled));
+    suspendedScope = "";
+    residentSignature = "";
+    if (!enabled) await stopVoice();
+    else await syncResident();
+    hooks.renderSettings?.();
+  } catch (error) { notify(failure(error), true); }
+}
+
+export function renderVoiceSettings(body) {
+  if (!native?.voiceWake) return;
+  const section = el("section", "settings-section");
+  section.append(el("h2", "", "语音"));
+  const option = checkbox("常驻语音唤醒", wakeEnabled());
+  option.input.id = "voice-wake-enabled";
+  option.input.setAttribute("role", "switch");
+  option.input.addEventListener("change", () => setWakeEnabled(option.input.checked));
+  section.append(option.label);
+  const help = el("details", "settings-help"); help.id = "voice-wake-help";
+  help.append(el("summary", "", "唤醒与隐私说明"),
+    el("p", "hint", "随 App 启动开启，最小化或关闭到托盘后继续待机。说“你好奈克斯”或“Hey NEXUS”，听到提示音后提问；关闭此开关立即关麦，并记住选择。退出 App 后停止。"),
+    el("p", "hint", "待机音频只在本机处理；唤醒后音频经 Core 发送至百炼，文字及获准工具结果交给聊天模型。沿用当前会话的上下文与工具设置，不自动开启主动播报。"));
+  const status = el("p", "hint");
+  status.id = "voice-wake-setting-status";
+  section.append(status, help);
+  body.append(section);
+  renderStatus();
+}
+
+async function syncResident() {
+  if (!native?.voiceWake) return;
+  if (gameModeActive()) return;
+  if (!state.ready) {
+    if (residentRequested) await stopVoice();
+    residentSignature = "";
+    return;
+  }
+  if (!wakeEnabled() || suspendedScope === currentScope()) return;
+  if (!state.conversation) {
+    if (state.activeTurn) return;
+    await createConversation(state.prefs.projectId || null);
+  }
+  const config = { owner_id: state.session.owner_id, conversation_id: state.conversation.conversation_id,
+    include_context: !!state.prefs.context, allow_tools: !!state.prefs.tools };
+  const signature = JSON.stringify(config);
+  if (residentSignature === signature) return;
+  if (state.activeTurn && !residentRequested) return;
+  residentRequested = true;
+  residentMessage = "正在开启本地唤醒待机";
+  latest = "activating";
+  await native.voiceWake(config);
+  residentSignature = signature;
+  renderStatus();
+}
 
 function failure(error) {
   const text = error?.message || String(error || "");
@@ -30,9 +104,14 @@ function failure(error) {
 
 function renderStatus(event = {}) {
   if (event.event === "state") latest = event.state;
+  const indicator = document.getElementById("voice-wake-indicator");
+  const settingStatus = document.getElementById("voice-wake-setting-status");
+  const summary = gameModeActive() ? "游戏模式：语音与唤醒已暂停" : residentRequested ? (residentMessage || LABEL[latest] || "唤醒待机") : "语音唤醒已关闭";
+  if (indicator) { indicator.hidden = !residentRequested; indicator.textContent = latest === "standby" ? "唤醒待机 · 关麦" : "语音 · 关麦"; indicator.title = summary; }
+  if (settingStatus) settingStatus.textContent = summary;
   const bar = document.getElementById("voice-status");
   if (!bar) return;
-  bar.hidden = !active && !starting;
+  bar.hidden = gameModeActive() || (!active && !starting && !residentRequested);
   bar.dataset.state = latest;
   bar.querySelector("strong").textContent = LABEL[latest] || "语音连接中";
   const detail = bar.querySelector(".voice-detail");
@@ -40,7 +119,7 @@ function renderStatus(event = {}) {
   else if (event.event === "devices") detail.textContent = `${event.input || "默认麦克风"} · ${event.aec_active ? "回声消除已启用，可插话" : "半双工；请用打断按钮"}`;
   else if (event.event === "state" && event.detail) detail.textContent = event.detail;
   const expiry = bar.querySelector(".voice-expiry");
-  expiry.textContent = active?.expires_at ? `麦克风已开启 · ${new Date(active.expires_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} 到期自动关闭` : "";
+  expiry.textContent = residentRequested ? (residentMessage || "麦克风已开启 · 常驻唤醒，可在设置里关闭") : active?.expires_at ? `麦克风已开启 · ${new Date(active.expires_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} 到期自动关闭` : "";
   if (event.event === "state" && event.state === "standby") detail.textContent = event.detail || "说“你好奈克斯”或“Hey NEXUS”，听到提示音后说话。待机音频仅在本机处理。";
   for (const id of ["chat-voice", "dock-voice"]) {
     const control = document.getElementById(id);
@@ -50,8 +129,11 @@ function renderStatus(event = {}) {
 
 async function onEvent(event) {
   if (!event || typeof event.event !== "string") return;
+  if (event.event === "wake_waiting") residentMessage = event.message;
+  else if (event.event === "state" && event.state !== "stopped") residentMessage = "";
   renderStatus(event);
   if (event.event === "error") {
+    if (residentRequested) { residentMessage = event.message; renderStatus(); return; }
     notify(event.message || "语音不可用，请检查连接和设备", true);
     await stopVoice();
   } else if (event.event === "final" || event.event === "session") {
@@ -60,6 +142,7 @@ async function onEvent(event) {
     const old = active;
     active = null;
     renderStatus();
+    if (residentRequested) return; // Native worker reconciles and returns to standby.
     // Always reconcile the original session; never recreate a paid request.
     api(`/api/v1/voice/sessions/${old.voice_session_id}/stop`, { method: "POST", body: "{}" }).catch(() => {});
     await hooks.refresh?.(true);
@@ -67,6 +150,10 @@ async function onEvent(event) {
 }
 
 export async function stopVoice() {
+  suspendedScope = currentScope();
+  residentRequested = false;
+  residentSignature = "";
+  residentMessage = "";
   const old = active;
   active = null;
   latest = "stopped";
@@ -79,6 +166,11 @@ export async function stopVoice() {
       await hooks.refresh?.(true);
     }
   }
+}
+
+async function stopFromControl() {
+  if (residentRequested) await setWakeEnabled(false);
+  else await stopVoice();
 }
 
 function checkbox(text, checked = false) {
@@ -111,6 +203,7 @@ function deviceSelect(title, devices, direction) {
 }
 
 async function openVoice(wakeByDefault = false) {
+  if (gameModeActive()) return;
   if (starting) return;
   if (!state.ready) { notify("请先登录 Core", true); return; }
   if (!native?.voiceStart) { notify("Windows 实时语音请在更新后的 NEXUS Windows App 中使用", true); return; }
@@ -126,7 +219,7 @@ async function openVoice(wakeByDefault = false) {
       openSheet({ title: "语音会话", body, actions: [
         { label: "返回", className: "quiet", onClick: closeSheet },
         { label: "打断回答", className: "quiet", onClick: () => native.voiceInterrupt().catch((e) => notify(failure(e), true)) },
-        { label: "结束语音", className: "quiet danger", onClick: async () => { closeSheet(); await stopVoice(); } },
+        { label: residentRequested ? "关闭语音唤醒" : "结束语音", className: "quiet danger", onClick: async () => { closeSheet(); await stopFromControl(); } },
       ] });
       return;
     }
@@ -169,6 +262,7 @@ async function openVoice(wakeByDefault = false) {
         renderStatus();
         try {
           const requestId = crypto.randomUUID();
+          if (gameModeActive()) throw new Error("游戏模式已开启，语音已暂停");
           active = await api("/api/v1/voice/sessions", { method: "POST", body: JSON.stringify({
             request_id: requestId, node_id: local.node_id, conversation_id: conversationId,
             allow_audio_model: true, allow_model: true, include_context: context.input.checked,
@@ -192,6 +286,19 @@ async function openVoice(wakeByDefault = false) {
 export function initVoice(value) {
   hooks = value;
   native = window.__NEXUS_NATIVE__;
+  window.addEventListener("nexus-game-mode-change", () => {
+    if (gameModeActive()) {
+      const old = active; active = null; latest = "stopped";
+      if (old && !old.resident && state.ready) api(`/api/v1/voice/sessions/${old.voice_session_id}/stop`, { method: "POST", body: "{}" }).catch(() => {});
+    }
+    renderStatus();
+  });
+  if (native?.voiceWake) {
+    const indicator = button("唤醒待机 · 关麦", "quiet", () => setWakeEnabled(false));
+    indicator.id = "voice-wake-indicator";
+    indicator.hidden = true;
+    document.getElementById("settings-button")?.before(indicator);
+  }
   const css = document.createElement("link");
   css.rel = "stylesheet";
   css.href = new URL("./voice.css", import.meta.url).href;
@@ -215,13 +322,20 @@ export function initVoice(value) {
   text.append(status, el("p", "voice-detail hint"), el("p", "voice-expiry hint"));
   bar.append(text,
     button("打断", "quiet", () => native?.voiceInterrupt?.().catch((e) => notify(failure(e), true))),
-    button("结束语音", "quiet danger", () => stopVoice()));
+    button("结束语音", "quiet danger", () => stopFromControl()));
   document.querySelector(".chat-head")?.after(bar);
   native?.onVoice?.(onEvent);
   if (native?.voiceStatus) {
     const poll = async () => {
       try {
-        if (active) {
+        await syncResident();
+        if (gameModeActive()) { renderStatus(); return; }
+        if (residentRequested) {
+          const local = await native.voiceStatus();
+          active = local.resident?.session || null;
+          residentMessage = local.resident?.message || "";
+          if (local.event) renderStatus(local.event);
+        } else if (active) {
           if (!state.ready || state.conversation?.conversation_id !== active.conversation_id) await stopVoice();
           else {
             const local = await native.voiceStatus();
@@ -229,7 +343,8 @@ export function initVoice(value) {
             else if (local.event) renderStatus(local.event);
           }
         }
-      } finally { timer = setTimeout(poll, 1000); }
+      } catch (error) { residentMessage = failure(error); renderStatus(); }
+      finally { timer = setTimeout(poll, 1000); }
     };
     timer = setTimeout(poll, 1000);
   }

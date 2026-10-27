@@ -1,0 +1,27 @@
+name: Source checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Check public source contents
+        run: python scripts/check-public-repo.py
+      - name: Install locked dependencies
+        run: python -m pip install -r requirements.lock
+      - name: Check contracts, configuration and served UI
+        run: python -m pytest -q tests/test_public_repo.py tests/test_contract_boundaries.py tests/test_settings.py tests/test_service_config.py tests/test_app_page.py

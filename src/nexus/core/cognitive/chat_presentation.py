@@ -93,7 +93,7 @@ async def presentation(conn: aiosqlite.Connection, turn: dict) -> dict:
         "responding", "stopping", "stopped", "incomplete", "interrupted", "failed", "expired"
     } else ""
     exchanges = await conn.execute_fetchall("""
-        SELECT e.call_id,e.response_json,e.partial_text FROM chat_exchanges e WHERE e.turn_id=?
+        SELECT e.call_id,e.response_json,e.partial_text,e.outcome FROM chat_exchanges e WHERE e.turn_id=?
         AND e.finished_at IS NOT NULL AND NOT EXISTS (
             SELECT 1 FROM chat_compactions c WHERE c.call_id=e.call_id
         ) AND NOT EXISTS (SELECT 1 FROM model_calls m WHERE m.call_id=e.call_id AND m.web_step_id IS NOT NULL)
@@ -105,7 +105,9 @@ async def presentation(conn: aiosqlite.Connection, turn: dict) -> dict:
         text = reply["content"] if reply else exchange["partial_text"]
         if not text or index == 0 and text in {final, live}:
             continue
-        process.append(ChatProgressText(id=exchange["call_id"], text=text[:1200], truncated=len(text) > 1200))
+        process.append(ChatProgressText(id=exchange["call_id"], text=text[:1200], truncated=len(text) > 1200,
+            substantive=bool(reply and reply.get("public_progress") and reply.get("complete")
+                             and reply.get("work_calls") and exchange["outcome"] == "completed")))
     if not exchanges and turn["initial_response_text"]:
         text = turn["initial_response_text"]
         process.append(ChatProgressText(id="initial", text=text[:1200], truncated=len(text) > 1200))
@@ -122,10 +124,16 @@ async def presentation(conn: aiosqlite.Connection, turn: dict) -> dict:
         label = "回复已完成，部分操作未完成"
     from nexus.core.cognitive.chat_files import turn_files
     from nexus.contracts.file_transfer import ChatFile
+    from nexus.core.cognitive.conversation_routes import presentation as conversation_sources
+    from nexus.contracts.conversation_routes import ConversationLink, ConversationNavigation
+    sources, navigation = await conversation_sources(conn, turn)
     return ChatPresentation(
+        conversations=[ConversationLink.model_validate_json(json.dumps(source)) for source in sources],
+        navigation=ConversationNavigation.model_validate_json(json.dumps(navigation)) if navigation else None,
         files=[ChatFile.model_validate_json(json.dumps(file)) for file in await turn_files(conn,turn)],
         phase=phase, label=label, process=process, process_truncated=truncated,
         live_text=live, final_text=final,
-        collapse_process=phase == "completed" and bool(final) and not failed and not turn.get("error_code")
-                        and bool(process or turn["work_steps"] or turn["action_status"] == "submitted"),
+        collapse_process=phase in {"completed", "stopped", "incomplete", "interrupted", "failed", "expired"}
+                        and not unsettled and bool(final)
+                        and bool(process or live or turn["work_steps"] or turn["action_status"] == "submitted"),
     ).model_dump(mode="json")

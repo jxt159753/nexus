@@ -53,6 +53,8 @@ class PluginService:
         self.tester=None
         from nexus.core.plugins.health import HealthService
         self.health=HealthService(self)
+        from nexus.core.plugins.ui_extensions import UIExtensionService
+        self.ui_extensions=UIExtensionService(self)
 
     def require_enabled(self):
         if not self.config.enabled: raise AccessDenied('PLUGINS_DISABLED')
@@ -219,6 +221,8 @@ class PluginService:
                         _, release = await self.resolve(conn,principal.identity_id,item['plugin_id'],item['digest'])
                         item['execution'] = await self.execution_status(conn,principal.identity_id,node_id,release)
                     data={'plugins':items, 'registry_is_not_execution_permission':True}
+                data['permission_mode'] = grant['permission_mode']
+                data['host_access_available'] = grant['permission_mode'] == 'full'
                 await permissions.operation(conn,step['step_id'],'plugin-inspect:'+step['step_id'],utc_now())
                 await self.chat.work.result(conn,fresh,{'status':'succeeded','verification':'plugin_registry_snapshot','data':data},utc_now())
                 return
@@ -230,8 +234,10 @@ class PluginService:
             if tool is None: raise AccessDenied('PLUGIN_TOOL_UNAVAILABLE')
             if conversation['plan_mode'] and (tool.effect!='read' or not row['builtin']) and args['plugin_id'] not in {'builtin.interaction','builtin.todo'}:
                 raise AccessDenied('PLAN_MODE_READ_ONLY')
+            if args.get('access_root') is not None and grant['permission_mode'] != 'full':
+                raise AccessDenied('HOST_ACCESS_REQUIRES_FULL')
             checked(tool.input_schema,args['input'])
-            if (args['plugin_id'],args['tool']) in {('builtin.files','read_image'),('builtin.browser','browser_screenshot')} and not self.chat.config.chat_images_enabled:
+            if (args['plugin_id'],args['tool']) in {('builtin.files','read_image'),('builtin.browser','browser_screenshot'),('builtin.android_emulator','observe')} and not self.chat.config.chat_images_enabled:
                 raise AccessDenied('MODEL_IMAGES_DISABLED')
             if not await self.permission(conn,fresh,grant,args['plugin_id'],tool): return
             mcp_binding=None
@@ -276,7 +282,7 @@ class PluginService:
             if args['plugin_id']=='builtin.workflow' and args['tool']=='workflow': subcalls=min(subcalls,len(args['input']['steps']))
             request=REQUEST.validate_json(canonical({'request_id':str(uuid5(NAMESPACE_URL,'plugin:'+step['step_id'])),
                 'project_id':conversation['project_id'],'intent':'execute_plugin','arguments':PluginNodeArguments(
-                    plugin_id=args['plugin_id'],tool=args['tool'],input=args['input'],release_digest=row['digest'],
+                    plugin_id=args['plugin_id'],tool=args['tool'],input=args['input'],release_digest=row['digest'],access_root=args.get('access_root'),
                     context_id=UUID(conversation['conversation_id']),invocation_id=UUID(step['step_id']),
                     release=release if not row['builtin'] else None,capability_digests=dependencies if programmatic else {},max_subcalls=subcalls,mcp_binding=mcp_binding).model_dump(mode='json')}))
             async with self.chat.harness.operation:

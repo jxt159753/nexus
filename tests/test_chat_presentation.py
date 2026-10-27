@@ -74,7 +74,7 @@ def test_streaming_final_stays_provisional_until_commit(world, monkeypatch):
         await asyncio.wait_for(worker, 3)
         stopped = (await chat.get(world.owner, turn["turn_id"]))["presentation"]
         assert stopped["phase"] == "stopped" and stopped["live_text"] == final.text[:4]
-        assert "停止" in stopped["final_text"] and not stopped["collapse_process"]
+        assert "停止" in stopped["final_text"] and stopped["collapse_process"]
         assert final.closed
 
     asyncio.run(run())
@@ -90,7 +90,8 @@ def test_plain_reply_and_incomplete_or_failed_partial_are_distinct(world, monkey
         turn, _ = await send(chat, world, conv["conversation_id"])
         await chat.process_one()
         display = (await chat.get(world.owner, turn["turn_id"]))["presentation"]
-        assert display["phase"] == phase and not display["collapse_process"]
+        assert display["phase"] == phase
+        assert display["collapse_process"] == (phase != "completed")
         assert not display["process"]
         if phase == "completed":
             assert display["final_text"] == provider.text
@@ -119,7 +120,7 @@ def test_cancel_keeps_process_open_until_real_child_execution_stops(world, monke
         assert stopping["final_text"] is None
         await repo.cancelled(world.node, command.attempt_id)
         stopped = (await chat.get(world.owner, turn["turn_id"]))["presentation"]
-        assert stopped["phase"] == "stopped" and not stopped["collapse_process"]
+        assert stopped["phase"] == "stopped" and stopped["collapse_process"]
 
     asyncio.run(run())
 

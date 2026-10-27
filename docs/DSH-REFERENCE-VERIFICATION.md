@@ -37,8 +37,8 @@ $env:NEXUS_TEST_OPENSSL='C:\Program Files\Git\usr\bin\openssl.exe'
 ./.venv/Scripts/python.exe -B -m pytest -q -p no:cacheprovider -W error tests/test_acceptance.py tests/test_chat_context.py tests/test_chat.py tests/test_chat_work.py tests/test_workspace_work.py tests/test_web_work.py --basetemp var/dsh-optimization/final-focused --junitxml var/dsh-optimization/final-focused.xml
 
 # 独立浏览器检查：1 通过
-$env:NEXUS_TEST_NODE='C:\Users\User\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe'
-$env:NODE_PATH='C:\Users\User\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\node_modules'
+$env:NEXUS_TEST_NODE='C:\Users\example\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe'
+$env:NODE_PATH='C:\Users\example\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\node_modules'
 ./.venv/Scripts/python.exe -B -m pytest -q -p no:cacheprovider -W error tests/test_chat_work_browser.py --basetemp var/dsh-optimization/browser-check --junitxml var/dsh-optimization/browser-check.xml
 ```
 

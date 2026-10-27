@@ -16,6 +16,13 @@ fun statusLabel(value:String):String = mapOf(
 }
 
 fun actionLabel(value:String):String = mapOf(
+    "android_screen_observe" to "读取手机画面","android.screen_observe" to "读取手机画面",
+    "android_screen_act" to "按画面操作手机","android.screen_act" to "按画面操作手机",
+    "android_ui_observe" to "读取手机界面","android.ui_observe" to "读取手机界面",
+    "android_ui_act" to "操作手机界面","android.ui_act" to "操作手机界面",
+    "android_files" to "读取手机文件","android.files" to "读取手机文件",
+    "android_file_write" to "保存手机文件","android.file_write" to "保存手机文件",
+    "android_file_preview" to "预览手机文件修改","android.file_preview" to "预览手机文件修改",
     "get_system_info" to "查看电脑信息","system.info" to "查看电脑信息","list_directory" to "查看文件",
     "filesystem.list" to "查看文件","read_file" to "读取文件","filesystem.read" to "读取文件",
     "write_file" to "保存文件","filesystem.write" to "保存文件","send_file" to "发送文件","filesystem.receive" to "接收文件",

@@ -100,6 +100,7 @@ class VoiceService:
         self.sessions: dict[UUID, VoiceSession] = {}
         self.lock = asyncio.Lock()
         self.validate_owner = None
+        self.node_permitted = None
 
     @staticmethod
     def now() -> datetime:
@@ -583,6 +584,8 @@ class VoiceService:
                     if not session.active:
                         continue
                     reason = None
+                    if self.node_permitted and not self.node_permitted(session.node_id):
+                        reason = "policy"
                     if session.owner_principal and self.validate_owner:
                         try:
                             await self.validate_owner(session.owner_principal)

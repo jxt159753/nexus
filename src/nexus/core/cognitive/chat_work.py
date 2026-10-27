@@ -50,9 +50,9 @@ def request_for(step, role, project_id, command_digests, preview=None, interacti
         arguments["template_digest"]=(interaction_digests or {}).get(arguments["target_id"],"")
     if intent == "run_command":
         arguments["template_digest"] = command_digests.get(arguments["command_id"], "")
-    if intent in {"write_file","edit_file"}:
+    if intent in {"write_file","edit_file","android_file_write"}:
         if role == "preview":
-            intent = "preview_file_write" if intent == "write_file" else "preview_file_edit"
+            intent = {"write_file":"preview_file_write", "edit_file":"preview_file_edit", "android_file_write":"android_file_preview"}[intent]
         else:
             if not preview:
                 raise AccessDenied("WRITE_PREVIEW_REQUIRED")
@@ -78,20 +78,21 @@ async def validate_task(conn, step_id, role, owner_id, node_id, request, now):
         return
     if request.intent == 'execute_plugin' and proposal['intent'] == 'plugin_execute' and role == 'execute':
         if (request.arguments.plugin_id != arguments['plugin_id'] or request.arguments.tool != arguments['tool']
-                or request.arguments.input != arguments['input'] or str(request.arguments.invocation_id) != str(step_id)
+                or request.arguments.input != arguments['input'] or request.arguments.access_root != arguments.get('access_root')
+                or str(request.arguments.invocation_id) != str(step_id)
                 or str(request.arguments.context_id) != (await one(conn,'SELECT conversation_id FROM chat_turns WHERE turn_id=?',(step['turn_id'],)))[0]):
             raise AccessDenied('POLICY_DENIED')
         return
-    if (request.intent,proposal["intent"]) in {("preview_file_write","write_file"),("preview_file_edit","edit")} and role == "preview":
+    if (request.intent,proposal["intent"]) in {("preview_file_write","write_file"),("preview_file_edit","edit"),("android_file_preview","android_file_write")} and role == "preview":
         pass
     elif request.intent != WORK_INTENTS.get(proposal["intent"],proposal["intent"]) or role != "execute":
         raise AccessDenied("POLICY_DENIED")
     actual = request.arguments.model_dump(mode="json")
     if any(actual.get(key) != value for key,value in arguments.items()) or project[0] != (str(request.project_id) if request.project_id else None):
         raise AccessDenied("POLICY_DENIED")
-    if request.intent in {"write_file","edit_file"} and (not grant["auto_files"] and step["permission_decision"] != "approve" or str(request.arguments.preview_task_id) != step["preview_task_id"]):
+    if request.intent in {"write_file","edit_file","android_file_write"} and (not grant["auto_files"] and step["permission_decision"] != "approve" and grant["permission_mode"] != "full" or str(request.arguments.preview_task_id) != step["preview_task_id"]):
         raise AccessDenied("WORK_CONFIRMATION_REQUIRED")
-    if request.intent == "run_command" and grant["profile"] != "standard" and step["permission_decision"] != "approve":
+    if request.intent == "run_command" and grant["profile"] != "standard" and step["permission_decision"] != "approve" and grant["permission_mode"] != "full":
         raise AccessDenied("WORK_CONFIRMATION_REQUIRED")
 
 
@@ -194,7 +195,7 @@ class WorkService:
         if value.workspace_work:
             # Existing configured workspace + persisted identity grants are the
             # authorization. This internal scope is not an extra user approval.
-            if not {"get_node_status","get_system_info","android_device_status","android_notification_digest","read_file","find_files","write_file","read","glob","grep","edit","web_search","web_fetch","read_image","plugin_inspect","plugin_execute","skill_create"}.intersection(item["name"] for item in directory["catalog"]):
+            if not {"get_node_status","get_system_info","android_device_status","android_notification_digest","android_ui_observe","android_ui_act","android_screen_observe","android_screen_act","android_files","android_file_write","read_file","find_files","write_file","read","glob","grep","edit","web_search","web_fetch","read_image","plugin_inspect","plugin_execute","skill_create"}.intersection(item["name"] for item in directory["catalog"]):
                 raise AccessDenied("POLICY_DENIED")
             now=utc_now()
             if (await one(conn,"SELECT count(*) FROM chat_work_grants"))[0]>=10000:
@@ -227,7 +228,7 @@ class WorkService:
         options = self.chat.model_options(row, self.chat.config.work_actions_remaining(count))
         projected = fit_work_context(self.chat.config, messages, options["work_catalog"],
                                      allow_tools=options["allow_tools"], work_limit=options["work_limit"],
-                                     generate_title=options["generate_title"],history_summary=json.loads(row["history_summary_json"]),auto_memory=options.get('auto_memory',False))
+                                     generate_title=options["generate_title"],history_summary=json.loads(row["history_summary_json"]),auto_memory=options.get('auto_memory',False),assistant_style=options['assistant_style'])
         if projected != messages:
             await conn.execute("UPDATE chat_turns SET work_messages_json=?,context_truncated=1 WHERE turn_id=?",(canonical(projected),row["turn_id"]))
             await audit(conn,row["owner_id"],None,"chat.context_compacted",now)
@@ -251,7 +252,8 @@ class WorkService:
         for index,(proposal,native) in enumerate(checked,1):
             proposal, routed = await node_routing.bind_step(conn,row,proposal,now)
             await conn.execute("INSERT INTO chat_work_steps(step_id,turn_id,step_index,proposal_json,native_json,status,created_at,routed_grant_id) VALUES(?,?,?,?,?,'pending',?,?)",(str(uuid4()),row["turn_id"],count+index,canonical(proposal),canonical(native),timestamp(now),routed))
-        messages.append({"role":"assistant","content":reply.content or None,"tool_calls":[native for _,native in checked]})
+        # Routine commentary stays in the journal, not every subsequent model input.
+        messages.append({"role":"assistant","content":reply.content if reply.public_progress else None,"tool_calls":[native for _,native in checked]})
         await conn.execute("UPDATE chat_turns SET work_status='waiting',work_messages_json=? WHERE turn_id=?",(canonical(messages),row["turn_id"]))
 
     async def rejected(self,conn,row,reply,now):
@@ -265,7 +267,7 @@ class WorkService:
         old_ids={call["id"] for message in messages for call in message.get("tool_calls",[])}
         if len(set(identifiers)) != len(identifiers) or old_ids.intersection(identifiers):
             raise AccessDenied("MODEL_RESPONSE_INVALID")
-        messages.append({"role":"assistant","content":reply.content or None,"tool_calls":list(reply.rejected_calls)})
+        messages.append({"role":"assistant","content":None,"tool_calls":list(reply.rejected_calls)})
         for index,native in enumerate(reply.rejected_calls):
             evidence={"status":"failed","phase":"arguments","execution_outcome":"not_started","batch_executed":False,
                       "error_code":"INVALID_TOOL_ARGUMENTS","errors":[item for item in reply.validation_errors if item["index"]==index],
@@ -326,7 +328,7 @@ class WorkService:
         options = self.chat.model_options({**dict(row), "work_round": row["work_round"]+1}, self.chat.config.work_actions_remaining(count))
         try:
             projected = messages if json.loads(row["request_json"]).get("allow_compaction") else fit_work_context(self.chat.config, messages, options["work_catalog"],
-                                         allow_tools=options["allow_tools"], work_limit=options["work_limit"],history_summary=json.loads(row["history_summary_json"]),auto_memory=options.get('auto_memory',False))
+                                         allow_tools=options["allow_tools"], work_limit=options["work_limit"],history_summary=json.loads(row["history_summary_json"]),auto_memory=options.get('auto_memory',False),assistant_style=options['assistant_style'])
         except AccessDenied as exc:
             # A full model context cannot erase an already verified execution.
             await self.abort(conn,row["turn_id"],exc.code,now)
@@ -416,6 +418,9 @@ class WorkService:
             from nexus.core.cognitive.work_creation import create_skill
             await create_skill(self.chat, step, principal, node_id)
             return
+        if intent in {'inspect_ui_extension','submit_ui_extension'}:
+            await self.chat.plugins.ui_extensions.work_step(step, principal, node_id, proposal)
+            return
         if intent in {'plugin_inspect','plugin_execute','plugin_install'}:
             await self.chat.plugins.work_step(step,principal,node_id,proposal)
             return
@@ -428,7 +433,7 @@ class WorkService:
                 data = await work_queries.query(conn,fresh,current_grant,intent,proposal["arguments"],utc_now())
                 await self.result(conn,fresh,{"status":"succeeded","verification":"core_record_snapshot","data":data},utc_now())
             return
-        if intent == "read_image" and not self.chat.config.chat_images_enabled:
+        if intent in {"read_image", "android_screen_observe", "android_screen_act"} and not self.chat.config.chat_images_enabled:
             raise AccessDenied("POLICY_DENIED")
         if intent in {"web_search","web_fetch"}:
             await self.web.start(step)
@@ -478,9 +483,17 @@ class WorkService:
                         await self.result(conn,step,data,utc_now())
                 return
             preview=task.result.model_dump(mode="json")
+            if intent == "android_file_write":
+                import difflib
+                difference = "\n".join(difflib.unified_diff(
+                    (preview["previous_text"] or "").splitlines(),
+                    proposal["arguments"]["content"].splitlines(),
+                    fromfile="before/"+preview["path"], tofile="after/"+preview["path"], lineterm=""))
+                preview.update(diff=difference[:16000], truncated=len(difference)>16000)
         if not step["task_id"]:
-            if intent in {"write_file","edit"} and preview is not None and not fresh["permission_decision"] and not grant["auto_files"] and grant['permission_mode'] != 'full':
-                text=f"我需要写入 workspace/{proposal['arguments']['path']}。请查看下面的实际差异；回复“同意”将只批准本次内容，回复“不同意”则停止。"
+            if intent in {"write_file","edit","android_file_write"} and preview is not None and not fresh["permission_decision"] and not grant["auto_files"] and grant['permission_mode'] != 'full':
+                location = "手机授权目录" if intent == "android_file_write" else "workspace"
+                text=f"我需要写入 {location}/{proposal['arguments']['path']}。请查看下面的写入预览；回复“同意”将只批准本次内容，回复“不同意”则停止。"
                 async with self.database.transaction() as conn:
                     await permissions.allowed_step(conn,step["step_id"],utc_now())
                     await conn.execute("UPDATE chat_work_steps SET status='permission',request_text=?,result_json=? WHERE step_id=?",(text,canonical({"preview":preview}),step["step_id"]))
@@ -493,13 +506,13 @@ class WorkService:
                         await conn.execute("UPDATE chat_work_steps SET status='permission',request_text=? WHERE step_id=?",(f"本轮需要操作已配置目标 {proposal['arguments']['target_id']}，仅允许该目标的固定动作，不含其他程序或页面范围。回复“同意”授权本轮该目标，回复“不同意”停止。",step["step_id"]))
                         await conn.execute("UPDATE chat_turns SET work_status='permission',revision=revision+1 WHERE turn_id=?",(step["turn_id"],))
                         return
-            if intent == "run_command" and grant["profile"] != "standard" and not fresh["permission_decision"]:
+            if intent == "run_command" and grant["profile"] != "standard" and not fresh["permission_decision"] and grant["permission_mode"] != "full":
                 async with self.database.transaction() as conn:
                     await permissions.allowed_step(conn,step["step_id"],utc_now())
                     await conn.execute("UPDATE chat_work_steps SET status='permission',request_text=? WHERE step_id=?",(f"需要执行已配置的固定命令 {proposal['arguments']['command_id']}。回复“同意”执行，回复“不同意”停止。",step["step_id"]))
                     await conn.execute("UPDATE chat_turns SET work_status='permission',revision=revision+1 WHERE turn_id=?",(step["turn_id"],))
                 return
-            role="preview" if intent in {"write_file","edit"} and not preview else "execute"
+            role="preview" if intent in {"write_file","edit","android_file_write"} and not preview else "execute"
             file_source=None
             if intent=='send_file':
                 from nexus.core.cognitive.chat_files import materialize

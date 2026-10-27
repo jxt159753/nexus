@@ -10,8 +10,8 @@ android {
         applicationId = "ai.nexus.android"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.1.5"
+        versionCode = 17
+        versionName = "0.1.16"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }
@@ -27,7 +27,7 @@ android {
 }
 // Bundle the same renderer and pinned Three.js assets as Windows, without a network view.
 val syncVisualization by tasks.registering(Sync::class) {
-    from(rootProject.file("../../src/nexus/web/app")) {
+    from(rootProject.file("../site/nexus/web/app")) {
         include("visualization.js", "vendor/three*.js", "vendor/THREE-LICENSE.txt", "vendor/addons/**")
         into("visualization")
     }

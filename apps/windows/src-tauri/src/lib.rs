@@ -2,6 +2,9 @@ mod auth;
 mod bridge;
 mod node;
 mod voice;
+mod wake;
+mod reminders;
+mod game_mode;
 
 use std::time::Duration;
 
@@ -16,6 +19,10 @@ fn show_main(app: &tauri::AppHandle, from_tray: bool) -> tauri::Result<()> {
     // Closing during startup or opening from the tray consumes the splash.
     // The delayed callback must not reopen a window the user already hid.
     if !from_tray && splash.is_none() {
+        return Ok(());
+    }
+    if !from_tray && app.state::<game_mode::GameMode>().active() {
+        if let Some(window) = splash { window.destroy()?; }
         return Ok(());
     }
     let position = splash.as_ref().and_then(|window| window.outer_position().ok());
@@ -80,6 +87,9 @@ pub fn run() {
         .manage(BridgeState::new())
         .manage(NodeManager::new())
         .manage(voice::VoiceManager::new())
+        .manage(wake::WakeManager::default())
+        .manage(reminders::Reminders::new())
+        .manage(game_mode::GameMode::default())
         .invoke_handler(tauri::generate_handler![
             bridge::set_core_url,
             bridge::load_session,
@@ -102,7 +112,12 @@ pub fn run() {
             voice::voice_devices,
             voice::voice_start,
             voice::voice_stop,
-            voice::voice_interrupt
+            voice::voice_interrupt,
+            wake::voice_wake,
+            reminders::reminders_start,
+            reminders::reminders_stop,
+            game_mode::game_mode_status,
+            game_mode::game_mode_set
         ])
         .on_window_event(|window, event| {
             if matches!(window.label(), "main" | "splash") {
@@ -120,6 +135,9 @@ pub fn run() {
         })
         .setup(|app| {
             create_tray(app)?;
+            game_mode::start(app.handle());
+            wake::start(app.handle());
+            reminders::restore(app.handle());
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("app.html".into()))
                 .title("NEXUS")
                 .inner_size(1280.0, 720.0)
@@ -139,6 +157,7 @@ pub fn run() {
                 .maximizable(false)
                 .always_on_top(false)
                 .focused(false)
+                .visible(!app.state::<game_mode::GameMode>().active())
                 .center()
                 .use_https_scheme(true)
                 .build()?;
@@ -158,8 +177,10 @@ pub fn run() {
         .expect("NEXUS Windows shell")
         .run(|app, event| {
             if matches!(event, tauri::RunEvent::Exit) {
+                app.state::<wake::WakeManager>().disable();
                 app.state::<voice::VoiceManager>().stop();
                 app.state::<NodeManager>().stop();
+                app.state::<reminders::Reminders>().stop();
             }
         });
 }

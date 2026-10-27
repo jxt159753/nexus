@@ -19,14 +19,16 @@ import {
   pendingPermissions,
   previewResult,
   projectName,
-  selectConversation,
   setPref,
   state,
   taskDetail,
   clearPrefs,
+  loadConversations,
 } from "./api.js";
 
 import { renderChatFiles } from "./chat-files.js";
+import { renderAssistantSettings } from "./personality.js";
+import { gameModeActive, renderGameModeSettings } from "./game-mode.js";
 import { markdownPreview, renderMarkdown } from "./markdown.js";
 import {
   attachmentBlocksSend,
@@ -49,6 +51,8 @@ const presentationUi = new Map();
 
 export const ui = {
   openChat: () => {},
+  openConversationSource: async () => {},
+  toggleConversationArchive: async () => {},
   closeChat: () => {},
   openSettings: () => {},
   openScope: () => {},
@@ -83,6 +87,7 @@ export function button(label, className, onClick) {
 }
 
 export function notify(message, error = false) {
+  if (gameModeActive()) return;
   const box = $("notice");
   if (!box) return;
   box.textContent = message;
@@ -95,6 +100,12 @@ export function notify(message, error = false) {
 export function errorText(error) {
   const code = error instanceof ApiError ? error.code : error?.message;
   const labels = {
+    UI_EXTENSION_POLICY_REQUIRED: "请在手势面板授权当前会话的插件开发",
+    UI_EXTENSION_CLIENT_UNAVAILABLE: "请保持已授权的客户端在线",
+    UI_EXTENSION_POLICY_CHANGED: "插件授权已变化，请重新检查",
+    UI_EXTENSION_SCOPE_MISMATCH: "插件名称不在本会话授权范围内",
+    UI_EXTENSION_EVIDENCE_MISMATCH: "插件验证记录与当前版本不一致",
+    UI_EXTENSION_LEASE_EXPIRED: "插件验证已过期，旧版本保持不变",
     AUTH_REQUIRED: "会话已过期，请重新登录",
     BUSY: "当前繁忙，请稍后再试",
     IDEMPOTENCY_CONFLICT: "状态已经变化，请刷新后重试",
@@ -776,19 +787,14 @@ function presentationBadge(presentation) {
 }
 
 function presentationState(turn, presentation) {
+  const collapse = presentation.collapse_process && !!presentation.final_text;
   let value = presentationUi.get(turn.turn_id);
   if (!value) {
-    value = {
-      open: !(presentation.phase === "completed" && presentation.collapse_process && presentation.final_text !== null),
-      manual: false,
-      phase: presentation.phase,
-    };
+    value = { open: !collapse, collapse };
     presentationUi.set(turn.turn_id, value);
-  } else if (value.phase !== presentation.phase) {
-    if (presentation.phase === "completed" && !value.manual) {
-      value.open = !(presentation.collapse_process && presentation.final_text !== null);
-    }
-    value.phase = presentation.phase;
+  } else {
+    if (collapse && !value.collapse) value.open = false;
+    value.collapse = collapse;
   }
   if (presentation.phase === "awaiting_input") value.open = true;
   return value;
@@ -796,8 +802,15 @@ function presentationState(turn, presentation) {
 
 function renderPresentationBody(assistant, turn, presentation) {
   if(presentation.files?.length) assistant.append(renderChatFiles(presentation.files,api,uuid));
+  for (const source of presentation.conversations || []) {
+    const card = el("div", "process-panel");
+    card.append(el("strong", "", source.title || "会话记录"));
+    card.append(el("p", "hint", [source.project_name, source.created_at ? formatDate(source.created_at) : "", source.archived ? "已归档" : ""].filter(Boolean).join(" · ")));
+    const open = button("打开会话", "quiet", () => runAction(() => ui.openConversationSource(source.conversation_id, source.turn_id), open));
+    card.append(open); assistant.append(card);
+  }
   const status = el("div", "status-line");
-  if (presentation.phase !== "completed") status.append(presentationBadge(presentation));
+  if (presentation.phase !== "completed" || turn.error_code || turn.work_steps?.some(step => ["failed", "stopped"].includes(step.status))) status.append(presentationBadge(presentation));
   if (turn.cost_status === "unknown") status.append(el("span", "hint", "部分费用待核对"));
   if (turn.context_truncated) status.append(el("span", "hint", "较早的内容未全部带入本次回复"));
   if (status.childElementCount) assistant.append(status);
@@ -821,17 +834,17 @@ function renderPresentationBody(assistant, turn, presentation) {
     const ui = presentationState(turn, presentation);
     const body = el("div", "process-body");
     body.hidden = !ui.open;
-    const toggle = button(ui.open ? "收起处理过程" : "查看处理过程", "process-toggle");
+    const closedLabel = `查看处理过程${steps.length ? ` · ${steps.length} 步` : ""}`;
+    const toggle = button(ui.open ? "收起处理过程" : closedLabel, "process-toggle");
     toggle.setAttribute("aria-expanded", String(ui.open));
     toggle.hidden = presentation.phase === "awaiting_input";
     toggle.disabled = presentation.phase === "awaiting_input";
     const head = el("div", "process-head");
-    head.append(el("span", "process-title", "处理过程"), toggle);
+    head.append(toggle);
     toggle.addEventListener("click", () => {
       ui.open = !ui.open;
-      ui.manual = true;
       body.hidden = !ui.open;
-      toggle.textContent = ui.open ? "收起处理过程" : "查看处理过程";
+      toggle.textContent = ui.open ? "收起处理过程" : closedLabel;
       toggle.setAttribute("aria-expanded", String(ui.open));
     });
 
@@ -1034,25 +1047,44 @@ export function renderDock() {
 
 export function renderConversations() {
   const list = $("conversation-list");
+  const scrollTop = list.scrollTop;
   list.replaceChildren();
   if (!state.conversations.length) {
     list.append(el("p", "hint", state.archived ? "没有已归档会话" : "还没有会话"));
   }
   for (const conversation of state.conversations) {
+    const row = el("div", "conversation-row");
+    row.dataset.conversationId = conversation.conversation_id;
     const item = el("button", "conversation-item" + (conversation.conversation_id === state.conversation?.conversation_id ? " active" : ""));
     item.type = "button";
+    item.title = conversation.title || "新会话";
     item.append(el("strong", "", conversation.title || "新会话"));
     const project = conversation.project_id ? projectName(conversation.project_id) || "项目会话" : "";
     item.append(el("small", "", `${formatDate(conversation.created_at)}${project ? " · " + project : ""}${conversation.archived ? " · 已归档" : ""}`));
     item.addEventListener("click", () => runAction(async () => {
-      if (conversation.conversation_id !== state.conversation?.conversation_id) leaveConversation();
-      await selectConversation(conversation.conversation_id);
-      ui.openChat();
-      ui.refresh(true);
+      await ui.openConversationSource(conversation.conversation_id);
     }, item));
-    list.append(item);
+    const label = conversation.archived ? "取消归档" : "归档";
+    const archive = button("", "conversation-archive quiet", () => runAction(
+      () => ui.toggleConversationArchive(conversation), archive));
+    archive.title = label;
+    archive.setAttribute("aria-label", `${label}：${conversation.title || "新会话"}`);
+    archive.disabled = state.archivingConversations.has(conversation.conversation_id);
+    archive.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8v12h16V8M3 4h18v4H3z"/><path d="${conversation.archived ? "M12 17v-6m-3 3 3-3 3 3" : "M9 12h6"}"/></svg>`;
+    row.append(item, archive);
+    list.append(row);
+  }
+  if (state.conversationsBefore) {
+    const more = button(state.conversationsLoading ? "正在加载…" : "加载更多会话", "quiet conversation-more", () => runAction(async () => {
+      const loading = loadConversations(state.archived, true);
+      renderConversations();
+      try { await loading; } finally { renderConversations(); }
+    }, more));
+    more.disabled = state.conversationsLoading;
+    list.append(more);
   }
   $("archive-toggle").textContent = state.archived ? "查看进行中" : "查看归档";
+  list.scrollTop = scrollTop;
 }
 
 export function refreshComposerState() {
@@ -1108,13 +1140,16 @@ export function renderChat(force = false) {
   $("chat-text").disabled = !state.ready;
 }
 
-export function renderSettings() {
+export function renderSettings({ refreshAssistant = false } = {}) {
   const body = $("settings-body");
   if (!body) return;
+  const assistantSettings = refreshAssistant ? null : body.querySelector(".assistant-settings");
+  const openSections = new Set([...body.querySelectorAll("details[id][open]")].map((item) => item.id));
   body.replaceChildren();
 
-  const connection = el("section", "settings-section");
-  connection.append(el("h2", "", "连接与账户"));
+  const connection = el("details", "settings-section settings-disclosure");
+  connection.id = "settings-account";
+  connection.append(el("summary", "", "连接与账户"));
   const core = el("div", "settings-row");
   const coreText = el("div", "grow");
   coreText.append(el("strong", "", "已连接"));
@@ -1125,16 +1160,13 @@ export function renderSettings() {
   actions.append(button("退出登录", "quiet", () => ui.logout()));
 
   connection.append(actions);
-  body.append(connection);
 
   const permissionSection = el("section", "settings-section");
   permissionSection.append(el("h2", "", "权限与扩展"));
-  permissionSection.append(el("p", "", "管理助手可以执行的操作、扩展功能和提醒。"));
   permissionSection.append(el("p", "hint", "普通模式会在需要时询问；完全模式按你授权的范围执行。"));
   const permissionActions = el("div", "settings-row");
   permissionActions.append(button("管理权限与扩展", "primary", () => ui.openPlugins("permissions")));
 
-  if (state.conversation) permissionActions.append(button("本会话权限", "quiet", () => ui.openConversationPermission()));
   permissionSection.append(permissionActions);
   body.append(permissionSection);
 
@@ -1143,8 +1175,13 @@ export function renderSettings() {
   body.append(devices);
   renderDevices();
 
+  if (assistantSettings) body.append(assistantSettings);
+  else renderAssistantSettings(body);
+  ui.renderVoiceSettings?.(body);
+  renderGameModeSettings(body);
 
   const projects = el("details", "settings-section settings-disclosure");
+  projects.id = "settings-projects";
   projects.append(el("summary", "", "项目"));
   for (const project of state.projects) {
     const row = el("div", "settings-row");
@@ -1164,10 +1201,12 @@ export function renderSettings() {
   const form = el("form", "field");
   const name = el("input");
   name.placeholder = "新项目名称";
+  name.setAttribute("aria-label", "新项目名称");
   name.maxLength = 100;
   name.required = true;
   const description = el("input");
   description.placeholder = "项目说明（可选）";
+  description.setAttribute("aria-label", "项目说明（可选）");
   description.maxLength = 500;
   const submit = el("button", "quiet", "创建项目");
   submit.type = "submit";
@@ -1188,6 +1227,7 @@ export function renderSettings() {
   body.append(projects);
 
   const usage = el("details", "settings-section settings-disclosure");
+  usage.id = "settings-usage";
   usage.append(el("summary", "", "用量与费用"));
   const value = state.usage;
   if (!value) usage.append(el("p", "", "正在读取用量…"));
@@ -1201,6 +1241,7 @@ export function renderSettings() {
   body.append(usage);
 
   const privacy = el("details", "settings-section settings-disclosure");
+  privacy.id = "settings-privacy";
   privacy.append(el("summary", "", "隐私与高级设置"));
   privacy.append(el("p", "", "聊天发送前会说明实际分享范围。清除显示偏好不会删除聊天记录，也不会撤销已发送的内容。"));
   privacy.append(button("清除本地显示偏好", "quiet", () => {
@@ -1217,7 +1258,8 @@ export function renderSettings() {
   about.append(el("h2", "", "关于"));
   about.append(el("p", "", "NEXUS · 一个助手，连接你的设备"));
 
-  body.append(about);
+  body.append(connection, about);
+  for (const section of body.querySelectorAll("details[id]")) section.open = openSections.has(section.id);
 }
 
 export function openSheet({ title, body, actions = [] }) {

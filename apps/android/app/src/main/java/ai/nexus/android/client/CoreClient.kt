@@ -83,7 +83,7 @@ class CoreClient(private val vault: Vault) {
             })
         }
     }
-    suspend fun request(method: String, path: String, data: JsonObject? = null, raw: ByteArray? = null): JsonObject = withContext(Dispatchers.IO) {
+    suspend fun request(method: String, path: String, data: JsonObject? = null, raw: ByteArray? = null, proof: String? = null): JsonObject = withContext(Dispatchers.IO) {
         require(path.startsWith("/api/v1/") && !path.substringBefore('?').contains(".."))
         val url = requireNotNull(base).resolve(path)!!
         require(url.host == base!!.host && url.port == base!!.port && url.scheme == base!!.scheme)
@@ -92,6 +92,7 @@ class CoreClient(private val vault: Vault) {
         val request = Request.Builder().url(url).method(method, body).header("Origin", APP_ORIGIN)
         cookie?.let { request.header("Cookie", "nexus_session=$it") }
         csrf?.let { request.header("X-CSRF-Token", it) }
+        proof?.let { request.header("X-Nexus-Device-Proof", it) }
         suspendCancellableCoroutine { continuation ->
         val call = (if(method == "GET") readHttp else http).newCall(request.build())
         continuation.invokeOnCancellation { call.cancel() }

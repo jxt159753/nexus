@@ -17,6 +17,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import ai.nexus.android.BuildConfig
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -28,17 +30,17 @@ import ai.nexus.android.security.Vault
 import ai.nexus.protocol.*
 import kotlinx.serialization.json.*
 
-// Shared visual tokens from apps/windows/ui/app.css (DSH): monochrome, 14px panels.
+// Shared palette and panel hierarchy with the web and Windows clients.
 private val colors = darkColorScheme(primary=Color.White,onPrimary=Color.Black,
-    background=Color.Black,surface=Color(0xFF0D0D0D),surfaceVariant=Color(0xFF181818),
-    surfaceContainer=Color(0xFF121212),surfaceContainerHigh=Color(0xFF181818),
+    background=Color(0xFF080A0C),surface=Color(0xFF101316),surfaceVariant=Color(0xFF181D22),
+    surfaceContainer=Color(0xFF101316),surfaceContainerHigh=Color(0xFF181D22),
     onSurface=Color(0xFFF2F2F2),onBackground=Color(0xFFF2F2F2),
     secondary=Color(0xFFA3A3A3),onSecondary=Color.Black,secondaryContainer=Color(0xFF242424),
-    outline=Color(0xFF333333),outlineVariant=Color(0xFF242424),error=Color(0xFFE0E0E0))
+    outline=Color(0xFF30353A),outlineVariant=Color(0xFF282C30),error=Color(0xFFE0E0E0))
 private val pretty = Json { prettyPrint = true }
 private fun formatted(value: JsonElement) = pretty.encodeToString(JsonElement.serializer(),value).take(18000)
 
-@Composable fun NexusApp(model: AppModel, nodeState: String, nodeRunning: Boolean, onVoiceStart: () -> Unit, onStartNode: () -> Unit, onStopNode: () -> Unit, onNotificationSettings: () -> Unit) {
+@Composable fun NexusApp(model: AppModel, nodeState: String, nodeRunning: Boolean, onVoiceStart: () -> Unit, onStartNode: () -> Unit, onStopNode: () -> Unit, onNotificationSettings: () -> Unit, onStartReminders: () -> Unit = {}) {
     MaterialTheme(colorScheme=colors, shapes=Shapes(small=RoundedCornerShape(9.dp),medium=RoundedCornerShape(14.dp),large=RoundedCornerShape(20.dp))) {
         Surface(Modifier.fillMaxSize()) {
             if(!model.signedIn) Login(model) else BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -48,7 +50,8 @@ private fun formatted(value: JsonElement) = pretty.encodeToString(JsonElement.se
                         Box(Modifier.size(32.dp).border(1.dp,Color(0xFF4A4A4A),RoundedCornerShape(9.dp)),contentAlignment=Alignment.Center) { Text("N",fontWeight=FontWeight.SemiBold) }
                         Spacer(Modifier.width(10.dp))
                         Text("NEXUS",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold,modifier=Modifier.weight(1f))
-                        Text(if(model.syncState=="已同步") "${model.nodes.count{it.text("online")=="true"}} 台设备在线" else model.syncState,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.secondary)
+                        Text(if(model.nodesFresh && model.activityFresh) "${model.nodes.count{it.text("online")=="true"}} 台设备在线" else "正在同步",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.secondary)
+                        TextButton(onClick={model.page=4}) { Text("提醒") }
                     } },
                     bottomBar = { if(!rail && WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current)==0) NavigationBar {
                         listOf("对话","任务","设备","设置").forEachIndexed { index,title ->
@@ -68,6 +71,7 @@ private fun formatted(value: JsonElement) = pretty.encodeToString(JsonElement.se
                             0 -> ChatPage(model)
                             1 -> Box(Modifier.fillMaxSize(),contentAlignment=Alignment.TopCenter) { Box(Modifier.widthIn(max=900.dp).fillMaxSize()){TasksPage(model)} }
                             2 -> Box(Modifier.fillMaxSize(),contentAlignment=Alignment.TopCenter) { Box(Modifier.widthIn(max=760.dp).fillMaxSize()){DevicesPage(model,nodeState,nodeRunning,onStartNode,onStopNode,onNotificationSettings)} }
+                            4 -> ReminderPage(model,onStartReminders)
                             else -> Box(Modifier.fillMaxSize(),contentAlignment=Alignment.TopCenter) { Box(Modifier.widthIn(max=760.dp).fillMaxSize()){SettingsPage(model,onStopNode)} }
                         }
                     }
@@ -137,11 +141,11 @@ private fun formatted(value: JsonElement) = pretty.encodeToString(JsonElement.se
         Row(Modifier.padding(horizontal=12.dp),verticalAlignment=Alignment.CenterVertically) {
             TextButton(onClick={listOpen=true}) { Text("会话") }
             Text(model.history.objectAt("conversation").text("title").ifEmpty { "开始一段对话" },Modifier.weight(1f),maxLines=1,overflow=TextOverflow.Ellipsis)
-            TextButton(onClick={model.newConversation()},enabled=!model.busy && model.pending==null) { Text("新建") }
             if(!expanded) TextButton(onClick={showScene=!showScene}) { Text(if(showScene) "对话" else "动态") }
             Box {
-                TextButton(onClick={menu=true}) { Text("更多") }
+                IconButton(onClick={menu=true},modifier=Modifier.semantics { contentDescription="会话操作" }) { Text("⋯",style=MaterialTheme.typography.titleLarge) }
                 DropdownMenu(expanded=menu,onDismissRequest={menu=false}) {
+                    DropdownMenuItem(text={Text("新对话")},onClick={model.newConversation();menu=false;showScene=false},enabled=!model.busy && model.pending==null)
                     DropdownMenuItem(text={Text("重命名")},onClick={title=model.history.objectAt("conversation").text("title");rename=true;menu=false},enabled=model.conversationId.isNotEmpty())
                     DropdownMenuItem(text={Text(if(model.history.objectAt("conversation").text("archived")=="1") "恢复会话" else "归档会话")},onClick={menu=false;if(model.history.objectAt("conversation").text("archived")=="1")model.updateConversation(archive=false) else archiveConfirm=true},enabled=model.conversationId.isNotEmpty())
                 }
@@ -153,43 +157,33 @@ private fun formatted(value: JsonElement) = pretty.encodeToString(JsonElement.se
             Text(model.voiceDetail,style=MaterialTheme.typography.bodySmall)
             Row { TextButton(onClick={model.interruptVoice()}){Text("打断回答")};TextButton(onClick={model.stopVoice()}){Text("结束语音")}}
         } }
+        val sceneOnly = !expanded && (showScene || turns.isEmpty())
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            Column(Modifier.fillMaxSize(),horizontalAlignment=Alignment.CenterHorizontally) {
         Row(Modifier.weight(1f).fillMaxWidth()) {
-            if(expanded || showScene || turns.isEmpty()) Column(Modifier.then(if(expanded) Modifier.weight(.42f) else Modifier.weight(1f)).fillMaxHeight().padding(12.dp)) {
-                Surface(Modifier.weight(1f).fillMaxWidth(),shape=RoundedCornerShape(22.dp),color=Color(0xFF080A0E)) { Visualization(model,Modifier.fillMaxSize()) }
-                if(turns.isEmpty()) { Text("想一起完成什么？",Modifier.padding(top=16.dp),style=MaterialTheme.typography.titleLarge);Text("直接输入，也可以用语音聊聊。",Modifier.padding(top=6.dp,bottom=12.dp),color=MaterialTheme.colorScheme.secondary) }
-                else Text(if(model.activeTurn.isNotEmpty()) "正在处理你的请求" else "设备动态 · 与对话同步",Modifier.padding(8.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.secondary)
+            if(expanded || showScene || turns.isEmpty()) Column(Modifier.then(if(expanded) Modifier.weight(.42f) else Modifier.weight(1f)).fillMaxHeight()) {
+                Surface(Modifier.weight(1f).fillMaxWidth(),color=Color.Black) { Visualization(model,Modifier.fillMaxSize()) }
+
             }
             if((expanded || !showScene) && turns.isNotEmpty()) LazyColumn(Modifier.weight(if(expanded) .58f else 1f).fillMaxHeight(),state=messageList,contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
-                item { TextButton(onClick={model.earlierTurns()},enabled=!model.busy){Text("更早消息")} }
+                item { if(model.history.objects("turns").size >= 20 || model.olderTurns.isNotEmpty()) TextButton(onClick={model.earlierTurns()},enabled=!model.busy){Text("更早消息")} }
                 items(turns,key={it.text("turn_id")}) { turn -> TurnCard(model,turn) }
             }
         }
-        if(model.activeTurn.isNotEmpty()) TextButton(onClick={model.stopTurn(model.activeTurn)},enabled=!model.busy && model.pending==null,modifier=Modifier.align(Alignment.End)) { Text("停止当前回复") }
-        Column(Modifier.background(MaterialTheme.colorScheme.surface).padding(horizontal=16.dp,vertical=8.dp)) {
-
-            if(options) Column(Modifier.heightIn(max=240.dp).verticalScroll(rememberScrollState())) {
-                Toggle("允许将本轮消息发给模型",model.allowModel){model.allowModel=it}
-                Toggle("携带本会话上下文",model.allowContext){model.allowContext=it}
-                Toggle("允许助手使用已授权设备",model.allowTools){model.allowTools=it}
-                Toggle("允许模型读取本轮执行结果（可能含通知）",model.allowResults){model.allowResults=it}
-
+                if(!sceneOnly) ChatComposer(model,onOptions={options=true},onSend={if(!model.allowModel || model.allowTools && !model.allowResults) sendConsent=true else model.send()})
             }
-            if(model.sendBlockedReason.isNotEmpty()) Text(model.sendBlockedReason,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.secondary)
-            OutlinedTextField(model.draft,model::editDraft,label={Text("输入消息")},maxLines=5,modifier=Modifier.fillMaxWidth(),enabled=!model.busy)
-            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                TextButton(onClick={model.showVoice()},enabled=!model.busy && !model.voiceActive && model.pending==null) { Text("语音") }
-                TextButton(onClick={options=!options}) { Text(if(options) "收起选项" else "选项") }
-                Spacer(Modifier.weight(1f))
-                Button(onClick={
-                    if(!model.allowModel || model.allowTools && !model.allowResults) sendConsent=true else model.send()
-                },enabled=model.sendBlockedReason.isEmpty() && model.draft.isNotBlank()) { Text("发送") }
-            }
+            if(sceneOnly) Box(Modifier.align(Alignment.BottomCenter)) { ChatComposer(model,onOptions={options=true},onSend={if(!model.allowModel || model.allowTools && !model.allowResults) sendConsent=true else model.send()}) }
         }
+
     }
     }
+    if(options) AlertDialog(onDismissRequest={options=false},title={Text("对话选项")},text={Column {
+        Toggle("携带本会话上下文",model.allowContext){model.allowContext=it}
+        Toggle("使用已授权设备",model.allowTools){model.allowTools=it}
+    }},confirmButton={TextButton(onClick={options=false}){Text("完成")}})
     if(sendConsent) AlertDialog(onDismissRequest={sendConsent=false},title={Text("发送本轮消息")},text={Column {
         Text("本轮文字${if(model.allowContext) "和会话上下文" else ""}将发送给模型。")
-        if(model.allowTools) Text("助手可使用已授权设备，相关执行结果会交给模型，可能包含文件、图片或通知内容。需要确认的操作仍会询问你。",Modifier.padding(top=12.dp))
+        if(model.allowTools) Text("助手可使用已授权设备，相关执行结果以及按问题查到的本人其他会话摘录、项目记录会交给模型，可能包含文件、图片或通知内容。需要确认的操作仍会询问你。",Modifier.padding(top=12.dp))
     }},confirmButton={TextButton(onClick={
         sendConsent=false;model.allowModel=true;model.allowResults=model.allowTools;model.send()
     },enabled=model.sendBlockedReason.isEmpty()){Text("同意并发送")}},dismissButton={TextButton(onClick={sendConsent=false}){Text("返回")}})
@@ -199,16 +193,40 @@ private fun formatted(value: JsonElement) = pretty.encodeToString(JsonElement.se
             items(model.conversations,key={it.text("conversation_id")}) { value -> TextButton(onClick={model.selectConversation(value.text("conversation_id"));listOpen=false}){Text(value.text("title"))} }
             item { TextButton(onClick={model.moreConversations()},enabled=!model.busy){Text("加载更多")}}
         }
-    }},confirmButton={TextButton(onClick={listOpen=false}){Text("关闭")}})
+    }},confirmButton={TextButton(onClick={listOpen=false;showScene=false;model.newConversation()},enabled=!model.busy && model.pending==null){Text("新对话")}},dismissButton={TextButton(onClick={listOpen=false}){Text("关闭")}})
     if(rename) AlertDialog(onDismissRequest={rename=false},title={Text("重命名")},text={OutlinedTextField(title,{title=it.take(80)})},confirmButton={TextButton(onClick={model.updateConversation(title=title);rename=false},enabled=title.isNotBlank()){Text("保存")}})
     if(archiveConfirm) AlertDialog(onDismissRequest={archiveConfirm=false},title={Text("归档会话？")},text={Text("归档会停止此会话的工作授权，可在归档记录中恢复。")},confirmButton={TextButton(onClick={model.updateConversation(archive=true);archiveConfirm=false}){Text("归档")}},dismissButton={TextButton(onClick={archiveConfirm=false}){Text("返回")}})
+}
+@Composable private fun ChatComposer(model: AppModel, onOptions: () -> Unit, onSend: () -> Unit) {
+    var composerMenu by remember { mutableStateOf(false) }
+    Surface(Modifier.widthIn(max=760.dp).fillMaxWidth().padding(horizontal=12.dp,vertical=8.dp),shape=RoundedCornerShape(20.dp),color=MaterialTheme.colorScheme.surface,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outline)) {
+    Column(Modifier.padding(10.dp)) {
+            if(model.sendBlockedReason.isNotEmpty() && model.activeTurn.isEmpty()) Text(model.sendBlockedReason,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.secondary)
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.Bottom,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                Box {
+                    IconButton(onClick={composerMenu=true},modifier=Modifier.semantics { contentDescription="语音与对话选项" }) { Text("＋",style=MaterialTheme.typography.titleLarge) }
+                    DropdownMenu(expanded=composerMenu,onDismissRequest={composerMenu=false}) {
+                        DropdownMenuItem(text={Text("语音")},onClick={composerMenu=false;model.showVoice()},enabled=!model.busy && !model.voiceActive && model.pending==null)
+                        DropdownMenuItem(text={Text("对话选项")},onClick={composerMenu=false;onOptions()})
+                    }
+                }
+                OutlinedTextField(model.draft,model::editDraft,placeholder={Text("输入消息")},maxLines=4,modifier=Modifier.weight(1f),enabled=!model.busy,shape=RoundedCornerShape(20.dp),colors=OutlinedTextFieldDefaults.colors(focusedBorderColor=Color.Transparent,unfocusedBorderColor=Color.Transparent,disabledBorderColor=Color.Transparent))
+                if(model.activeTurn.isNotEmpty()) OutlinedButton(onClick={model.stopTurn(model.activeTurn)},enabled=!model.busy && model.pending==null) { Text("停止") }
+                else Button(onClick={
+                    onSend()
+                },enabled=model.sendBlockedReason.isEmpty() && model.draft.isNotBlank()) { Text("发送") }
+            }
+        }
+    }
 }
 @Composable private fun TurnCard(model: AppModel, turn: JsonObject) {
     val presentation=turn.objectAt("presentation")
     val steps=turn.objects("work_steps")
     val processes=presentation.objects("process")
     val attention=steps.any{it.text("status") in setOf("permission","failed","unknown")}
-    var details by rememberSaveable(turn.text("turn_id")) { mutableStateOf(false) }
+    val awaiting=presentation.text("phase")=="awaiting_input" || steps.any{it.text("status")=="permission"}
+    val collapse=presentation.text("collapse_process")=="true" && presentation.text("final_text").isNotEmpty()
+    var details by rememberSaveable(turn.text("turn_id"),collapse) { mutableStateOf(false) }
     val live=turn.text("turn_id")==model.activeTurn
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         Surface(Modifier.align(Alignment.End).fillMaxWidth(.88f),color=Color(0xFF181818),shape=RoundedCornerShape(18.dp,18.dp,5.dp,18.dp),border=androidx.compose.foundation.BorderStroke(1.dp,Color(0xFF333333))) {
@@ -218,16 +236,30 @@ private fun formatted(value: JsonElement) = pretty.encodeToString(JsonElement.se
             Text("NEXUS",fontWeight=FontWeight.SemiBold,style=MaterialTheme.typography.labelMedium)
             if(live || attention || turn.text("status") !in setOf("completed","")) Text(presentation.text("label").ifEmpty{statusLabel(turn.text("status"))},style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.secondary)
             val reply=presentation.text("final_text").ifEmpty{presentation.text("live_text").ifEmpty{turn.text("response_text")}}
-            if(reply.isNotEmpty()) Markdown(reply)
+            val deviceChange = turn.objectAt("device_change")
+            if(reply.isNotEmpty()) { if(deviceChange.isNotEmpty()) Text(reply) else Markdown(reply) }
+            if(deviceChange.text("changed") == "true") Text(
+                if(deviceChange.text("online") == "true") "${deviceChange.text("name")} · 设备已连接" else "${deviceChange.text("name")} · 配置已保存，设备尚未连接",
+                style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.secondary)
             ChatFileCards(model,presentation.objects("files"))
+            presentation.objects("conversations").forEach { source ->
+                OutlinedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(source.text("title"),fontWeight=FontWeight.SemiBold)
+                        Text(listOf(source.text("project_name"),source.text("created_at").take(10),if(source.text("archived")=="true") "已归档" else "").filter{it.isNotEmpty()}.joinToString(" · "),style=MaterialTheme.typography.bodySmall)
+                        TextButton(onClick={model.selectConversation(source.text("conversation_id"),source.text("turn_id"))},enabled=!model.busy){Text("打开会话")}
+                    }
+                }
+            }
             if(steps.isNotEmpty() || processes.isNotEmpty() || turn.objectAt("error").isNotEmpty()) {
                 TextButton(onClick={details=!details}){Text(if(details) "收起过程" else "查看处理过程${if(steps.isNotEmpty()) " · ${steps.size} 步" else ""}")}
-                if(details || live || attention) {
+                if(details || awaiting) {
                     processes.takeLast(8).forEach { Text(it.text("text"),style=MaterialTheme.typography.bodySmall) }
                     for(step in steps) {
                         Text(listOf(step.text("node_label"),actionLabel(step.objectAt("proposal").text("intent")),statusLabel(step.text("status"))).filter{it.isNotBlank()}.joinToString(" · "),style=MaterialTheme.typography.bodySmall)
                         if(step.text("task_id").isNotEmpty()) TextButton(onClick={model.page=1;model.viewTask(step.text("task_id"))},enabled=!model.busy){Text(if(step.text("status")=="permission") "查看并确认" else "查看任务")}
                         if(step.text("status")=="permission") {
+                            if(step.objectAt("proposal").text("intent")=="android_file_write") PhoneWritePreview(step)
                             Text(step.objectAt("proposal").text("reason").ifEmpty{"此操作需要你确认，请查看详细内容。"},style=MaterialTheme.typography.bodySmall)
                             TechnicalDetails(step)
                             Row { TextButton(onClick={model.answer(turn,step,"同意")},enabled=!model.busy && model.pending==null){Text("同意本步骤")};TextButton(onClick={model.answer(turn,step,"拒绝")},enabled=!model.busy && model.pending==null){Text("拒绝")}}
@@ -264,7 +296,7 @@ private fun formatted(value: JsonElement) = pretty.encodeToString(JsonElement.se
             TextButton(onClick={model.taskDetail=JsonObject(emptyMap())}){Text("关闭详情")}
         } } }
         if(model.tasks.isEmpty()) item { Text("暂无任务。新的任务和审批会自动显示。") }
-        items(model.tasks.reversed(),key={it.text("task_id")}) { value -> OutlinedCard(onClick={model.viewTask(value.text("task_id"))},modifier=Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) {
+        items(model.tasks,key={it.text("task_id")}) { value -> OutlinedCard(onClick={model.viewTask(value.text("task_id"))},modifier=Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) {
             Text(actionLabel(value.objectAt("action").text("tool").ifEmpty{value.text("intent")}))
             Text(statusLabel(value.text("status")),color=MaterialTheme.colorScheme.secondary,style=MaterialTheme.typography.bodySmall)
         } } }
@@ -275,23 +307,29 @@ private fun formatted(value: JsonElement) = pretty.encodeToString(JsonElement.se
 @Composable private fun DevicesPage(model: AppModel, state: String, running: Boolean, start: () -> Unit, stop: () -> Unit, settings: () -> Unit) {
     val context = LocalContext.current
     val vault = remember { Vault(context,"node") }
-    val saved = remember { runCatching{vault.read()}.getOrNull() }
-    var url by remember { mutableStateOf(saved?.text("url") ?: model.client.base.toString()) }
-    var id by remember { mutableStateOf(saved?.text("node_id") ?: "") }
+    val saved = remember(model.localDevice) { runCatching{vault.read()}.getOrNull() }
+    var url by remember(saved) { mutableStateOf(saved?.text("url") ?: model.client.base.toString()) }
+    var id by remember(saved) { mutableStateOf(saved?.text("node_id") ?: "") }
     var token by remember { mutableStateOf("") }
     var packages by remember { mutableStateOf((saved?.get("packages") as? JsonArray)?.joinToString("\n"){it.jsonPrimitive.content} ?: "") }
-    var configured by remember { mutableStateOf(saved != null) }
+    var configured by remember(saved) { mutableStateOf(saved != null) }
     var receiveFiles by remember { mutableStateOf(saved?.get("receive_files")?.jsonPrimitive?.boolean ?: true) }
-    var connectionOpen by remember { mutableStateOf(saved == null) }
+    var connectionOpen by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Text("我的设备",style=MaterialTheme.typography.headlineSmall)
-        model.nodes.forEach { node -> DeviceCard(model,node) }
-        HorizontalDivider()
-        Text("让助手使用这台设备",style=MaterialTheme.typography.titleMedium)
+        SectionCard("本机执行服务") {
         Text(state,color=MaterialTheme.colorScheme.primary)
         Text("开启后，助手可以在你授权的范围内使用本机功能。",style=MaterialTheme.typography.bodySmall)
         Row { Button(onClick=start,enabled=configured && !running){Text("开启")};Spacer(Modifier.width(12.dp));OutlinedButton(onClick=stop,enabled=running){Text("停止")}}
-        TextButton(onClick={connectionOpen=!connectionOpen}){Text(if(connectionOpen) "收起连接设置" else "连接与权限")}
+        }
+        if(model.localDevice.text("registered")!="true") SectionCard("连接这台手机") {
+            Text("在会话中说“注册这台手机”，再选择允许的功能。",style=MaterialTheme.typography.bodySmall)
+            TextButton(onClick={model.editDraft("注册这台手机");model.page=0}) { Text("带到会话中") }
+        }
+        PhonePermissions(model)
+        Text("设备列表",style=MaterialTheme.typography.titleMedium)
+        model.nodes.forEach { node -> DeviceCard(model,node) }
+        TextButton(onClick={connectionOpen=!connectionOpen}){Text(if(connectionOpen) "收起连接设置" else "高级连接与本机权限")}
         if(connectionOpen) Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
         OutlinedTextField(url,{url=it},label={Text("服务地址")},enabled=!running,singleLine=true,modifier=Modifier.fillMaxWidth())
         OutlinedTextField(id,{id=it},label={Text("设备编号")},enabled=!running,singleLine=true,modifier=Modifier.fillMaxWidth())
@@ -305,7 +343,7 @@ private fun formatted(value: JsonElement) = pretty.encodeToString(JsonElement.se
                 require(token.isNotBlank() || old?.text("node_id")==id.trim() && old.text("url")==url.trim()) { "更换设备身份或地址时请提供设备凭证。" }
                 val config = NodeConfig(url.trim(),id.trim(),token.trim().ifEmpty{old?.text("token") ?: ""},packages.split(Regex("[\\s,]+" )).filter{it.isNotEmpty()}.toSet(),receiveFiles)
                 vault.write(obj("url" to str(config.url),"node_id" to str(config.nodeId),"token" to str(config.token),"packages" to JsonArray(config.packages.sorted().map(::str)),"receive_files" to JsonPrimitive(config.receiveFiles)))
-                token="";configured=true;model.notice="已保存连接设置。设备需要服务端授权后才能使用。"
+                token="";configured=true;model.notice="已保存连接设置，本机权限将自动同步。";model.syncDevicePermissions()
             }.onFailure { model.notice=it.message ?: "设备配置无法保存" }},enabled=!running){Text("保存配置")}
             TextButton(onClick=settings){Text("系统通知读取权限")}
         }
@@ -315,10 +353,14 @@ private fun formatted(value: JsonElement) = pretty.encodeToString(JsonElement.se
 @Composable private fun DeviceCard(model: AppModel, node: JsonObject) {
     var editing by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
-    Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) {
-            Text(node.text("label").ifEmpty{"设备"})
-            TextButton(onClick={name=node.text("label");editing=true}){Text("修改名称")}
-            Text(if(node.text("online")=="true") "在线" else "离线",color=MaterialTheme.colorScheme.secondary)
+    OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment=Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(node.text("label").ifEmpty{"设备"},style=MaterialTheme.typography.titleSmall)
+                    Text(if(!model.nodesFresh) "等待同步" else if(node.text("online")=="true") "在线" else "离线",color=MaterialTheme.colorScheme.secondary,style=MaterialTheme.typography.bodySmall)
+                }
+                TextButton(onClick={name=node.text("label");editing=true}){Text("修改名称")}
+            }
             if(node.toString().contains(DEVICE)) TextButton(onClick={model.deviceStatus(node.text("node_id"))},enabled=!model.busy && model.pending==null){Text("读取设备状态")}
         } }
     if(editing) AlertDialog(onDismissRequest={editing=false},title={Text("设备名称")},
@@ -330,13 +372,15 @@ private fun formatted(value: JsonElement) = pretty.encodeToString(JsonElement.se
 @Composable private fun SettingsPage(model: AppModel, stop: () -> Unit) {
     var logout by remember { mutableStateOf(false) }
     Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-        Text("连接与隐私",style=MaterialTheme.typography.headlineSmall)
+        Text("设置",style=MaterialTheme.typography.headlineSmall)
+        SectionCard("人格与表达") { AssistantSettings(model) }
+        Disclosure("连接与隐私", "会话与凭证保存在各自授权范围内") {
         Text("聊天记录在你的服务中保存；登录与设备凭证在本机加密保存。",color=MaterialTheme.colorScheme.secondary)
         Text("语音只在前台开启。切到后台或锁屏时会关麦，恢复页面不会自动开麦。",style=MaterialTheme.typography.bodySmall)
-        var advanced by remember { mutableStateOf(false) }
-        TextButton(onClick={advanced=!advanced}){Text(if(advanced) "收起连接详情" else "连接详情")}
-        if(advanced) { Text(model.client.base.toString());Text("设备身份与执行记录绑定，更换前需核对未完成操作。",style=MaterialTheme.typography.bodySmall) }
-        ReceivedFiles()
+        Text(model.client.base.toString(),style=MaterialTheme.typography.bodySmall)
+        Text("设备身份与执行记录绑定，更换前需核对未完成操作。",style=MaterialTheme.typography.bodySmall)
+        }
+        SectionCard("本机文件") { ReceivedFiles() }
         model.fileUpload?.let { saved ->
             Text("旧版上传待核对：${saved.text("filename")}")
             TextButton(onClick=model::retryFileUpload,enabled=!model.busy){Text("核对原上传")}

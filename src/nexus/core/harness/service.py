@@ -171,7 +171,8 @@ class Harness:
                         if authorization.mode != "allow":
                             continue
                         command = await self.executions.dispatch(task_id, connection.principal, connection.scope,
-                            connection.session_id, connection.hello.boot_id, self.link.config.execution_timeout_seconds)
+                            connection.session_id, connection.hello.boot_id, self.link.config.execution_timeout_seconds,
+                            mcp_timeout=min(self.link.config.mcp_execution_timeout_seconds, connection.hello.mcp_execution_timeout_seconds))
                     if command is not None:
                         await self.link.dispatch(connection, command)
                         self.probes[connection.principal.identity_id] = (connection.session_id, command.attempt_id, False, time.monotonic())

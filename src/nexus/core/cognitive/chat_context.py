@@ -39,13 +39,13 @@ def pressure(config, messages, **options):
     request = build_request(config, messages, **options)
     tokens = estimated_tokens(request)
     window = config.chat_context_window_tokens
-    threshold = min(config.chat_input_tokens * config.chat_compaction_threshold_percent // 100,
+    threshold = min(config.chat_input_limit() * config.chat_compaction_threshold_percent // 100,
                     window * config.chat_compaction_threshold_percent // 100,
                     window - request["max_tokens"] - config.chat_compaction_headroom_tokens)
     size = len(canonical(request).encode("utf-8"))
     return {"estimated_tokens": tokens, "threshold_tokens": threshold, "request_bytes": size,
             "pressured": tokens >= threshold or size >= config.chat_input_bytes * config.chat_compaction_threshold_percent // 100,
-            "fits": tokens <= min(config.chat_input_tokens, window-request["max_tokens"])
+            "fits": tokens <= config.chat_input_limit(request["max_tokens"])
                     and size <= config.chat_input_bytes}
 
 
@@ -93,13 +93,13 @@ def history_message(records):
     return {"role":"user","content":"较早对话的确定性摘录（不完整，原文按 turn_id 保留）：\n"+canonical(list(reversed(records)))}
 
 
-def fit_work_context(config, messages, catalog, *, allow_tools=True, work_limit=4, generate_title=False, history_summary=None, auto_memory=False):
+def fit_work_context(config, messages, catalog, *, allow_tools=True, work_limit=4, generate_title=False, history_summary=None, auto_memory=False, assistant_style=None):
     """Drop whole old chat rounds, then excerpt results; preserve every call/id."""
     output = copy.deepcopy(messages)
-    options = {"allow_tools": allow_tools, "work_catalog": catalog, "work_limit": work_limit, "generate_title": generate_title, "auto_memory": auto_memory}
+    options = {"allow_tools": allow_tools, "work_catalog": catalog, "work_limit": work_limit, "generate_title": generate_title, "auto_memory": auto_memory, "assistant_style": assistant_style}
 
     def fits():
-        return request_size(config, output, **options) <= config.chat_input_bytes
+        return pressure(config, output, **options)["fits"]
 
     if not fits() and history_summary and output and output[0]==history_message(history_summary):
         del output[0]

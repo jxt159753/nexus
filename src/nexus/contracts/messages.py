@@ -1,6 +1,19 @@
+from nexus.contracts.android_screen import AndroidScreenObserveArguments, AndroidScreenActArguments, AndroidScreenResult, AndroidScreenObserveCall, AndroidScreenActCall
+"""JARVIS Link v1 payloads. These types do not authorize or execute actions."""
+
+from nexus.contracts.android_control import (
+    AndroidUIObserveCall,
+    AndroidUIResult,
+    AndroidUIActCall,
+    AndroidFilesCall,
+    AndroidFilesResult,
+    AndroidFilePreviewCall,
+    AndroidFilePreviewResult,
+    AndroidFileWriteCall,
+    AndroidFileWriteResult,
+)
 from nexus.contracts.file_transfer import FileReceiveCall, FileReceiveResult
 from nexus.plugins.contracts import PluginNodeCall, PluginNodeResult,PluginId,ToolId
-"""JARVIS Link v1 payloads. These types do not authorize or execute actions."""
 
 from typing import Annotated, Literal, Self
 from uuid import UUID
@@ -105,6 +118,7 @@ class ToolCapability(StrictContract):
 
 
 class NodeHello(StrictContract):
+    mcp_execution_timeout_seconds: StrictInt = Field(default=10, ge=1, le=60)
     plugin_digest: CommandDigest | None=None
     plugin_tools: dict[PluginId,list[ToolId]]=Field(default_factory=dict,max_length=32)
     node_id: UUID
@@ -112,7 +126,7 @@ class NodeHello(StrictContract):
     tools: list[ToolCapability] = Field(max_length=20)
     interaction_digests: dict[CommandId, CommandDigest] = Field(default_factory=dict, max_length=16)
     command_digests: dict[CommandId, CommandDigest] = Field(default_factory=dict, max_length=16)
-    roots: list[ResourceId] = Field(max_length=3)
+    roots: list[ResourceId] = Field(max_length=5)
     boot_id: UUID
 
     @model_validator(mode="after")
@@ -226,7 +240,13 @@ class InteractExecute(CommandExecuteBase, InteractCall):
 
 
 class PluginNodeExecute(CommandExecuteBase, PluginNodeCall):
-    pass
+    execution_timeout_seconds: StrictInt = Field(ge=1, le=60)
+
+    @model_validator(mode="after")
+    def check_mcp_timeout(self) -> Self:
+        if self.execution_timeout_seconds > 10 and self.arguments.plugin_id != "builtin.mcp":
+            raise ValueError("extended execution timeout is only available for MCP")
+        return self
 
 
 class AndroidDeviceStatusExecute(CommandExecuteBase, AndroidDeviceStatusCall):
@@ -241,7 +261,36 @@ class FileReceiveExecute(CommandExecuteBase, FileReceiveCall):
     pass
 
 
+class AndroidScreenObserveExecute(CommandExecuteBase, AndroidScreenObserveCall):
+    pass
+
+
+class AndroidUIObserveExecute(CommandExecuteBase, AndroidUIObserveCall):
+    pass
+
+
+class AndroidScreenActExecute(CommandExecuteBase, AndroidScreenActCall):
+    pass
+
+
+class AndroidUIActExecute(CommandExecuteBase, AndroidUIActCall):
+    pass
+
+
+class AndroidFilesExecute(CommandExecuteBase, AndroidFilesCall):
+    pass
+
+
+class AndroidFilePreviewExecute(CommandExecuteBase, AndroidFilePreviewCall):
+    pass
+
+
+class AndroidFileWriteExecute(CommandExecuteBase, AndroidFileWriteCall):
+    pass
+
+
 CommandExecute = Annotated[
+    AndroidScreenObserveExecute | AndroidScreenActExecute | AndroidUIObserveExecute | AndroidUIActExecute | AndroidFilesExecute | AndroidFilePreviewExecute | AndroidFileWriteExecute |
     SystemInfoExecute | ListDirectoryExecute | FileReadExecute | FileSearchExecute | FilePreviewExecute | FileWriteExecute | CommandRunExecute | FileLinesExecute | FileGlobExecute | FileGrepExecute | FileEditPreviewExecute | FileEditExecute | ObserveExecute | InteractExecute | ImageReadExecute | PluginNodeExecute | AndroidDeviceStatusExecute | AndroidNotificationDigestExecute | FileReceiveExecute, Field(discriminator="tool")
 ]
 
@@ -379,7 +428,43 @@ class FileReceiveCommandResult(CommandResultBase):
     result: FileReceiveResult | None = None
 
 
+class AndroidScreenObserveCommandResult(CommandResultBase):
+    tool: Literal["android.screen_observe"]
+    result: AndroidScreenResult | None = None
+
+
+class AndroidUIObserveCommandResult(CommandResultBase):
+    tool: Literal["android.ui_observe"]
+    result: AndroidUIResult | None = None
+
+
+class AndroidScreenActCommandResult(CommandResultBase):
+    tool: Literal["android.screen_act"]
+    result: AndroidScreenResult | None = None
+
+
+class AndroidUIActCommandResult(CommandResultBase):
+    tool: Literal["android.ui_act"]
+    result: AndroidUIResult | None = None
+
+
+class AndroidFilesCommandResult(CommandResultBase):
+    tool: Literal["android.files"]
+    result: AndroidFilesResult | None = None
+
+
+class AndroidFilePreviewCommandResult(CommandResultBase):
+    tool: Literal["android.file_preview"]
+    result: AndroidFilePreviewResult | None = None
+
+
+class AndroidFileWriteCommandResult(CommandResultBase):
+    tool: Literal["android.file_write"]
+    result: AndroidFileWriteResult | None = None
+
+
 CommandResult = Annotated[
+    AndroidScreenObserveCommandResult | AndroidScreenActCommandResult | AndroidUIObserveCommandResult | AndroidUIActCommandResult | AndroidFilesCommandResult | AndroidFilePreviewCommandResult | AndroidFileWriteCommandResult |
     SystemInfoCommandResult | ListDirectoryCommandResult | FileReadCommandResult | FileSearchCommandResult | FilePreviewCommandResult | FileWriteCommandResult | CommandRunCommandResult | FileLinesCommandResult | FileGlobCommandResult | FileGrepCommandResult | FileEditPreviewCommandResult | FileEditCommandResult | ObserveCommandResult | InteractCommandResult | ImageReadCommandResult | PluginNodeCommandResult | AndroidDeviceStatusCommandResult | AndroidNotificationDigestCommandResult | FileReceiveCommandResult, Field(discriminator="tool")
 ]
 

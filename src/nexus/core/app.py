@@ -39,6 +39,7 @@ from nexus.core.security.service import SecurityService
 from nexus.core.security.types import AccessDenied
 from nexus.core.security.modes import PermissionHTTP
 from nexus.core.plugins.http import PluginHTTP
+from nexus.core.plugins.ui_extension_http import UIExtensionHTTP
 from nexus.core.storage.database import Database
 from nexus.core.storage.tasks import Conflict
 from nexus.core.voice.link import VoiceLink
@@ -104,6 +105,7 @@ def create_app(config: CoreConfig) -> FastAPI:
     )
     voice_link = VoiceLink(guards, config, voice)
     voice.validate_owner = guards.service.validate_principal
+    voice.node_permitted = lambda node_id: bool(config.nodes.get(node_id) and config.nodes[node_id].voice.enabled)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -120,6 +122,7 @@ def create_app(config: CoreConfig) -> FastAPI:
         health_watcher = None
         try:
             await database.initialize()
+            await chat.devices.reload()
             await harness.executions.resume_verification()
             await language.recover()
             await chat.recover()
@@ -166,10 +169,17 @@ def create_app(config: CoreConfig) -> FastAPI:
     app.include_router(RecordsHTTP(guards).router)
     app.include_router(LanguageHTTP(language, guards).router)
     app.include_router(ChatHTTP(chat, guards).router)
+    from nexus.core.security.devices import DeviceHTTP
+    app.include_router(DeviceHTTP(chat.devices, guards).router)
     app.include_router(PermissionHTTP(chat, guards).router)
+    from nexus.core.cognitive.personality import PersonalityHTTP
+    app.include_router(PersonalityHTTP(database, guards).router)
     app.include_router(PluginHTTP(chat.plugins, guards).router)
+    app.include_router(UIExtensionHTTP(chat.plugins.ui_extensions, guards).router)
     from nexus.core.plugins.autonomy_http import AutonomyHTTP
     app.include_router(AutonomyHTTP(chat.plugins, guards).router)
+    from nexus.core.plugins.notifications import NotificationHTTP
+    app.include_router(NotificationHTTP(chat.plugins, guards).router)
     from nexus.core.plugins.mcp_http import MCPHTTP
     app.include_router(MCPHTTP(chat.plugins, guards).router)
     app.include_router(voice_link.router)
@@ -214,6 +224,12 @@ def create_app(config: CoreConfig) -> FastAPI:
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'sha256-UaO1DKdOZTH3g72w3U/IhBu3y5cxME0JyJYosMMMerQ=' 'sha256-jH4JDM+p01kuu6ou/A4MgTq6B9+X7dUZGHEdH52L4GY='; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
+        if request.url.path == '/static/app/extension-sandbox.html':
+            # The HTML adds a hash-only script policy. Candidate workers inherit
+            # it: no imports, eval or network, and the iframe has an opaque origin.
+            response.headers['Content-Security-Policy'] = "default-src 'none'; script-src 'unsafe-inline'; worker-src blob:; connect-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'"
+        elif request.url.path == '/static/app/gesture-worker.js':
+            response.headers['Content-Security-Policy'] = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; worker-src 'none'"
         return response
 
     @app.exception_handler(AccessDenied)

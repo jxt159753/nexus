@@ -214,7 +214,14 @@ class BailianTtsProvider(TtsProvider):
                 while True:
                     if sender.done() and not sender.cancelled() and sender.exception():
                         raise sender.exception()
-                    raw = await asyncio.wait_for(ws.recv(), timeout=45)
+                    try:
+                        raw = await asyncio.wait_for(ws.recv(), timeout=45)
+                    except TimeoutError:
+                        if sender.done():
+                            raise
+                        # A sparse progress update may be followed by tool work
+                        # with no speech. Keep the original overall TTS deadline.
+                        continue
                     if isinstance(raw, bytes):
                         combined = remainder + raw
                         size = len(combined) // 2 * 2

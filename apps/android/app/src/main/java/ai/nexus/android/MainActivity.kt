@@ -38,18 +38,38 @@ class MainActivity : ComponentActivity() {
     private val microphone = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if(granted) model.startVoice() else model.notice="未授予麦克风权限，语音尚未启动。"
     }
+    private val reminderPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if(granted) startReminders() else model.notice="系统通知权限未开启，提醒仍保存在中心服务。"
+    }
+    private fun startReminders() {
+        getSharedPreferences("reminder-status",0).edit().putBoolean("enabled",true).apply()
+        runCatching { startForegroundService(Intent(this,ai.nexus.android.reminders.ReminderService::class.java)) }
+            .onFailure {
+                getSharedPreferences("reminder-status",0).edit().putBoolean("enabled",false).apply()
+                model.notice="提醒服务未能启动，请保持 App 在前台后重试。"
+            }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         model = ViewModelProvider(this)[AppModel::class.java]
-        setContent { NexusApp(model,nodeState,nodeRunning,
+        if(intent.getBooleanExtra("open_reminders",false)) model.page=4
+        setContent {
+            LaunchedEffect(model.deviceStartRequest) {
+                if(model.deviceStartRequest > 0) {
+                    model.deviceStartHandled()
+                    requestNodeStart()
+                }
+            }
+            NexusApp(model,nodeState,nodeRunning,
             onVoiceStart = { if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED) microphone.launch(Manifest.permission.RECORD_AUDIO) else model.startVoice() },
-            onStartNode = {
-                if(Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
-                    notifications.launch(Manifest.permission.POST_NOTIFICATIONS) else startNode()
-            },
+            onStartNode = { requestNodeStart() },
             onStopNode = { runCatching { service?.send(Message.obtain(null,2)) }; stopService(Intent(this,NodeService::class.java)) },
-            onNotificationSettings = { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }) }
+            onNotificationSettings = { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) },
+            onStartReminders = { if(Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) reminderPermission.launch(Manifest.permission.POST_NOTIFICATIONS) else startReminders() }) }
+    }
+    private fun requestNodeStart() {
+        if(Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
+            notifications.launch(Manifest.permission.POST_NOTIFICATIONS) else startNode()
     }
     private fun startNode() {
         runCatching { startForegroundService(Intent(this,NodeService::class.java)) }

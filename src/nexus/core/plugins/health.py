@@ -44,7 +44,7 @@ class HealthService:
             unknown=(await one(conn,"""SELECT count(*) FROM tasks t LEFT JOIN task_attempts a ON a.attempt_id=t.current_attempt_id
                 WHERE t.execution_outcome='unknown' AND (t.status IN ('succeeded','failed','cancelled','timed_out') OR a.phase='unknown')"""))[0]
             sensor_errors=await one(conn,"SELECT 1 FROM autonomy_events WHERE acknowledged=0 AND json_extract(value_json,'$.kind') IN ('sensor_failed','sensor_blocked') LIMIT 1")
-            near=hot>=80 or turns>=8000 or cold>=410*1024*1024 or events>=8000 or schedules>=8000 or tests>=800
+            near=turns>=8000 or cold>=410*1024*1024 or events>=8000 or schedules>=8000 or tests>=800
             low_disk=disk.free<128*1024*1024
             if low_disk:
                 self.service.chat.failed = self.service.chat.harness.failed = True

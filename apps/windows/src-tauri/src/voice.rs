@@ -20,19 +20,20 @@ struct VoiceInner {
     child: Option<Child>,
     input: Option<ChildStdin>,
     event: Value,
+    failed: bool,
 }
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VoiceLaunch {
-    request_id: Uuid,
-    conversation_id: Uuid,
+    pub(crate) request_id: Uuid,
+    pub(crate) conversation_id: Uuid,
     #[serde(default)]
-    wake: bool,
+    pub(crate) wake: bool,
     #[serde(default)]
-    input_device: String,
+    pub(crate) input_device: String,
     #[serde(default)]
-    output_device: String,
+    pub(crate) output_device: String,
 }
 
 #[derive(Serialize)]
@@ -41,6 +42,7 @@ pub struct VoiceStatus {
     running: bool,
     node_id: Option<String>,
     event: Value,
+    resident: crate::wake::WakeStatus,
 }
 
 fn executable(app: &AppHandle) -> Result<PathBuf, String> {
@@ -71,6 +73,7 @@ impl VoiceManager {
     pub fn new() -> Self {
         Self { inner: Arc::new(Mutex::new(VoiceInner {
             child: None, input: None, event: json!({"event":"state","state":"stopped"}),
+            failed: false,
         })) }
     }
 
@@ -94,16 +97,29 @@ impl VoiceManager {
             inner.event = json!({"event":"state","state":"stopped","media_stopped":true});
         }
     }
+
+    pub(crate) fn running(&self) -> bool {
+        let mut inner = self.inner.lock().expect("voice state");
+        let outcome = inner.child.as_mut().map(|child| child.try_wait());
+        let running = matches!(outcome, Some(Ok(None)));
+        if matches!(outcome, Some(Ok(Some(status))) if !status.success()) { inner.failed = true; }
+        if !running { inner.child.take(); inner.input.take(); }
+        running
+    }
+
+    pub(crate) fn take_failure(&self) -> bool {
+        std::mem::take(&mut self.inner.lock().expect("voice state").failed)
+    }
 }
 
 #[tauri::command]
 pub fn voice_status(app: AppHandle, state: State<'_, VoiceManager>) -> Result<VoiceStatus, String> {
-    let mut inner = state.inner.lock().map_err(|_| "语音状态不可用")?;
-    let running = inner.child.as_mut().map(|child| matches!(child.try_wait(), Ok(None))).unwrap_or(false);
-    if !running { inner.child.take(); inner.input.take(); }
+    let resident = app.state::<crate::wake::WakeManager>().status();
+    let running = state.running();
+    let inner = state.inner.lock().map_err(|_| "语音状态不可用")?;
     let saved = auth::load_node()?;
     Ok(VoiceStatus { available: executable(&app).is_ok(), running,
-        node_id: saved.map(|value| value.node_id), event: inner.event.clone() })
+        node_id: saved.map(|value| value.node_id), event: inner.event.clone(), resident })
 }
 
 #[tauri::command]
@@ -130,6 +146,16 @@ pub fn voice_devices(app: AppHandle) -> Result<Value, String> {
 #[tauri::command]
 pub fn voice_start(app: AppHandle, state: State<'_, VoiceManager>, bridge: State<'_, BridgeState>,
                    config: VoiceLaunch) -> Result<(), String> {
+    if app.state::<crate::game_mode::GameMode>().active() {
+        return Err("游戏模式已开启，语音已暂停".into());
+    }
+    app.state::<crate::wake::WakeManager>().disable();
+    state.stop();
+    launch(&app, &state, &bridge, config)
+}
+
+pub(crate) fn launch(app: &AppHandle, state: &VoiceManager, bridge: &BridgeState,
+                    config: VoiceLaunch) -> Result<(), String> {
     let core = bridge.authenticated_origin()?;
     let saved = auth::load_node()?.ok_or("请先配置本机 Node")?;
     let mut url = Url::parse(&saved.core_ws_url).map_err(|_| "本机 Node 地址无效")?;
@@ -161,6 +187,9 @@ pub fn voice_start(app: AppHandle, state: State<'_, VoiceManager>, bridge: State
         startup["wake_keywords"] = json!(resources.join("keywords.txt").to_string_lossy());
     }
     let mut inner = state.inner.lock().map_err(|_| "语音状态不可用")?;
+    if app.state::<crate::game_mode::GameMode>().active() {
+        return Err("游戏模式已开启，语音已暂停".into());
+    }
     if inner.child.as_mut().map(|child| matches!(child.try_wait(), Ok(None))).unwrap_or(false) {
         return Err("语音已在运行，请先结束当前会话".into());
     }
@@ -173,11 +202,14 @@ pub fn voice_start(app: AppHandle, state: State<'_, VoiceManager>, bridge: State
         return Err("语音启动失败".into());
     }
     let output = child.stdout.take().ok_or("无法读取语音状态")?;
+    let pid = child.id();
     inner.input = Some(input);
     inner.child = Some(child);
+    inner.failed = false;
     inner.event = json!({"event":"state","state":"activating"});
     drop(inner);
     let shared = state.inner.clone();
+    let app = app.clone();
     std::thread::spawn(move || {
         let mut reader = BufReader::new(output);
         loop {
@@ -187,7 +219,11 @@ pub fn voice_start(app: AppHandle, state: State<'_, VoiceManager>, bridge: State
             let Ok(value) = serde_json::from_slice::<Value>(&line) else { continue };
             if !matches!(value.get("event").and_then(Value::as_str),
                          Some("state" | "devices" | "session" | "partial" | "final" | "speak" | "metrics" | "error")) { continue; }
-            if let Ok(mut inner) = shared.lock() { inner.event = value.clone(); }
+            if let Ok(mut inner) = shared.lock() {
+                if inner.child.as_ref().map(Child::id) != Some(pid) { break; }
+                if value["event"] == "error" { inner.failed = true; }
+                inner.event = value.clone();
+            }
             let _ = app.emit("nexus-voice", value);
         }
     });
@@ -203,6 +239,7 @@ pub fn voice_interrupt(state: State<'_, VoiceManager>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn voice_stop(state: State<'_, VoiceManager>) {
+pub fn voice_stop(app: AppHandle, state: State<'_, VoiceManager>) {
+    app.state::<crate::wake::WakeManager>().disable();
     state.stop();
 }

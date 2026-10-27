@@ -1,0 +1,3 @@
+<resources>
+    <string name="phone_accessibility_description">仅在你开启 NEXUS 设备执行并授权任务后，读取当前界面、点击、输入、滚动和返回。密码控件内容不读取。系统权限需要你亲自设置，可随时在 NEXUS 设备页或系统设置关闭。</string>
+</resources>

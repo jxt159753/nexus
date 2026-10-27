@@ -52,7 +52,9 @@ class ClientLink:
 
     async def snapshot(self, request: Request, before: int = Query(2**63-1, ge=1, le=2**63-1)) -> dict:
         principal = await self.guards.owner_http(request)
-        return await self.events.snapshot(principal.identity_id, before)
+        value = await self.events.snapshot(principal.identity_id, before)
+        value["activity"] = await request.app.state.chat.activity(principal)
+        return value
 
     async def sender(self, connection: BrowserConnection) -> None:
         while True:

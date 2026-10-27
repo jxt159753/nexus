@@ -13,7 +13,8 @@ from nexus.contracts.extensions import digest_value
 from nexus.core.cognitive import chat_skills, chat_journal, chat_compaction, chat_presentation
 from nexus.core.cognitive.chat_work import WorkService
 from nexus.core.cognitive.attachments import AttachmentService
-from nexus.core.cognitive.chat_context import request_size, history_message, pressure, prune_tools
+from nexus.core.cognitive.chat_context import history_message, pressure, prune_tools
+from nexus.core.cognitive.personality import preferences as assistant_preferences
 from nexus.core.memory import context as memory_context
 from nexus.core.memory import automatic as auto_memory
 from nexus.core.memory.service import project_owned
@@ -41,6 +42,7 @@ FROM chat_turns t LEFT JOIN (
 
 def public_turn(row: sqlite3.Row, *, detail: bool = False) -> dict:
     value = dict(row)
+    value["assistant_style"] = json.loads(value.pop("assistant_style_json"))
     value["history_summary"] = json.loads(value.pop("history_summary_json"))
     value["references"] = json.loads(value.pop("references_json"))
     value["attachments"] = json.loads(value.pop("attachments_json"))
@@ -87,6 +89,8 @@ class ChatService:
         self.journal = chat_journal.ChatJournal(self)
         from nexus.core.plugins.service import PluginService
         self.plugins = PluginService(self)
+        from nexus.core.security.devices import DeviceRegistry
+        self.devices = DeviceRegistry(self)
 
     async def snapshot(self, conn, row: sqlite3.Row, *, detail: bool = False) -> dict:
         from nexus.core.storage.archive import hydrate
@@ -94,6 +98,10 @@ class ChatService:
         value = public_turn(row, detail=detail)
         value["work_steps"] = await self.work.steps(conn, value["turn_id"])
         value["presentation"] = await chat_presentation.presentation(conn, value)
+        change = await one(conn, "SELECT result_json FROM device_chat_changes WHERE turn_id=?", (value["turn_id"],))
+        value["device_change"] = json.loads(change["result_json"]) if change else None
+        if value["device_change"] and value["device_change"].get("node_id"):
+            value["device_change"]["online"] = (await self.harness.link.node_status(UUID(value["device_change"]["node_id"])))["online"]
         return value
 
     async def conversation(self, conn, principal: Principal, conversation_id: UUID | str) -> sqlite3.Row:
@@ -112,8 +120,6 @@ class ChatService:
                     raise Conflict("IDEMPOTENCY_CONFLICT")
                 return dict(old)
             await project_owned(conn, value.project_id, principal.identity_id)
-            if (await one(conn, "SELECT count(*) FROM conversations WHERE cold_archived=0"))[0] >= 100:
-                raise Conflict("BUSY")
             identifier, now = str(uuid4()), utc_now()
             await conn.execute("INSERT INTO conversations(conversation_id,owner_id,request_id,title,created_at,auto_title) VALUES(?,?,?,'新会话',?,1)", (identifier, str(principal.identity_id), str(value.request_id), timestamp(now)))
             await conn.execute("UPDATE conversations SET project_id=? WHERE conversation_id=?", (str(value.project_id) if value.project_id else None, identifier))
@@ -154,6 +160,17 @@ class ChatService:
                     await self.work.abort(conn,turn[0],"WORK_ARCHIVED",utc_now())
             await audit(conn, str(principal.identity_id), None, "chat.updated", utc_now())
             return dict(await one(conn, "SELECT * FROM conversations WHERE conversation_id=?", (str(conversation_id),)))
+
+    async def activity(self, principal: Principal) -> dict:
+        """Owner-wide display facts, independent of the client's selected chat."""
+        async with self.database.transaction(write=False) as conn:
+            await self.owner(conn, principal)
+            rows = await conn.execute_fetchall(
+                f"SELECT turn_id,conversation_id,json_extract(request_json,'$.client_node_id') AS node_id "
+                f"FROM chat_turns WHERE owner_id=? AND {ACTIVE} ORDER BY rowid",
+                (str(principal.identity_id),),
+            )
+            return {"turns": [dict(row) for row in rows]}
 
     async def history(self, principal: Principal, conversation_id: UUID | str, before: int = 2**63-1) -> dict:
         async with self.database.transaction(write=False) as conn:
@@ -203,9 +220,12 @@ class ChatService:
             await audit(conn, row["owner_id"], None, "chat.skill_previewed", utc_now())
             return {"plan": plan, "proposal_digest": digest}
 
-    async def submit(self, principal: Principal, conversation_id: UUID | str, value: ChatSubmission) -> dict:
+    async def submit(self, principal: Principal, conversation_id: UUID | str, value: ChatSubmission, *, verified_client_id: UUID | None = None) -> dict:
         # Confirmation and the next message cannot interleave task association.
         async with self.harness.operation:
+            managed = await self.devices.command(principal, conversation_id, value, verified_client_id)
+            if managed is not None:
+                return managed
             return await self._submit(principal, conversation_id, value)
 
     async def _submit(self, principal: Principal, conversation_id: UUID | str, value: ChatSubmission) -> dict:
@@ -249,7 +269,10 @@ class ChatService:
             total = await one(conn, "SELECT count(*),coalesce(sum(length(CAST(context_json AS BLOB))+length(CAST(response_text AS BLOB))+length(CAST(request_json AS BLOB))+coalesce(length(CAST(result_preview_json AS BLOB)),0)+coalesce(length(CAST(initial_response_text AS BLOB)),0)+coalesce(length(CAST(auto_result_json AS BLOB)),0)+length(CAST(skill_catalog_json AS BLOB))+coalesce(length(CAST(skill_plan_json AS BLOB)),0)),0) FROM chat_turns")
             count = (await one(conn, "SELECT count(*) FROM chat_turns WHERE conversation_id=?", (str(conversation_id),)))[0]
             hot_count=(await one(conn,'SELECT count(*) FROM chat_turns t JOIN conversations c USING(conversation_id) WHERE c.cold_archived=0'))[0]
-            if recent[0] >= 10 or hot_count >= 10000 or total[1] + 2*CHAT_MAX_TEXT_BYTES >= 268000000 or count >= 200:
+            # Only a prepared Core continuation can outlive the interactive
+            # conversation count. It still consumes real storage and rate limits.
+            continuation = await one(conn, "SELECT 1 FROM plugin_wakeups w JOIN plugin_authorities a USING(authority_id) WHERE w.status='prepared' AND a.state='active' AND a.conversation_id=? AND json_extract(w.request_json,'$.request_id')=?", (str(conversation_id),str(value.request_id)))
+            if recent[0] >= 10 or total[1] + self.config.chat_input_bytes + 2*CHAT_MAX_TEXT_BYTES >= 268000000 or not continuation and (hot_count >= 10000 or count >= 200):
                 raise Conflict("BUSY")
             messages = [{"role": "user", "content": value.text}]
             attachments = None
@@ -283,6 +306,9 @@ class ChatService:
             history_summary = []
             available = 0
             options = {"generate_title": count == 0 and bool(conversation["auto_title"]), "allow_tools": value.allow_tools}
+            style = await assistant_preferences(conn, principal.identity_id)
+            style.pop('revision')
+            options['assistant_style'] = style
             if auto_revision and not value.compact_only:
                 options["auto_memory"] = True
             if work_grant_id:
@@ -304,13 +330,13 @@ class ChatService:
                         history_summary.append({"turn_id":row["turn_id"],"user_excerpt":row["text"][:160],"assistant_excerpt":row["response_text"][:240]})
                         continue
                     candidate = [{"role": "user", "content": row["text"]}, {"role": "assistant", "content": row["response_text"]}, *messages]
-                    if len(canonical(candidate).encode()) > 24576 or request_size(self.config,candidate,**options) > self.config.chat_input_bytes:
+                    if not pressure(self.config,candidate,**options)["fits"]:
                         break
                     messages, selected = candidate, selected+1
             if history_summary:
                 while history_summary:
                     candidate=[history_message(history_summary),*messages]
-                    if request_size(self.config,candidate,**options)<=self.config.chat_input_bytes:
+                    if pressure(self.config,candidate,**options)["fits"]:
                         messages=candidate
                         break
                     history_summary.pop()
@@ -332,6 +358,7 @@ class ChatService:
                 turn_id, str(conversation_id), str(principal.identity_id), str(value.request_id), encoded, value.text, context,
                 hashlib.sha256(context.encode()).hexdigest(), selected, int(available > selected), timestamp(now), timestamp(now+timedelta(minutes=5))))
             await conn.execute("UPDATE chat_turns SET skill_catalog_json=? WHERE turn_id=?", (canonical(skills), turn_id))
+            await conn.execute("UPDATE chat_turns SET assistant_style_json=? WHERE turn_id=?", (canonical(style), turn_id))
             await conn.execute("UPDATE chat_turns SET auto_memory_revision=?,auto_memory_refs_json=?,auto_memory_expires_at=? WHERE turn_id=?",
                                (auto_revision, canonical(auto_refs), min(memory_expirations, default=None), turn_id))
             await conn.execute("UPDATE chat_turns SET memory_refs_json=?,queue_after_turn_id=?,history_summary_json=?,references_json=? WHERE turn_id=?", (canonical(refs),previous[0] if previous else None,canonical(history_summary),canonical(references),turn_id))
@@ -513,7 +540,8 @@ class ChatService:
         request = json.loads(row["request_json"])
         summary = row["phase"] == "summary"
         options = {"generate_title": not summary and bool(row.get("generate_title",False)),
-                   "allow_tools": not summary and request.get("allow_tools",False)}
+                   "allow_tools": not summary and request.get("allow_tools",False),
+                   "assistant_style": json.loads(row["assistant_style_json"])}
         if row.get("auto_memory_revision") and not summary and not request.get("compact_only"):
             options["auto_memory"] = True
         if not summary and request.get("allow_skills"):
@@ -722,7 +750,7 @@ class ChatService:
                 error=code
             if failure.usage is not None:
                 incoming,outgoing=failure.usage
-                if type(incoming) is int and type(outgoing) is int and 0<incoming<=32768 and 0<=outgoing<=self.config.chat_max_output_tokens:
+                if type(incoming) is int and type(outgoing) is int and 0<incoming<=self.config.chat_input_limit() and 0<=outgoing<=self.config.chat_max_output_tokens and incoming+outgoing<=self.config.chat_context_window_tokens:
                     input_tokens,output_tokens,reported_model=incoming,outgoing,failure.model or MODEL
                     cost=(incoming*self.config.input_price+outgoing*self.config.output_price+999999)//1000000
         if reply is not None:

@@ -1,6 +1,7 @@
 """Owner-visible names and bounded cross-device catalogs; no extra model loop."""
 
 import json
+from copy import deepcopy
 from collections import Counter
 from uuid import UUID, uuid4
 
@@ -76,13 +77,24 @@ async def directory(chat, conn, principal):
         for function in work_catalog.functions(current['catalog']):
             entry = dict(function['function'])
             original = entry['name']
+            if original == 'plugin_execute' and 'core_plugin_execute' not in shared:
+                core_ids = sorted(item['plugin_id'] for item in current['catalog'] if item.get('plugin_id') in {'builtin.schedule','builtin.goal'})
+                if core_ids:
+                    core = deepcopy(entry)
+                    core.update(name='core__plugin_execute', route_node_id=str(node_id), route_intent=original,
+                                route_label='Core', core_plugins=core_ids)
+                    core['parameters']['properties']['plugin_id'] = {'type':'string','enum':core_ids}
+                    core['parameters']['properties'].pop('access_root', None)
+                    core['description'] = 'Core reminders/goals. First use native plugin_inspect, not a plugin tool. Execute its returned tool/input.'
+                    entries.append(core)
+                    shared.add('core_plugin_execute')
             if original == 'plugin_execute' and not plugin_ready:
                 continue
             if original == 'skill_create' and not ({'system.info@1','filesystem.list@1','plugin.call@1'} & scope.tools & scope.local_tools):
                 # Current Skill profiles cannot execute Android-only tools.
                 continue
             # These run entirely in Core and have no device-specific inputs.
-            common = original in {'get_current_time','web_search','web_fetch','plugin_install'}
+            common = original in {'conversation_route','get_current_time','web_search','web_fetch','plugin_install','inspect_ui_extension','submit_ui_extension'}
             if common and original in shared:
                 continue
             if common:
@@ -118,7 +130,7 @@ async def prepare(work, conn, principal, conversation_id, value):
     if value.client_node_id is not None:
         for entry in current['catalog']:
             if 'route_node_id' in entry:
-                entry['client_device'] = entry['route_node_id'] == str(value.client_node_id)
+                entry['client_device'] = not entry.get('core_plugins') and entry['route_node_id'] == str(value.client_node_id)
     return current['catalog'], parent
 
 

@@ -1,0 +1,466 @@
+{
+  "date": "2026-10-25",
+  "scope": "P90 visualization plugin lifecycle and camera selection",
+  "user_acceptance": "pending physical camera gesture experience",
+  "production": {
+    "release": "/opt/nexus/releases/ui-extension-camera-20261025-568b5030",
+    "wheel_sha256": "568b5030267be1e3ba2ea1fe04bb4042fef57fb173a0c2132a57bb548f21b90e",
+    "schema": 37,
+    "runtime_resources": 288,
+    "single_core": true,
+    "paused": 0,
+    "backup": "/var/backups/nexus/before-ui-extension-camera-20261024T164755Z",
+    "backup_sha256": "a89a801b345980ceab0e9419a216da4f487f780c2ea792ea505b8fbcf56be53d",
+    "historical_tables_preserved": 39,
+    "configuration_unchanged": true,
+    "identity_count": 4,
+    "grant_count": 35,
+    "memory_count": 4,
+    "old_unknown_costs_unchanged": 6,
+    "call_limits_enabled": false,
+    "cost_limits_enabled": false
+  },
+  "windows": {
+    "version": "0.1.13",
+    "databases": {
+      "node\\plugins.sqlite3": {
+        "preserved": true,
+        "tables": 4
+      },
+      "node\\receipts.sqlite3": {
+        "preserved": true,
+        "tables": 5
+      },
+      "node-manual\\receipts.sqlite3": {
+        "preserved": true,
+        "tables": 4
+      }
+    },
+    "configuration_preserved": true,
+    "installed_hashes": {
+      "nexus-windows.exe": "1d545f66ef1755be2fcb95287977d4e1b81a686dc3bc379d6ce7adc7b1fc704d",
+      "binaries/nexus-node.exe": "5deb7915f562357b4513bb580dd130bfec7a5d44a3c98f578b8444e6f7bb5c01",
+      "binaries/nexus-voice.exe": "5c13916a66bd1dafbc02c5ce6aec4996cdd93436511b8a44d38906919dbb6879"
+    },
+    "nsis_bundle_marker_only_difference": true,
+    "normal_restart": {
+      "debugging": false,
+      "version": "0.1.13",
+      "pid": 70808
+    },
+    "installer": {
+      "filename": "NEXUS_0.1.13_x64-setup.exe",
+      "sha256": "7f69e29e4a174a73d3922881ad3a12e2905ff7dac124d46c2bc18b349c1a5a49",
+      "bytes": 116424373
+    },
+    "selection": "Integrated Camera (174f:246f)",
+    "selection_persisted_after_reload": true,
+    "camera_off_at_final_check": true,
+    "node_online": true,
+    "temporary_debug_port_closed": true
+  },
+  "real_model": {
+    "provider": "deepseek",
+    "model": "deepseek-flash",
+    "calls": 12,
+    "cost_microunits": 53696,
+    "cost_usd": "0.053696",
+    "ledger_outcomes": "all completed and calculated",
+    "normal_mode_preserved": true,
+    "phases": [
+      {
+        "phase": "develop",
+        "calls": 4,
+        "cost_microunits": 16289,
+        "status": "completed"
+      },
+      {
+        "phase": "upgrade",
+        "calls": 3,
+        "cost_microunits": 13977,
+        "status": "completed"
+      },
+      {
+        "phase": "fault",
+        "calls": 3,
+        "cost_microunits": 15149,
+        "status": "completed"
+      },
+      {
+        "phase": "report",
+        "calls": 2,
+        "cost_microunits": 8281,
+        "status": "completed"
+      }
+    ],
+    "source_authorship": "model generated candidates from natural-language requirements and tool contract; no fixture source supplied",
+    "active_version": "1.0.1",
+    "versions": [
+      {
+        "version": "1.0.2",
+        "bundle_digest": "975e19242bc3319e97217de0af99fa9741aa51364e439e66c8dbdc33295d5be6",
+        "status": "rolled_back",
+        "baseline_id": "ad9881d4-09b7-467e-97dc-fe9774321e09",
+        "test": {
+          "passed": true,
+          "receipt": {
+            "bundle_digest": "975e19242bc3319e97217de0af99fa9741aa51364e439e66c8dbdc33295d5be6",
+            "client_id": "b1008db3-a9ef-4c39-8b39-acdc381e909d",
+            "error": "",
+            "lease_id": "0b140d59-3d7b-4dc0-ab33-96cae87779cd",
+            "outputs": [
+              [
+                [],
+                [],
+                []
+              ],
+              [
+                [],
+                [
+                  {
+                    "dx": 74.99999999999999,
+                    "dy": 37.500000000000036,
+                    "op": "rotate"
+                  }
+                ],
+                []
+              ],
+              [
+                [],
+                [
+                  {
+                    "delta": -200,
+                    "op": "zoom"
+                  }
+                ],
+                []
+              ],
+              [
+                [],
+                [
+                  {
+                    "op": "select",
+                    "x": 0.4,
+                    "y": 0.5
+                  }
+                ]
+              ],
+              [
+                [
+                  {
+                    "op": "reset"
+                  }
+                ],
+                []
+              ]
+            ]
+          },
+          "verification": "client_sandbox_gesture_fixtures",
+          "webcam_verified": false
+        },
+        "runtime": {
+          "reason": "Uncaught Error: P90_SYNTHETIC_ROLLBACK_PROBE",
+          "restored_version_id": "ad9881d4-09b7-467e-97dc-fe9774321e09",
+          "status": "failed"
+        }
+      },
+      {
+        "version": "1.0.1",
+        "bundle_digest": "ef5b66c08d39cb863de8014f7be73c324b38b4c268f50583ec1412ed67224b16",
+        "status": "accepted",
+        "baseline_id": "b28d37c4-79b9-4efc-87d3-9287ed829e34",
+        "test": {
+          "passed": true,
+          "receipt": {
+            "bundle_digest": "ef5b66c08d39cb863de8014f7be73c324b38b4c268f50583ec1412ed67224b16",
+            "client_id": "b1008db3-a9ef-4c39-8b39-acdc381e909d",
+            "error": "",
+            "lease_id": "2e554ecc-5b66-4c08-b17d-b1d5036663f8",
+            "outputs": [
+              [
+                [],
+                [],
+                []
+              ],
+              [
+                [],
+                [
+                  {
+                    "dx": 74.99999999999999,
+                    "dy": 37.500000000000036,
+                    "op": "rotate"
+                  }
+                ],
+                []
+              ],
+              [
+                [],
+                [
+                  {
+                    "delta": -200,
+                    "op": "zoom"
+                  }
+                ],
+                []
+              ],
+              [
+                [],
+                [
+                  {
+                    "op": "select",
+                    "x": 0.4,
+                    "y": 0.5
+                  }
+                ]
+              ],
+              [
+                [
+                  {
+                    "op": "reset"
+                  }
+                ],
+                []
+              ]
+            ]
+          },
+          "verification": "client_sandbox_gesture_fixtures",
+          "webcam_verified": false
+        },
+        "runtime": {
+          "bundle_digest": "ef5b66c08d39cb863de8014f7be73c324b38b4c268f50583ec1412ed67224b16",
+          "client_id": "b1008db3-a9ef-4c39-8b39-acdc381e909d",
+          "deployment_revision": 3,
+          "error": "",
+          "status": "ready",
+          "version_id": "ad9881d4-09b7-467e-97dc-fe9774321e09"
+        }
+      },
+      {
+        "version": "1.0.0",
+        "bundle_digest": "043f2243bff7485381dba3b91710fd21acde8c1498a6daebb3e7cccbc9e8a05b",
+        "status": "accepted",
+        "baseline_id": null,
+        "test": {
+          "passed": true,
+          "receipt": {
+            "bundle_digest": "043f2243bff7485381dba3b91710fd21acde8c1498a6daebb3e7cccbc9e8a05b",
+            "client_id": "b1008db3-a9ef-4c39-8b39-acdc381e909d",
+            "error": "",
+            "lease_id": "0f4054e6-4761-4a87-bed9-75c817e97233",
+            "outputs": [
+              [
+                [],
+                [],
+                []
+              ],
+              [
+                [],
+                [
+                  {
+                    "dx": 99.99999999999997,
+                    "dy": 50.00000000000004,
+                    "op": "rotate"
+                  }
+                ],
+                []
+              ],
+              [
+                [],
+                [
+                  {
+                    "delta": -200,
+                    "op": "zoom"
+                  }
+                ],
+                []
+              ],
+              [
+                [],
+                [
+                  {
+                    "op": "select",
+                    "x": 0.4,
+                    "y": 0.5
+                  }
+                ]
+              ],
+              [
+                [
+                  {
+                    "op": "reset"
+                  }
+                ],
+                []
+              ]
+            ]
+          },
+          "verification": "client_sandbox_gesture_fixtures",
+          "webcam_verified": false
+        },
+        "runtime": {
+          "bundle_digest": "043f2243bff7485381dba3b91710fd21acde8c1498a6daebb3e7cccbc9e8a05b",
+          "client_id": "b1008db3-a9ef-4c39-8b39-acdc381e909d",
+          "deployment_revision": 2,
+          "error": "",
+          "status": "ready",
+          "version_id": "b28d37c4-79b9-4efc-87d3-9287ed829e34"
+        }
+      }
+    ]
+  },
+  "rollback_input": {
+    "trigger": "user confirmed clicking camera start",
+    "user_correction": "OPPO Pad 4 Pro is a Windows virtual camera; use Integrated Camera instead",
+    "camera_track_id_recorded_at_failure": false,
+    "agent_synthetic_injection_executed": false,
+    "runtime_failure": "Uncaught Error: P90_SYNTHETIC_ROLLBACK_PROBE",
+    "restored_version": "1.0.1",
+    "physical_camera_gesture_acceptance": false
+  },
+  "validation": {
+    "initial_production_fixed_package": {
+      "windows_pytest_passed": 78,
+      "linux_pytest_passed": 136
+    },
+    "camera_patch_fixed_package": {
+      "linux_pytest_passed": 55,
+      "browser": {
+        "passed": true,
+        "browser": "156.0.4314.42",
+        "evidence": [
+          {
+            "surface": "web",
+            "cases": [
+              "idle",
+              "rotate",
+              "zoom",
+              "select",
+              "reset"
+            ],
+            "isolation": true,
+            "invalidCodeStopped": true,
+            "digestVerified": true,
+            "scene": {
+              "rotated": true,
+              "zoomed": true,
+              "reset": true,
+              "selected": true
+            },
+            "recognition": {
+              "localModelLoaded": true,
+              "hands": 0,
+              "stopped": true,
+              "selectedCamera": true,
+              "missingCameraRejected": true
+            }
+          },
+          {
+            "surface": "windows",
+            "cases": [
+              "idle",
+              "rotate",
+              "zoom",
+              "select",
+              "reset"
+            ],
+            "isolation": true,
+            "invalidCodeStopped": true,
+            "digestVerified": true,
+            "scene": {
+              "rotated": true,
+              "zoomed": true,
+              "reset": true,
+              "selected": true
+            },
+            "recognition": {
+              "localModelLoaded": true,
+              "hands": 0,
+              "stopped": true,
+              "selectedCamera": true,
+              "missingCameraRejected": true
+            }
+          }
+        ],
+        "webcam": "synthetic browser camera only",
+        "real_model_calls": 0
+      },
+      "native": {
+        "passed": true,
+        "native": true,
+        "version": "0.1.13",
+        "webview": "155.0.4283.62",
+        "runtime": {
+          "error": "",
+          "cases": 5,
+          "commands": []
+        },
+        "recognition": {
+          "hands": 2,
+          "landmarks": [
+            21,
+            21
+          ],
+          "local": true
+        },
+        "camera": {
+          "hands": 0,
+          "stopped": true
+        },
+        "real_model_calls": 0,
+        "human_camera": false
+      },
+      "public": {
+        "/static/downloads/NEXUS_0.1.13_x64-setup.exe": {
+          "sha256": "7f69e29e4a174a73d3922881ad3a12e2905ff7dac124d46c2bc18b349c1a5a49",
+          "bytes": 116424373,
+          "status": 200,
+          "cache_control": "no-store",
+          "csp": "default-src 'self'; script-src 'self' 'sha256-UaO1DKdOZTH3g72w3U/IhBu3y5cxME0JyJYosMMMerQ=' 'sha256-jH4JDM+p01kuu6ou/A4MgTq6B9+X7dUZGHEdH52L4GY='; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
+        },
+        "/static/app/gesture-input.js": {
+          "sha256": "e4e73fe086d3fe053027a4601a1baa380eb31534f7ef438fc5a13db308ea0600",
+          "bytes": 3035,
+          "status": 200,
+          "cache_control": "no-store",
+          "csp": "default-src 'self'; script-src 'self' 'sha256-UaO1DKdOZTH3g72w3U/IhBu3y5cxME0JyJYosMMMerQ=' 'sha256-jH4JDM+p01kuu6ou/A4MgTq6B9+X7dUZGHEdH52L4GY='; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
+        },
+        "/static/app/ui-extensions.js": {
+          "sha256": "f1f342c32b44a1414b109cf347fcc7e8bf5bb238f0e237bc05e40de90bf3c8d1",
+          "bytes": 12368,
+          "status": 200,
+          "cache_control": "no-store",
+          "csp": "default-src 'self'; script-src 'self' 'sha256-UaO1DKdOZTH3g72w3U/IhBu3y5cxME0JyJYosMMMerQ=' 'sha256-jH4JDM+p01kuu6ou/A4MgTq6B9+X7dUZGHEdH52L4GY='; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
+        }
+      }
+    },
+    "batches_overlap_do_not_add": true
+  },
+  "server_temporary_materials": {
+    "initial_archive": {
+      "sha256": "238f62286ba21a1558e6f98d5637921f7b6a1e4d3d5622b0709def2db59eb21f",
+      "bytes": 15560368
+    },
+    "initial_cleanup": {
+      "temporary_server_materials_removed": true,
+      "runtime_rollback_backups_retained": true
+    },
+    "camera_archive": {
+      "sha256": "7b69e243eac1fe6b5d7133202088fb9e26eaa2b82f2001317ce87eb2e11108c7",
+      "bytes": 8270503
+    },
+    "camera_cleanup": {
+      "temporary_server_materials_removed": true,
+      "runtime_rollback_backups_retained": true
+    }
+  },
+  "verification_notes": [
+    "Early camera-selector UI tests failed because the isolated test page omitted main handlers and retained the preceding scene drawer. Corrected test setup; final web and Windows checks passed.",
+    "Initial camera patch HTTP verification used the prior release manifest. Corrected the manifest path and verified complete public file hashes.",
+    "Installed executable differs from the standalone build only in the three-byte Tauri bundle marker UNK to NSS; remaining bytes and bundled Node/voice match."
+  ],
+  "not_claimed": [
+    "physical camera tracking quality or comfort acceptance",
+    "arbitrary Core/Node source auto-publishing",
+    "Android release"
+  ]
+}

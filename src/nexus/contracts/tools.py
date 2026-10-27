@@ -1,3 +1,20 @@
+from nexus.contracts.android_screen import AndroidScreenObserveArguments, AndroidScreenActArguments, AndroidScreenResult, AndroidScreenObserveCall, AndroidScreenActCall
+from nexus.contracts.android_control import (
+    AndroidUIObserveArguments,
+    AndroidUIObserveCall,
+    AndroidUIResult,
+    AndroidUIActArguments,
+    AndroidUIActCall,
+    AndroidFilesArguments,
+    AndroidFilesCall,
+    AndroidFilesResult,
+    AndroidFilePreviewArguments,
+    AndroidFilePreviewCall,
+    AndroidFilePreviewResult,
+    AndroidFileWriteArguments,
+    AndroidFileWriteCall,
+    AndroidFileWriteResult,
+)
 from nexus.contracts.file_transfer import FileReceiveArguments, FileReceiveCall, FileReceiveResult
 from nexus.plugins.contracts import PluginNodeArguments, PluginNodeResult, PluginNodeCall
 
@@ -222,11 +239,19 @@ class InteractCall(StrictContract):
 
 from nexus.contracts.android import AndroidDeviceStatusArguments, AndroidNotificationDigestArguments, AndroidDeviceStatusResult, AndroidNotificationDigestResult, AndroidDeviceStatusCall, AndroidNotificationDigestCall
 
-ToolCall = Annotated[SystemInfoCall | ListDirectoryCall | FileReadCall | FileSearchCall | FilePreviewCall | FileWriteCall | CommandRunCall | FileLinesCall | FileGlobCall | FileGrepCall | FileEditPreviewCall | FileEditCall | ObserveCall | InteractCall | ImageReadCall | PluginNodeCall | AndroidDeviceStatusCall | AndroidNotificationDigestCall | FileReceiveCall, Field(discriminator="tool")]
-ToolResult = InteractionResult | SystemInfoResult | ListDirectoryResult | FileReadResult | FileSearchResult | FilePreviewResult | FileWriteResult | CommandRunResult | FileLinesResult | FileGlobResult | FileGrepResult | FileEditPreviewResult | FileEditResult | ImageReadResult | PluginNodeResult | AndroidDeviceStatusResult | AndroidNotificationDigestResult | FileReceiveResult
+ToolCall = Annotated[AndroidScreenObserveCall | AndroidScreenActCall | AndroidUIObserveCall | AndroidUIActCall | AndroidFilesCall | AndroidFilePreviewCall | AndroidFileWriteCall | SystemInfoCall | ListDirectoryCall | FileReadCall | FileSearchCall | FilePreviewCall | FileWriteCall | CommandRunCall | FileLinesCall | FileGlobCall | FileGrepCall | FileEditPreviewCall | FileEditCall | ObserveCall | InteractCall | ImageReadCall | PluginNodeCall | AndroidDeviceStatusCall | AndroidNotificationDigestCall | FileReceiveCall, Field(discriminator="tool")]
+ToolResult = AndroidScreenResult | AndroidUIResult | AndroidFilesResult | AndroidFilePreviewResult | AndroidFileWriteResult | InteractionResult | SystemInfoResult | ListDirectoryResult | FileReadResult | FileSearchResult | FilePreviewResult | FileWriteResult | CommandRunResult | FileLinesResult | FileGlobResult | FileGrepResult | FileEditPreviewResult | FileEditResult | ImageReadResult | PluginNodeResult | AndroidDeviceStatusResult | AndroidNotificationDigestResult | FileReceiveResult
 
 
 TOOL_ARGUMENT_MODELS = {
+    "android.screen_observe@1": AndroidScreenObserveArguments,
+    "android.ui_observe@1": AndroidUIObserveArguments,
+    "android.screen_act@1": AndroidScreenActArguments,
+    "android.ui_act@1": AndroidUIActArguments,
+    "android.files@1": AndroidFilesArguments,
+    "android.file_preview@1": AndroidFilePreviewArguments,
+    "android.file_write@1": AndroidFileWriteArguments,
+
     "filesystem.receive@1": FileReceiveArguments,
     "android.device_status@1": AndroidDeviceStatusArguments,
     "android.notification_digest@1": AndroidNotificationDigestArguments,
@@ -249,6 +274,14 @@ TOOL_ARGUMENT_MODELS = {
 }
 
 TOOL_RESULT_MODELS = {
+    "android.screen_observe@1": AndroidScreenResult,
+    "android.ui_observe@1": AndroidUIResult,
+    "android.screen_act@1": AndroidScreenResult,
+    "android.ui_act@1": AndroidUIResult,
+    "android.files@1": AndroidFilesResult,
+    "android.file_preview@1": AndroidFilePreviewResult,
+    "android.file_write@1": AndroidFileWriteResult,
+
     "filesystem.receive@1": FileReceiveResult,
     "android.device_status@1": AndroidDeviceStatusResult,
     "android.notification_digest@1": AndroidNotificationDigestResult,
@@ -276,12 +309,23 @@ def validate_result(command: ToolCall, result: ToolResult, max_bytes: int) -> To
     model = TOOL_RESULT_MODELS[f"{command.tool}@{command.tool_version}"]
     checked = model.model_validate_json(result.model_dump_json())
     args = command.arguments
+    if command.tool.startswith("android."):
+        from nexus.contracts.android_control import validate_android_result
+        validate_android_result(command, checked)
+        from nexus.contracts.android_screen import validate_screen_result
+        validate_screen_result(command, checked)
     if isinstance(checked, FileReceiveResult) and (checked.attachment_id != args.attachment_id or checked.sha256 != args.sha256 or checked.bytes_written != args.size_bytes):
         raise ValueError("file delivery evidence mismatch")
     if isinstance(checked, AndroidNotificationDigestResult) and len(checked.entries) > args.limit:
         raise ValueError("notification result exceeds requested limit")
     if isinstance(checked, PluginNodeResult) and (checked.release_digest != args.release_digest or checked.tool != args.tool):
         raise ValueError("plugin result identity mismatch")
+    if isinstance(checked, PluginNodeResult) and args.plugin_id == 'builtin.android_emulator' and args.tool == 'observe':
+        from nexus.contracts.images import ImageSnapshot
+        ImageSnapshot.model_validate({key: checked.data[key] for key in ImageSnapshot.model_fields})
+        import re
+        if not re.fullmatch('[a-f0-9]{64}', checked.data.get('observation_digest', '')):
+            raise ValueError('invalid emulator observation identity')
     if hasattr(checked, "root_id") and checked.root_id != args.root_id:
         raise ValueError("resource mismatch")
     if hasattr(checked, "path") and checked.path != args.path:
@@ -312,7 +356,7 @@ def validate_result(command: ToolCall, result: ToolResult, max_bytes: int) -> To
             if len(path.split("/"))-1 > args.max_depth or not fnmatch.fnmatchcase(path.rsplit("/",1)[-1].casefold(), args.pattern.casefold()):
                 raise ValueError("search result outside query")
     if isinstance(checked, FilePreviewResult) and not isinstance(checked, FileEditPreviewResult):
-        if checked.content_sha256 != text_digest(args.content) or checked.preview_digest != write_digest(args.root_id, args.path, checked.previous_sha256, checked.content_sha256):
+        if checked.content_sha256 != text_digest(args.content) or checked.preview_digest != write_digest(args.root_id,args.path,checked.previous_sha256,checked.content_sha256,args.access_root):
             raise ValueError("preview mismatch")
     if isinstance(checked, FileWriteResult) and not isinstance(checked, FileEditResult):
         if checked.sha256 != text_digest(args.content) or checked.bytes_written != len(args.content.encode()):
@@ -346,7 +390,7 @@ def validate_result(command: ToolCall, result: ToolResult, max_bytes: int) -> To
                 raise ValueError("grep match outside query")
     if isinstance(checked, FileEditPreviewResult):
         if (checked.previous_sha256 != args.expected_sha256 or not args.replace_all and checked.replacements != 1
-                or checked.preview_digest != write_digest(args.root_id,args.path,args.expected_sha256,checked.content_sha256)):
+                or checked.preview_digest != write_digest(args.root_id,args.path,args.expected_sha256,checked.content_sha256,args.access_root)):
             raise ValueError("edit preview mismatch")
     if isinstance(checked, FileEditResult):
         if (checked.sha256 != args.content_sha256 or checked.bytes_written != args.bytes_written

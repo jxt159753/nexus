@@ -15,6 +15,7 @@ export const SHANGHAI_ZONE = "Asia/Shanghai";
 export const pluginState = {
   enabled: false,
   list: [],
+  uiList: [],
   loadedAt: 0,
   detail: null,
   detailId: null,
@@ -159,6 +160,7 @@ export async function loadPlugins() {
   const value = await api("/api/v1/plugins");
   pluginState.enabled = !!value.enabled;
   pluginState.list = Array.isArray(value.plugins) ? value.plugins : [];
+  pluginState.uiList = Array.isArray(value.ui_plugins) ? value.ui_plugins : [];
   pluginState.loadedAt = Date.now();
   return value;
 }

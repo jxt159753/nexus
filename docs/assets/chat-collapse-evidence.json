@@ -1,0 +1,109 @@
+{
+  "task": "P102",
+  "status": "deployed_technical_verification_complete_user_acceptance_pending",
+  "core": {
+    "release": "/opt/nexus/releases/chat-collapse-20261026-2fc13726",
+    "wheel_sha256": "2fc13726d913da2c60a259120e320a64c1783f139eb9d51cc156e070d2dee1c0",
+    "schema": 40,
+    "runtime_resources": 300,
+    "changed_resources": [
+      "nexus/core/cognitive/chat_presentation.py",
+      "nexus/web/app/render.js",
+      "nexus/web/chat.js"
+    ],
+    "single_active": true,
+    "paused": false,
+    "historical_tables_preserved": 52,
+    "model_calls_before_and_after": 456,
+    "configuration_unchanged": true,
+    "backup": "/var/backups/nexus/before-chat-collapse-20261026T024905Z",
+    "backup_sha256": "970d9128447de8c21bb3cabee3768f51330517a61563a2f048fc3d3b77c536df"
+  },
+  "behavior": {
+    "settled_process_collapsed": true,
+    "failure_status_visible": true,
+    "approval_visible": true,
+    "completion_resets_running_expansion": true,
+    "post_completion_manual_choice_preserved": true,
+    "history_verified": [
+      {
+        "phase": "completed",
+        "steps": 4,
+        "collapse_process": true
+      },
+      {
+        "phase": "stopped",
+        "steps": 10,
+        "collapse_process": true
+      },
+      {
+        "phase": "completed",
+        "steps": 4,
+        "collapse_process": true
+      },
+      {
+        "phase": "completed",
+        "steps": 55,
+        "collapse_process": true
+      }
+    ]
+  },
+  "windows": {
+    "version": "0.1.22",
+    "normal_restart": true,
+    "node_running": true,
+    "temporary_debug_port_closed": true,
+    "databases_preserved": 3,
+    "tables_preserved": 13,
+    "configuration_preserved": true,
+    "node_and_voice_binaries_unchanged": true,
+    "installed_webview_verified": true
+  },
+  "android": {
+    "version": "0.1.10",
+    "version_code": 11,
+    "same_signer_as_0_1_9": true,
+    "emulator_interaction_passed": true,
+    "real_phone_installed": false,
+    "real_phone_verified": false
+  },
+  "downloads": [
+    {
+      "filename": "NEXUS_0.1.22_x64-setup.exe",
+      "sha256": "cba83848d6f3771ff4f56d549806212c710067f8aed260789a44d2ddd0870df9",
+      "bytes": 116494738,
+      "url": "https://core.example.com/static/downloads/NEXUS_0.1.22_x64-setup.exe"
+    },
+    {
+      "filename": "NEXUS-Android-0.1.10-debug.apk",
+      "sha256": "4c7072d0d2e5351afd16f1f70e4ba827c452de11fa2d1b1a1a7914c836a5c4d9",
+      "bytes": 12212663,
+      "url": "https://core.example.com/static/downloads/NEXUS-Android-0.1.10-debug.apk"
+    }
+  ],
+  "tests": {
+    "source_backend": 29,
+    "fixed_windows_backend": 80,
+    "fixed_linux_backend": 80,
+    "test_batches_overlap": true,
+    "browser_surfaces": [
+      "web",
+      "windows-ui",
+      "legacy"
+    ],
+    "browser_widths": [
+      1280,
+      390
+    ],
+    "installed_windows_steps": 24,
+    "android_instrumentation": 1,
+    "android_lint": "passed",
+    "real_model_calls": 0
+  },
+  "temporary_server_materials_archived_and_removed": true,
+  "test_environment_repairs": [
+    "synthetic price fixtures now use a future date",
+    "existing pytest library restored after archive filter omitted it",
+    "Android test accessibility nodes refreshed before assertions"
+  ]
+}

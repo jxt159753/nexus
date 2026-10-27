@@ -1,0 +1,118 @@
+{
+  "recorded_at": "2026-10-26T04:38:11.978047+00:00",
+  "status": "deployed_awaiting_physical_phone_validation",
+  "core": {
+    "release": "android-node-20261026-3303c4ea",
+    "schema": 42,
+    "wheel_sha256": "3303c4eabf972616f4a0c1a48e82caace74966a424fb01698ed5ba264b1919ca",
+    "runtime_resources": 307,
+    "changed_resources": [
+      "nexus/contracts/basic.py",
+      "nexus/contracts/messages.py",
+      "nexus/contracts/task.py",
+      "nexus/contracts/tools.py",
+      "nexus/contracts/work.py",
+      "nexus/core/cognitive/router.py",
+      "nexus/core/cognitive/work_catalog.py",
+      "nexus/core/cognitive/chat_work.py",
+      "nexus/core/cognitive/device_commands.py",
+      "nexus/core/security/devices.py",
+      "nexus/core/security/work.py",
+      "nexus/core/storage/tasks.py",
+      "nexus/core/harness/http.py",
+      "nexus/contracts/android_control.py",
+      "nexus/core/storage/migrations/042_android_control.sql"
+    ],
+    "backup": "/var/backups/nexus/before-android-node-20261026T043601Z",
+    "backup_sha256": "be67f8e264905507658182b52bb956de3a02a921d99fb470afd33f596c21420f",
+    "history_tables_preserved": 53,
+    "preserved_rows": {
+      "tasks": 236,
+      "task_attempts": 229,
+      "conversations": 94,
+      "chat_turns": 163,
+      "identities": 5,
+      "grants": 37,
+      "model_calls": 456,
+      "device_clients": 2,
+      "managed_node_profiles": 1,
+      "device_owner_grants": 2
+    },
+    "config_unchanged": true,
+    "new_grants": 0,
+    "model_calls_added": 0,
+    "unknown_cost_calls_unchanged": 6,
+    "single_active_core": true,
+    "paused": false,
+    "online_nodes": 2,
+    "cross_client_snapshot": {
+      "equal": true,
+      "latest_tasks": 20,
+      "active_tasks": 0,
+      "active_turns": 0
+    }
+  },
+  "validation": {
+    "windows": {
+      "passed": 216,
+      "skipped": 1,
+      "seconds": 76.03
+    },
+    "linux": {
+      "passed": 211,
+      "skipped": 6,
+      "seconds": 125.28
+    },
+    "android_unit_tests": 10,
+    "lint": {
+      "Warning": 18,
+      "Hint": 1
+    },
+    "android_instrumentation": {
+      "passed": 5,
+      "seconds": 140.325
+    },
+    "migration_copy_preserved": true,
+    "rollback_reads_schema42": true,
+    "resolved_test_fixture_failures": [
+      "migration scripts located through installed package resources",
+      "routed plugin selection respects catalog core_plugins scope"
+    ]
+  },
+  "android": {
+    "version": "0.1.12",
+    "version_code": 13,
+    "url": "https://core.example.com/static/downloads/NEXUS-Android-0.1.12-debug.apk",
+    "filename": "NEXUS-Android-0.1.12-debug.apk",
+    "sha256": "67e0c76971602b1a2217bde019d505e33029f33066bd8bce611d4efaa5af4369",
+    "bytes": 12279524,
+    "signing": "existing_debug_key",
+    "certificate_sha256": "4aae1191da4be22ca8b49c65e770426763db177df293672aa830b37ca76486cd",
+    "upgrade_from": "0.1.11",
+    "private_files_preserved": 8,
+    "emulator": "API37.2 x86_64 / 16 KiB"
+  },
+  "public": {
+    "downloads": [
+      {
+        "filename": "NEXUS-Android-0.1.12-debug.apk",
+        "sha256": "67e0c76971602b1a2217bde019d505e33029f33066bd8bce611d4efaa5af4369",
+        "bytes": 12279524,
+        "https_verified": true
+      }
+    ],
+    "existing_web_resources_preserved": true
+  },
+  "cleanup": {
+    "archive": "E:\\NEXUS\\var\\android-node-release\\android-node-validation-3303c4ea.tar.gz",
+    "sha256": "68e4db6ea9e4ab6ce596df347af6e95b92a8464c1d89a7059203241a1003b2b6",
+    "bytes": 39206386,
+    "temporary_server_data_removed": true
+  },
+  "limitations": [
+    "Physical RedMagic phone, OEM accessibility behavior and background retention are awaiting user tests.",
+    "No real model calls or physical phone installation were performed.",
+    "System accessibility, local switches, selected directories and Core device permissions must be enabled manually.",
+    "Text reads are bounded to 1 MiB with pagination; create/overwrite is at most 12000 UTF-8 bytes."
+  ]
+}

@@ -79,6 +79,17 @@ async def task_step(conn, task_id):
     return row[0] if row else None
 
 
+async def require_full_task(conn, task, scope, now):
+    """An approval alone never grants access outside the configured workspace."""
+    identifier = await task_step(conn, task.task_id)
+    if identifier is not None:
+        _, grant = await allowed_step(conn, identifier, now, scope=scope)
+        if (grant['permission_mode'] == 'full' and grant['owner_id'] == str(task.owner_id)
+                and grant['node_id'] == str(task.node_id)):
+            return
+    raise AccessDenied('HOST_ACCESS_REQUIRES_FULL')
+
+
 async def check_task(conn, task, scope, now):
     native_mode=None
     if task.action.tool=='plugin.call':
@@ -95,16 +106,18 @@ async def check_task(conn, task, scope, now):
     if grant["node_id"]!=str(task.node_id) or grant["owner_id"]!=str(task.owner_id):
         raise AccessDenied("POLICY_DENIED")
     plan=await one(conn,'SELECT plan_mode FROM conversations WHERE conversation_id=?',(grant['conversation_id'],))
-    if plan[0] and task.action.tool in {'command.run','filesystem.write','filesystem.edit','interaction.act','filesystem.receive'}:
+    if plan[0] and task.action.tool in {'command.run','filesystem.write','filesystem.edit','interaction.act','filesystem.receive','android.ui_act','android.screen_act','android.file_write'}:
         raise AccessDenied('PLAN_MODE_READ_ONLY')
     if task.current_attempt_id is None and not step["skill_run_id"] and await one(conn,"SELECT 1 FROM chat_controls WHERE turn_id=? AND kind='steer' AND applied_call_id IS NULL",(step["turn_id"],)):
         raise AccessDenied("WORK_STOPPED")
     if native_mode is not None: return native_mode=='full'
+    if task.action.tool in {"android.ui_act", "android.screen_act"} and grant["permission_mode"] != "full":
+        return False
     if task.action.tool == "android.notification_digest":
         return False  # A concrete Harness approval, including in full mode.
     if grant['permission_mode'] == 'full':
         return True
-    if task.action.tool in {"filesystem.write","filesystem.edit"} and step["permission_decision"]!="approve" and not grant["auto_files"]:
+    if task.action.tool in {"filesystem.write","filesystem.edit","android.file_write"} and step["permission_decision"]!="approve" and not grant["auto_files"]:
         raise AccessDenied("WORK_CONFIRMATION_REQUIRED")
     if task.action.tool=="interaction.act" and step["permission_decision"]!="approve" and (grant["auto_files"] or grant["profile"]!="standard"):
         import json

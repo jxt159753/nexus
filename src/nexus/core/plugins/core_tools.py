@@ -87,12 +87,15 @@ async def execute(service,conn,principal,conversation,step,grant,plugin_id,name,
                 SELECT 1 FROM plugin_authorities WHERE root_turn_id=? AND kind='goal' LIMIT 1''',(step['turn_id'],step['turn_id'])):
                 raise AccessDenied('GOAL_NEW_USER_TURN_REQUIRED')
             if (await one(conn,'SELECT count(*) FROM plugin_goals'))[0]>=1000: raise AccessDenied('GOAL_STORAGE_FULL')
-            old=await one(conn,"SELECT goal_id FROM plugin_goals WHERE conversation_id=? AND status='active' AND expires_at>?",(conversation_id,timestamp(now)))
+            old=await one(conn,"SELECT goal_id FROM plugin_goals WHERE conversation_id=? AND status='active' AND (run_until_stopped=1 OR expires_at>?)",(conversation_id,timestamp(now)))
             if old: raise ValueError('an active goal already exists')
             identifier=str(uuid4())
+            continuous=value.get('run_until_stopped','duration_minutes' not in value and 'max_rounds' not in value)
+            if continuous and ('duration_minutes' in value or 'max_rounds' in value): raise ValueError('持续目标不能同时设置次数或期限')
             await conn.execute("INSERT INTO plugin_goals(goal_id,conversation_id,owner_id,objective,status,max_rounds,created_at,expires_at) VALUES(?,?,?,?,'active',?,?,?)",
                 (identifier,conversation_id,str(principal.identity_id),value['objective'],value.get('max_rounds',5),timestamp(now),timestamp(now+timedelta(minutes=value.get('duration_minutes',30)))))
             await conn.execute('UPDATE plugin_goals SET rounds=1 WHERE goal_id=?',(identifier,))
+            await conn.execute('UPDATE plugin_goals SET run_until_stopped=?,resume_after_restart=? WHERE goal_id=?',(int(continuous),int(value.get('resume_after_restart',continuous)),identifier))
             from nexus.core.plugins.lifecycle import attach
             await attach(service,conn,identifier,'goal',conversation,step,grant)
             return goals.model_view(await goals.snapshot(conn,identifier))
@@ -114,14 +117,14 @@ async def execute(service,conn,principal,conversation,step,grant,plugin_id,name,
             from nexus.contracts.autonomy import GoalCheckpoint
             return goals.model_view(await goals.checkpoint(conn,row,GoalCheckpoint.model_validate(value['checkpoint']),turn_id=step['turn_id']))
         if name=='goal_wait':
-            if row['status']!='active' or row['expires_at']<=timestamp(now): raise AccessDenied('GOAL_NOT_ACTIVE')
+            if row['status']!='active' or not row['run_until_stopped'] and row['expires_at']<=timestamp(now): raise AccessDenied('GOAL_NOT_ACTIVE')
             watch=await one(conn,'SELECT watch_id FROM autonomy_watches WHERE watch_id=? AND goal_id=? AND paused=0 AND expires_at>?',(value['watch_id'],row['goal_id'],timestamp(now)))
             if not watch: raise AccessDenied('WATCH_SCOPE_DENIED')
             if not await one(conn,'SELECT 1 FROM goal_plans WHERE goal_id=?',(row['goal_id'],)): raise ValueError('goal plan required')
             await conn.execute('UPDATE goal_plans SET waiting_for_event=1,waiting_watch_id=?,last_reason=? WHERE goal_id=?',(value['watch_id'],value['reason'],row['goal_id']))
             return {'waiting':True,'goal_id':row['goal_id'],'model_calls_while_unchanged':0}
-        if row['status']=='complete' or row['expires_at']<=timestamp(now): raise AccessDenied('GOAL_ENDED')
-        if service.chat.config.call_limits_enabled and value['status']=='active' and row['rounds']>=row['max_rounds']: raise AccessDenied('PLUGIN_GOAL_LIMIT')
+        if row['status']=='complete' or not row['run_until_stopped'] and row['expires_at']<=timestamp(now): raise AccessDenied('GOAL_ENDED')
+        if not row['run_until_stopped'] and service.chat.config.call_limits_enabled and value['status']=='active' and row['rounds']>=row['max_rounds']: raise AccessDenied('PLUGIN_GOAL_LIMIT')
         if value['status']=='blocked' and row['rounds']<3: raise ValueError('blocked requires at least three goal rounds')
         verified=False
         if value['status']=='complete':
@@ -134,6 +137,12 @@ async def execute(service,conn,principal,conversation,step,grant,plugin_id,name,
             await conn.execute("UPDATE plugin_authorities SET state='paused' WHERE authority_id=?",(row['goal_id'],))
         return {'goal_id':row['goal_id'],'status':value['status'],'completion_verified':verified,'verification':'goal_state_recorded'}
     if plugin_id=='builtin.schedule':
+        if name=='notification_targets':
+            return {'clients':[dict(row) for row in await conn.execute_fetchall('SELECT client_id,name,platform,last_seen_at FROM reminder_clients WHERE owner_id=? AND enabled=1',(str(principal.identity_id),))]}
+        if name=='notify':
+            from nexus.core.plugins.notifications import publish
+            identifier=await publish(conn,principal.identity_id,conversation_id,'work:'+step['step_id'],value['title'],value['body'],value.get('targets') or None)
+            return {'reminder_id':identifier,'status':'queued','verification':'saved_to_device_inbox'}
         from nexus.core.plugins.schedule import manage
         result=await manage(conn,principal,conversation_id,name,value,now)
         if name=='schedule_create' and value.get('execute') or name=='schedule_update' and value.get('paused') is False:

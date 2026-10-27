@@ -24,6 +24,8 @@ async def snapshot(conn, goal_id, *, step_id=None):
         return None
     plan = await one(conn, "SELECT * FROM goal_plans WHERE goal_id=?", (str(goal_id),))
     result = dict(goal)
+    if goal['run_until_stopped']:
+        result.update(expires_at=None,max_rounds=None)
     result["completion_verified"] = bool(goal["completion_verified"])
     result["verification"] = "declared_task_assertions" if goal["completion_verified"] else "unverified"
     result["plan"] = json.loads(plan["plan_json"]) if plan else None
@@ -59,7 +61,7 @@ def model_view(value):
 
 
 async def set_plan(conn, goal, value: GoalPlan):
-    if goal["status"] == "complete" or goal["expires_at"] <= timestamp(utc_now()):
+    if goal["status"] == "complete" or not goal['run_until_stopped'] and goal["expires_at"] <= timestamp(utc_now()):
         raise Conflict("goal has ended")
     current = await one(conn, "SELECT * FROM goal_plans WHERE goal_id=?", (goal["goal_id"],))
     revision = current["revision"] if current else 0
@@ -88,7 +90,7 @@ async def set_plan(conn, goal, value: GoalPlan):
     else:
         if (await one(conn, "SELECT count(*) FROM goal_plans"))[0] >= 1000:
             raise AccessDenied("GOAL_STORAGE_FULL")
-        await conn.execute("INSERT INTO goal_plans(goal_id,plan_json,last_progress_round) VALUES(?,?,?)", (goal["goal_id"], value.model_dump_json(), goal['rounds']))
+        await conn.execute("INSERT INTO goal_plans(goal_id,plan_json,last_progress_round,resume_after_restart) VALUES(?,?,?,?)", (goal["goal_id"], value.model_dump_json(), goal['rounds'], goal['resume_after_restart']))
     # Keep finished work and its references; only replace unexecuted definitions.
     for step in old_steps:
         if step["step_id"] not in new_steps:
@@ -112,6 +114,7 @@ async def policy(conn, goal, value: GoalPolicy):
         raise Conflict("goal policy changed")
     await conn.execute("UPDATE goal_plans SET policy_revision=policy_revision+1,resume_after_restart=?,priority=? WHERE goal_id=?",
                        (int(value.resume_after_restart), value.priority, goal["goal_id"]))
+    await conn.execute("UPDATE plugin_goals SET resume_after_restart=? WHERE goal_id=?", (int(value.resume_after_restart), goal['goal_id']))
     await audit(conn, goal["owner_id"], None, "goal.policy_changed", utc_now())
     return await snapshot(conn, goal["goal_id"])
 
@@ -197,7 +200,7 @@ async def checkpoint(conn, goal, value: GoalCheckpoint, *, turn_id=None):
     plan = await one(conn, "SELECT * FROM goal_plans WHERE goal_id=?", (goal["goal_id"],))
     if plan is None or plan["revision"] != value.expected_revision:
         raise Conflict("goal plan changed")
-    if goal["status"] != "active" or goal["expires_at"] <= timestamp(utc_now()):
+    if goal["status"] != "active" or not goal['run_until_stopped'] and goal["expires_at"] <= timestamp(utc_now()):
         raise AccessDenied("GOAL_NOT_ACTIVE")
     if (await one(conn, 'SELECT count(*) FROM goal_checkpoints WHERE goal_id=?', (goal['goal_id'],)))[0] >= 100:
         raise AccessDenied('GOAL_CHECKPOINT_LIMIT')
@@ -246,7 +249,7 @@ async def verify_criteria(conn, goal, plan, identifiers=None, *, not_before=None
 
 
 async def verify_completion(conn, goal):
-    if goal['status']!='active' or goal['expires_at']<=timestamp(utc_now()):
+    if goal['status']!='active' or not goal['run_until_stopped'] and goal['expires_at']<=timestamp(utc_now()):
         raise AccessDenied('GOAL_NOT_ACTIVE')
     plan = await one(conn, "SELECT * FROM goal_plans WHERE goal_id=?", (goal["goal_id"],))
     if plan is None:

@@ -224,7 +224,7 @@ function text(value) {
   return value === null || value === undefined || value === "" ? "—" : String(value);
 }
 
-export function initVisualization(container) {
+export function initVisualization(container, gameModeActive = () => false) {
   if (!container) return null;
   if (!window.WebGLRenderingContext || !window.WebGL2RenderingContext) {
     container.append(Object.assign(document.createElement("p"), { className: "viz-fallback", textContent: "这台设备暂不支持动态画面，聊天和设备功能仍可使用。" }));
@@ -362,6 +362,10 @@ export function initVisualization(container) {
     renderer.domElement.style.width = "100%";
     renderer.domElement.style.height = "100%";
     camera.aspect = width / height;
+    // Preserve the overview's horizontal field on narrow phone/panel viewports.
+    camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(
+      Math.tan(THREE.MathUtils.degToRad(42) / 2) * Math.max(1, 1.45 / camera.aspect),
+    ));
     camera.updateProjectionMatrix();
     if (composer) {
       composer.value.setPixelRatio(quality.pixelRatio);
@@ -498,7 +502,7 @@ export function initVisualization(container) {
   }
 
   function addNode(node, position) {
-    const color = node.online ? COLORS.online : COLORS.offline;
+    const color = state?.nodesFresh === false ? COLORS.muted : node.online ? COLORS.online : COLORS.offline;
     const group = new THREE.Group();
     group.position.copy(position);
     group.userData.entity = { kind: "node", node };
@@ -666,7 +670,7 @@ export function initVisualization(container) {
     }
     nodes.forEach((node) => {
       const position = layout.get(node.node_id);
-      const color = node.online ? COLORS.online : COLORS.offline;
+      const color = data.nodesFresh === false ? COLORS.muted : node.online ? COLORS.online : COLORS.offline;
       if (!nodeGroups.has(node.node_id)) {
         addNode(node, position);
         addLink(node.node_id, position, color, hash(node.node_id));
@@ -723,15 +727,17 @@ export function initVisualization(container) {
     if (entity.kind === "core") {
       const nodes = state?.nodes || [];
       const tasks = taskList(state?.tasks || new Map());
-      row("状态", state?.paused ? "派发已暂停" : "运行中");
-      row("设备", `${nodes.filter((node) => node.online).length}/${nodes.length} 在线`);
-      row("进行中任务", tasks.filter((task) => TASK_ACTIVE.has(task.status)).length);
-      row("当前回复", state?.activeTurn ? "进行中" : "空闲");
+      row("状态", state?.activityFresh === false ? "等待同步" : state?.paused ? "派发已暂停" : "运行中");
+      row("设备", state?.nodesFresh === false ? "等待同步" : `${nodes.filter((node) => node.online).length}/${nodes.length} 在线`);
+      row("进行中任务", state?.activityFresh === false ? "等待同步" : tasks.filter((task) => TASK_ACTIVE.has(task.status)).length);
+      if (Array.isArray(state?.activeTurns)) {
+        row("全局活动会话", state.activityFresh === false ? "等待同步" : state.activeTurns.length);
+      } else row("当前会话回复", state?.activeTurn ? "进行中" : "空闲");
       body.append(Object.assign(document.createElement("p"), { className: "viz-note", textContent: "这里显示助手与设备的实时工作状态。" }));
     } else if (entity.kind === "node") {
       const node = entity.node;
       const tasks = taskList(state?.tasks || new Map()).filter((task) => task.node_id === node.node_id);
-      row("状态", node.online ? "在线" : "离线");
+      row("状态", state?.nodesFresh === false ? "等待同步" : node.online ? "在线" : "离线");
       row("工具", node.online ? `${(node.tools || []).length} 项` : "连接后确认");
       row("任务", tasks.length ? `${tasks.length} 项` : "无");
       if ((node.tools || []).length) {
@@ -970,6 +976,17 @@ export function initVisualization(container) {
   }
 
   function syncMessageFlow(data) {
+    if (Array.isArray(data.activeTurns)) {
+      const active = new Map(data.activeTurns.map(turn => [turn.turn_id, turn]));
+      for (const [id, flow] of messageFlows) if (!active.has(id)) finishFlow(flow);
+      for (const [id, turn] of active) {
+        if (messageFlows.has(id) || !links.length || messageFlows.size >= MESSAGE_FLOW_LIMIT) continue;
+        // Without an identified entry device, don't invent a device interaction.
+        const link = links.find(item => item.nodeId === turn.node_id);
+        if (link) messageFlows.set(id, createFlow(link.nodeId, 0xeaf8ff, hash(id)));
+      }
+      return;
+    }
     const key = data.messageKey || data.activeTurn || "";
     for (const [id, flow] of messageFlows) {
       if (id !== key || !data.activeTurn) finishFlow(flow);
@@ -1007,7 +1024,7 @@ export function initVisualization(container) {
   }
 
   function animate(now) {
-    if (!visible) {
+    if (!visible || gameModeActive()) {
       previousFrame = null;
       return;
     }
@@ -1087,6 +1104,11 @@ export function initVisualization(container) {
   drawerClose?.addEventListener("click", onCloseDrawer);
   resize();
   setCamera();
+  const onGameMode = () => {
+    cancelAnimationFrame(frame); previousFrame = null;
+    if (visible && !gameModeActive()) frame = requestAnimationFrame(animate);
+  };
+  window.addEventListener("nexus-game-mode-change", onGameMode);
   frame = requestAnimationFrame(animate);
 
   const bridge = {
@@ -1116,12 +1138,13 @@ export function initVisualization(container) {
       visible = value;
       previousFrame = null;
       cancelAnimationFrame(frame);
-      if (visible) frame = requestAnimationFrame(animate);
+      if (visible && !gameModeActive()) frame = requestAnimationFrame(animate);
     },
     resize,
     input: bridge,
     close: () => closeDrawer(),
     destroy() {
+      window.removeEventListener("nexus-game-mode-change", onGameMode);
       cancelAnimationFrame(frame);
       resizeObserver.disconnect();
       drawerClose?.removeEventListener("click", onCloseDrawer);

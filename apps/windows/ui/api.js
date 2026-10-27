@@ -45,6 +45,8 @@ export const TOOL_LABELS = {
   plugin_execute: "原生插件",
   plugin_inspect: "插件目录",
   plugin_install: "自写插件",
+  inspect_ui_extension: "检查界面插件",
+  submit_ui_extension: "开发与验证界面插件",
 };
 
 const PREFS_KEY = "nexus.chat.prefs.v1";
@@ -56,10 +58,15 @@ export const state = {
   view: "home",
   nodes: [],
   nodesFresh: false,
+  activity: null,
+  activityFresh: false,
   projects: [],
   usage: null,
   control: { paused: false, revision: 0 },
   conversations: [],
+  conversationsBefore: null,
+  conversationsLoading: false,
+  archivingConversations: new Set(),
   archived: false,
   conversation: null,
   turns: new Map(),
@@ -193,10 +200,16 @@ export function resetState() {
   state.ready = false;
   state.nodes = [];
   state.nodesFresh = false;
+  state.activity = null;
+  state.activityFresh = false;
   state.projects = [];
   state.usage = null;
   state.control = { paused: false, revision: 0 };
   state.conversations = [];
+  ++conversationListEpoch;
+  state.conversationsBefore = null;
+  state.conversationsLoading = false;
+  state.archivingConversations.clear();
   state.archived = false;
   state.conversation = null;
   state.turns.clear();
@@ -232,8 +245,11 @@ export async function loadCore() {
   state.usage = usage;
   state.control = control;
   state.conversations = conversations.conversations || [];
+  state.conversationsBefore = state.conversations.length === 20 ? state.conversations.at(-1).cursor : null;
   state.tasks.clear();
-  for (const task of snapshot.tasks || []) state.tasks.set(task.task_id, { task });
+  for (const task of [...(snapshot.tasks || []), ...(snapshot.active_tasks || [])]) state.tasks.set(task.task_id, { task });
+  state.activity = snapshot.activity || null;
+  state.activityFresh = true;
   state.nodesFresh = true;
   const conversation = pickConversation();
   state.ready = true;
@@ -267,11 +283,25 @@ export async function loadControl() {
   return state.control;
 }
 
-export async function loadConversations(archived = state.archived) {
-  const value = await api(`/api/v1/chat/conversations?archived=${archived ? "true" : "false"}`);
-  state.archived = archived;
-  state.conversations = value.conversations || [];
-  return state.conversations;
+let conversationListEpoch = 0;
+export async function loadConversations(archived = state.archived, more = false) {
+  if (more && (state.conversationsLoading || !state.conversationsBefore)) return;
+  const epoch = ++conversationListEpoch;
+  const before = more ? `&before=${state.conversationsBefore}` : "";
+  state.conversationsLoading = true;
+  try {
+    const value = await api(`/api/v1/chat/conversations?archived=${archived ? "true" : "false"}${before}`);
+    if (epoch !== conversationListEpoch) return;
+    const rows = value.conversations || [];
+    state.archived = archived;
+    state.conversations = more
+      ? [...new Map([...state.conversations, ...rows].map(row => [row.conversation_id, row])).values()]
+      : rows;
+    state.conversationsBefore = rows.length === 20 ? rows.at(-1).cursor : null;
+    return state.conversations;
+  } finally {
+    if (epoch === conversationListEpoch) state.conversationsLoading = false;
+  }
 }
 
 export async function createConversation(projectId = null) {
@@ -290,8 +320,12 @@ export async function createConversation(projectId = null) {
   return value.conversation;
 }
 
+let selectionEpoch = 0;
 export async function selectConversation(conversationId) {
-  const value = await api(`/api/v1/chat/conversations/${conversationId}/turns`);
+  const epoch = ++selectionEpoch;
+  const value = conversationId ? await api(`/api/v1/chat/conversations/${conversationId}/turns`)
+    : { conversation: null, turns: [], active_turn_id: null };
+  if (epoch !== selectionEpoch) return null;
   state.turns.clear();
   state.turnOrder = [];
   state.taskFetchAt.clear();
@@ -303,7 +337,7 @@ export async function selectConversation(conversationId) {
   const known = state.conversations.find((item) => item.conversation_id === conversationId);
   if (known) Object.assign(known, state.conversation);
   if (state.prefs.lastConversationId !== conversationId) {
-    state.prefs.lastConversationId = conversationId;
+    state.prefs.lastConversationId = conversationId || "";
     savePrefs();
   }
   await syncTasksForTurns();
@@ -313,9 +347,11 @@ export async function selectConversation(conversationId) {
 
 export async function loadHistory(conversationId = state.conversation?.conversation_id, before = null) {
   if (!conversationId) return null;
+  const epoch = selectionEpoch;
   const query = before ? `?before=${before}` : "";
   const value = await api(`/api/v1/chat/conversations/${conversationId}/turns${query}`);
-  if (!before || state.conversation?.conversation_id !== conversationId) {
+  if (epoch !== selectionEpoch || state.conversation?.conversation_id !== conversationId) return null;
+  if (!before) {
     state.turns.clear();
     state.turnOrder = [];
   }
@@ -367,6 +403,8 @@ function turnSignature() {
         turn.presentation.live_text,
         turn.presentation.final_text,
         turn.presentation.collapse_process,
+        turn.presentation.conversations,
+        turn.presentation.navigation,
         (turn.presentation.process || []).map((item) => [item.id, item.text, item.truncated]),
       ] : null,
     ]),
@@ -396,13 +434,24 @@ export async function syncTasksForTurns() {
 
 export async function loadSnapshot() {
   const value = await api("/api/v1/client/snapshot");
-  for (const task of value.tasks || []) {
+  const current = new Map([...(value.tasks || []), ...(value.active_tasks || [])].map(task => [task.task_id, task]));
+  // Older active tasks can finish outside the latest history page. Read their
+  // terminal evidence before retiring their visual marker.
+  const ended = [...state.tasks.values()].map(value => value.task || value)
+    .filter(task => !TASK_TERMINAL.has(task.status) && !current.has(task.task_id));
+  await Promise.all(ended.map(async task => {
+    const detail = await api(`/api/v1/tasks/${task.task_id}`);
+    current.set(task.task_id, detail.task);
+  }));
+  for (const task of current.values()) {
     const cached = state.tasks.get(task.task_id);
-    if (!cached?.task || cached.task.revision !== task.revision) {
+    if (!cached?.task || cached.task.revision <= task.revision) {
       state.tasks.set(task.task_id, { ...(cached || {}), task });
     }
   }
   state.control = value.control || state.control;
+  state.activity = value.activity || null;
+  state.activityFresh = true;
   return value;
 }
 
@@ -569,7 +618,10 @@ export async function archiveConversation(conversationId, archived) {
     method: "PATCH",
     body: JSON.stringify({ archived: !!archived }),
   });
-  await loadConversations(state.archived);
+  ++conversationListEpoch;
+  state.conversationsLoading = false;
+  state.conversations = state.conversations.filter(row => row.conversation_id !== conversationId);
+  if (state.conversation?.conversation_id === conversationId) state.conversation = value.conversation;
   return value.conversation;
 }
 

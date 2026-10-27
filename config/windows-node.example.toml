@@ -4,6 +4,7 @@ data_dir = 'E:\NEXUS\var\node'
 core_url = 'ws://127.0.0.1:8000/ws/v1/node'
 local_http = true
 allowed_tools = ['system.info@1', 'filesystem.list@1']
+mcp_execution_timeout_seconds = 60 # local MCP ceiling, including startup; other tools remain at 10 seconds
 # To receive files, explicitly add filesystem.receive@1 here and grant it to
 # this Node and owner in Core. The existing workspace root remains the boundary.
 

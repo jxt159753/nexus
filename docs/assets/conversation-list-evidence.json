@@ -1,0 +1,256 @@
+{
+  "date": "2026-10-26",
+  "status": "deployed_technical_checks_passed_user_acceptance_pending",
+  "live_read_only_observation": {
+    "release": "android-ui-20261026-ef874c64",
+    "service": "active",
+    "total_conversations": 101,
+    "hot_conversations": 100,
+    "ordinary_archived_conversations": 45,
+    "turns": 188
+  },
+  "reference": {
+    "source": "installed DSH app.asar",
+    "version": "0.2.1-rc.2",
+    "finding": "Session controller and JSONL create path have no total-session-count rejection; listLimit bounds listing concurrency.",
+    "sha256": {
+      "dsh-api-session-controller-lib_index.js": "a9801acb577b03053c5d5a3191ff555c5f1d791d0acddec113bea4511e33b386",
+      "dsh-api-session-controller-package.json": "a4c9b386c5f43d16f32aa7a4926a9cf32ac76d2fe68f33cc285b3af0e2a554a5",
+      "dsh-session-lib_index.js": "2f5dd07cb5c744a29abbb8003a8a4cefd9e582c6e2538074ca299a0ddd02a3bf",
+      "dsh-session-package.json": "06c940188426e4c21ea84fad21c7fda49febfd1f209368b79323410313f909ad",
+      "dsh-session-persistence-jsonl-lib_index.js": "973dd78679b2661d6f492343bc22b124ae958aa597d3b36c698a2c650f909984",
+      "dsh-session-persistence-jsonl-package.json": "965c4c6a2b1d9f5f821bba233b2b77200e581cc60e3d5aa12e82e442a58c5b0f",
+      "dsh-session-query-lib_index.js": "76ce2944e561c12f48b5e240d68cafe54ce6d667b1d20722e6939ed834489939",
+      "dsh-session-query-package.json": "6822705a3f1fccd30d0d2cc5c6c15d70361419ae3e3dc9a62f45a34c533279f5",
+      "dsh-session-query-sqlite-lib_index.js": "dbecf83320e10d93d735b3d01384ab817a0b90102ccecb0a22c013c71dfe70a0",
+      "dsh-session-query-sqlite-package.json": "a1a3ffde3849ec47950caa1bd8387f05d92fdeb38b0073de30a7cb79e9499675"
+    }
+  },
+  "regression": {
+    "baseline_failed": 3,
+    "after_passed": 35,
+    "after_seconds": 19.24,
+    "modules": [
+      "test_conversation_list.py (3 backend cases)",
+      "test_chat.py",
+      "test_autonomy_storage.py"
+    ]
+  },
+  "browser": {
+    "passed": true,
+    "evidence": [
+      {
+        "surface": "web",
+        "archive": true,
+        "restore": true,
+        "failedWritePreserved": true,
+        "pendingDeduplicated": true,
+        "draftsPreserved": true,
+        "pagination": true,
+        "stalePageIgnored": true,
+        "emptySelection": true,
+        "widths": [
+          1280,
+          390
+        ],
+        "pageErrors": []
+      },
+      {
+        "surface": "windows",
+        "archive": true,
+        "restore": true,
+        "failedWritePreserved": true,
+        "pendingDeduplicated": true,
+        "draftsPreserved": true,
+        "pagination": true,
+        "stalePageIgnored": true,
+        "emptySelection": true,
+        "widths": [
+          1280,
+          390
+        ],
+        "pageErrors": []
+      }
+    ]
+  },
+  "screenshots_reviewed": [
+    "web-1280.png",
+    "windows-390.png"
+  ],
+  "source_sha256": {
+    "src/nexus/core/cognitive/chat.py": "0bc6f587eb01dc254810202a79a6bfb96147837adf578fa023393cd17f2c9325",
+    "src/nexus/core/storage/archive.py": "c8122be8b1508b4d443c52b57dd328f4f50607212d070fde92d14f948997b079",
+    "src/nexus/core/plugins/health.py": "9f3dec3fe779471776ed4e1384083c1a13ad8bf19d1b44d2e4b52206899ddcaa",
+    "src/nexus/web/app/api.js": "672c9f35b8ee2fa528995ae40e4ecad4bb1c54f52ebdbebdca9fced6d506e658",
+    "src/nexus/web/app/main.js": "ad81cac95e2b463e1e9d88092b62964a98fadedadd0295a2a3080c348469ce6e",
+    "src/nexus/web/app/render.js": "e906c690208556ce8e4d981139373366ee1db75177ffe6282cbadc0455a00077",
+    "src/nexus/web/app/app.css": "2998a46a75d64149f1d185aaadc42443084e0c3f7a9d0c977595fc4a94472c5a",
+    "apps/windows/ui/api.js": "672c9f35b8ee2fa528995ae40e4ecad4bb1c54f52ebdbebdca9fced6d506e658",
+    "apps/windows/ui/main.js": "9834739ff47773e9cdcd74ebff9c2d8e18add9a42e615197e7d6321b7a0d4d3f",
+    "apps/windows/ui/render.js": "e906c690208556ce8e4d981139373366ee1db75177ffe6282cbadc0455a00077",
+    "apps/windows/ui/app.css": "c5251ee000cfb193270750e28131f6d78b64b07d2c38b1af47f1e9cbb1d2c684"
+  },
+  "real_model_calls": 0,
+  "production_mutations": true,
+  "installed_windows_verified": true,
+  "android_native_changed": false,
+  "deployment": {
+    "release": "/opt/nexus/releases/conversation-list-20261026-c62c9655",
+    "wheel_sha256": "c62c96559d1b69ceccf3bcf33f16ea3b088e065e70328997736f8de45b2f626a",
+    "backup": "/var/backups/nexus/before-conversation-list-20261026T092106Z",
+    "backup_sha256": "0774c9f0b1e60d9e6ee435d3979a9931a57fc572ccb1a4e49d43fc6d4b032af5",
+    "schema": 42,
+    "historical_records_preserved": true,
+    "runtime_resources_checked": 307,
+    "new_grants": 0,
+    "no_new_model_calls": true,
+    "main_pid": 1869193,
+    "windows_version": "0.1.25",
+    "changed_runtime_files": [
+      "nexus/core/cognitive/chat.py",
+      "nexus/core/storage/archive.py",
+      "nexus/core/plugins/health.py",
+      "nexus/web/app/api.js",
+      "nexus/web/app/main.js",
+      "nexus/web/app/render.js",
+      "nexus/web/app/app.css"
+    ],
+    "windows_regression": {
+      "passed": 35,
+      "skipped": 1,
+      "seconds": 29.4
+    },
+    "linux_regression": {
+      "passed": 35,
+      "skipped": 1,
+      "seconds": 26.49
+    },
+    "fixed_browser": {
+      "passed": true,
+      "evidence": [
+        {
+          "surface": "web",
+          "archive": true,
+          "restore": true,
+          "failedWritePreserved": true,
+          "pendingDeduplicated": true,
+          "draftsPreserved": true,
+          "pagination": true,
+          "stalePageIgnored": true,
+          "emptySelection": true,
+          "widths": [
+            1280,
+            390
+          ],
+          "pageErrors": []
+        },
+        {
+          "surface": "windows",
+          "archive": true,
+          "restore": true,
+          "failedWritePreserved": true,
+          "pendingDeduplicated": true,
+          "draftsPreserved": true,
+          "pagination": true,
+          "stalePageIgnored": true,
+          "emptySelection": true,
+          "widths": [
+            1280,
+            390
+          ],
+          "pageErrors": []
+        }
+      ]
+    },
+    "desktop_data": {
+      "version": "0.1.25",
+      "databases": {
+        "node\\plugins.sqlite3": {
+          "preserved": true,
+          "tables": 4
+        },
+        "node\\receipts.sqlite3": {
+          "preserved": true,
+          "tables": 5
+        },
+        "node-manual\\receipts.sqlite3": {
+          "preserved": true,
+          "tables": 4
+        }
+      },
+      "configuration_preserved": true,
+      "installed_hashes": {
+        "nexus-windows.exe": "a09744d1fcb75856adf8ad5251e5e4ad0339c65409b32fbb66e7315371589301",
+        "binaries/nexus-node.exe": "df5545e64b0dd852199807bab2456754cd9c7b23407ffa41f056daef87dea93f",
+        "binaries/nexus-voice.exe": "5c13916a66bd1dafbc02c5ce6aec4996cdd93436511b8a44d38906919dbb6879"
+      },
+      "nsis_bundle_marker_verified": true
+    },
+    "native_final": {
+      "version": "0.1.25",
+      "installed_webview": true,
+      "new_conversation_id": "774a8d2d-6a05-408e-b611-edcf7ed08f81",
+      "new_ui_selected_correct_id": true,
+      "new_title": "新会话",
+      "new_turns": 0,
+      "archive_selected_switch": true,
+      "restore_selected_switch": true,
+      "calls": 585,
+      "archived": true,
+      "empty": true,
+      "selected_other": true,
+      "online_nodes": 2
+    },
+    "normal_restart": {
+      "normal_restart": true,
+      "pid": 51796,
+      "node_running": true,
+      "debug_port_closed": true
+    },
+    "public": {
+      "downloads": [
+        {
+          "filename": "NEXUS_0.1.25_x64-setup.exe",
+          "sha256": "5446928c153e24e1907fdf53b25185c491c0ba154224ad00b466fd316f1dd9a7",
+          "bytes": 116497081,
+          "https_verified": true
+        }
+      ],
+      "existing_web_resources_preserved": true
+    },
+    "cleanup": {
+      "archive": "E:\\NEXUS\\var\\conversation-list\\conversation-list-validation-c62c9655.tar.gz",
+      "sha256": "284c75206c1a6d75fe5aa28e130c1403115eb91728e1d5324c5cedf7f34b972f",
+      "bytes": 23762061,
+      "temporary_server_data_removed": true
+    },
+    "final_history": {
+      "original_conversations_preserved": 101,
+      "original_other_tables_unchanged": 52,
+      "content_identity_permissions_preserved": true,
+      "only_existing_record_change": [
+        {
+          "conversation_id": "3ace1961-afd5-431d-88ce-a4deb4737cd3",
+          "fields": [
+            "revision"
+          ]
+        }
+      ],
+      "archived_empty_verification_conversations": 3,
+      "model_calls": 585,
+      "chat_turns": 188
+    },
+    "verification_metadata_repair": {
+      "conversation_id": "3ace1961-afd5-431d-88ce-a4deb4737cd3",
+      "title_and_archive_restored": true,
+      "auto_title_restored": true,
+      "work_grants_restored": 3,
+      "work_grants_match_backup": true,
+      "revision_and_audit_retained": true,
+      "backup": "/var/backups/nexus/before-verification-repair-20261026T094948Z",
+      "backup_sha256": "d5d89f47da6db17e161df0a18afcd4c4637a5446599e5439b818603180e80cd2"
+    },
+    "verification_incident": "Initial installed UI script read intermediate state before navigation completed and modified one existing conversation. Restored original title, archive flag, auto_title and work grants from pre-release backup; retained revision and audit. Invalidated initial native result. Final check uses actual creation response ID and waits for completed UI.",
+    "download_url": "https://core.example.com/static/downloads/NEXUS_0.1.25_x64-setup.exe"
+  }
+}
