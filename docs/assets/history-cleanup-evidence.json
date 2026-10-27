@@ -58,6 +58,24 @@
       "url": "https://github.com/jxt159753/nexus/actions/runs/40459537104"
     }
   ],
+  "local_sync": {
+    "approved_by_user": true,
+    "references_updated": 27,
+    "worktrees_verified": 3,
+    "worktree_files_preserved": 1988,
+    "main_workspace_files_preserved": 979,
+    "current_branch_preserved": true,
+    "staged_changes_before": 0,
+    "staged_changes_after": 0,
+    "tracking_refs_match_github": true,
+    "future_email_uses_github_noreply": true,
+    "history_commits_scanned": 51,
+    "history_blobs_scanned": 2034,
+    "history_findings": 0,
+    "gitleaks_findings": 0,
+    "private_backups_and_reflogs_retained": true,
+    "old_objects_pruned": false
+  },
   "remaining": {
     "readonly_merged_pr_refs": [
       "refs/pull/1/head",
@@ -66,7 +84,7 @@
     "old_commits_still_accessible": 4,
     "support_request_prepared": true,
     "support_request_sent": false,
-    "original_workspace_git_sync": "awaiting explicit confirmation",
+    "original_workspace_git_sync": "completed with explicit user approval",
     "private_backups_retained": true
   }
 }
