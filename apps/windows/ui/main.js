@@ -1,3 +1,4 @@
+import { openReminderCenter } from "./reminders.js";
 "use strict";
 
 import {
@@ -56,6 +57,7 @@ import {
 } from "./render.js";
 
 import { initVisualization } from "./visualization.js";
+import { initGameMode, gameModeActive } from "./game-mode.js";
 import { initUIExtensions } from "./ui-extensions.js";
 import { initVoice, stopVoice, renderVoiceSettings } from "./voice.js";
 import {
@@ -129,6 +131,27 @@ async function openConversationSource(id, turnId = null) {
   } finally { switchingConversation = false; }
 }
 
+async function toggleConversationArchive(conversation) {
+  const id = conversation.conversation_id;
+  if (state.archivingConversations.has(id)) return;
+  if (id === state.conversation?.conversation_id && draftAttachments().length) {
+    throw new Error("当前有未发送附件，请先发送或移除，再归档会话。文字草稿会保留。");
+  }
+  state.archivingConversations.add(id);
+  renderConversations();
+  try {
+    await archiveConversation(id, !conversation.archived);
+    if (id === state.conversation?.conversation_id) {
+      await openConversationSource(state.conversations[0]?.conversation_id || null);
+      renderDock();
+    }
+    notify(conversation.archived ? "已取消归档" : "已归档；历史仍保留");
+  } finally {
+    state.archivingConversations.delete(id);
+    renderConversations();
+  }
+}
+
 async function followConversationNavigation() {
   const turn = state.turnOrder.find(item => item.request_id === state.lastSent?.request_id && item.presentation?.phase === "completed" && item.presentation?.navigation);
   const navigation = turn?.presentation.navigation;
@@ -170,6 +193,7 @@ function setConnection(text, kind = "") {
   const node = $("connection");
   if (!node) return;
   node.textContent = text;
+  node.title = text;
   node.className = "connection" + (kind ? " " + kind : "");
 }
 
@@ -253,7 +277,7 @@ async function startNodeIfConfigured() {
 function syncVisualization(visible = state.view === "home") {
   const canvas = $("visual-canvas");
   if (!canvas) return;
-  if (!visualization) visualization = initVisualization(canvas);
+  if (!visualization) visualization = initVisualization(canvas, gameModeActive);
   if (!visualization) return;
   const tasks = new Map();
   for (const [id, value] of state.tasks) tasks.set(id, value?.task || value);
@@ -276,6 +300,8 @@ function enterApp() {
   $("login").hidden = true;
   $("shell").hidden = false;
   state.view = "home";
+  $("view-home").setAttribute("aria-current", "page");
+  $("dock-expand").removeAttribute("aria-current");
   $("home-view").hidden = false;
   $("chat-view").hidden = true;
   updateConnection();
@@ -464,6 +490,8 @@ async function syncConversationPermission() {
 
 function openChat() {
   state.view = "chat";
+  $("dock-expand").setAttribute("aria-current", "page");
+  $("view-home").removeAttribute("aria-current");
   $("home-view").hidden = true;
   $("chat-view").hidden = false;
   $("chat-view").classList.remove("drawer-open");
@@ -475,6 +503,8 @@ function openChat() {
 
 function closeChat() {
   state.view = "home";
+  $("view-home").setAttribute("aria-current", "page");
+  $("dock-expand").removeAttribute("aria-current");
   $("chat-view").hidden = true;
   $("home-view").hidden = false;
   renderDock();
@@ -482,9 +512,10 @@ function closeChat() {
 }
 
 function openSettings() {
+  $("tools-menu").open = false;
   closePluginPage();
   $("settings").hidden = false;
-  renderSettings();
+  renderSettings({ refreshAssistant: true });
   Promise.all([loadNodes(), loadProjects(), loadUsage(), loadControl()])
     .then(() => { renderSettings(); updateConnection(); })
     .catch((error) => notify(errorText(error), true));
@@ -512,6 +543,7 @@ function closeSettings() {
 }
 
 function openPlugins(tab = "permissions") {
+  $("tools-menu").open = false;
   closeSettings();
   openPluginPage(tab);
 }
@@ -865,17 +897,8 @@ function openChatMenu() {
   }, save));
   const archiveLabel = conversation.archived ? "取消归档" : "归档会话";
   const archive = button(archiveLabel, "quiet", () => runAction(async () => {
-    await archiveConversation(conversation.conversation_id, !conversation.archived);
+    await toggleConversationArchive(conversation);
     closeSheet();
-    leaveConversation();
-    state.conversation = null;
-    state.turns.clear();
-    state.turnOrder = [];
-    state.activeTurn = null;
-    await loadConversations(false);
-    closeChat();
-    renderDock();
-    notify(conversation.archived ? "已取消归档" : "已归档；历史仍保留");
   }, archive));
   openSheet({
     title: "会话操作",
@@ -984,16 +1007,20 @@ function bindEvents() {
   });
   $("dock-open").addEventListener("click", openChat);
   $("dock-expand").addEventListener("click", openChat);
-  $("chat-back").addEventListener("click", closeChat);
+  $("view-home").addEventListener("click", closeChat);
   $("chat-drawer").addEventListener("click", () => $("chat-view").classList.toggle("drawer-open"));
   $("settings-button").addEventListener("click", () => {
     if ($("settings").hidden) openSettings(); else closeSettings();
   });
   $("settings-close").addEventListener("click", closeSettings);
+  $("notifications-button").addEventListener("click", () => openReminderCenter(openConversationSource));
   $("plugins-button").addEventListener("click", () => {
     if ($("plugin-view").hidden) openPlugins("permissions"); else closePluginPage();
   });
   $("plugin-close").addEventListener("click", closePluginPage);
+  document.addEventListener("click", (event) => {
+    if (!$("tools-menu").contains(event.target) || event.target.closest("#quick-tools button")) $("tools-menu").open = false;
+  });
   $("sheet-close").addEventListener("click", closeSheet);
   $("sheet").addEventListener("click", (event) => {
     if (event.target?.hasAttribute?.("data-close-sheet")) closeSheet();
@@ -1072,6 +1099,11 @@ function bindEvents() {
       // A native image dialog owns Escape while it is open; do not also close
       // the surrounding decision sheet in the same key press.
       if (document.querySelector("dialog[open]")) return;
+      if ($("tools-menu").open) {
+        $("tools-menu").open = false;
+        $("tools-menu").querySelector("summary").focus();
+        return;
+      }
       if (!$("sheet").hidden) closeSheet();
       else if (!$("plugin-view").hidden) closePluginPage();
       else if (!$("settings").hidden) closeSettings();
@@ -1101,6 +1133,7 @@ async function stopActive() {
 bindUI({
   renderVoiceSettings,
   openConversationSource,
+  toggleConversationArchive,
   renameDevice,
   openChat,
   closeChat,
@@ -1133,6 +1166,7 @@ bindAttachmentUI({
 ["chat-text", "dock-text"].forEach(id => $(id).addEventListener("input", saveConversationDraft));
 state.ready = false;
 bindEvents();
+await initGameMode();
 initVoice({ refresh, openChat, renderSettings });
 uiExtensions = initUIExtensions(() => visualization);
 setUnauthorizedHandler(() => {

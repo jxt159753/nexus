@@ -2,6 +2,7 @@
 
 import { api, createConversation, state } from "./api.js";
 import { button, closeSheet, el, notify, openSheet } from "./render.js";
+import { gameModeActive } from "./game-mode.js";
 
 const LABEL = { stopped: "语音已结束", activating: "正在连接语音", standby: "本地唤醒待机",
   listening: "正在听你说", thinking: "正在思考", speaking: "正在回答", interrupted: "已打断", error: "语音不可用" };
@@ -47,18 +48,21 @@ export function renderVoiceSettings(body) {
   option.input.id = "voice-wake-enabled";
   option.input.setAttribute("role", "switch");
   option.input.addEventListener("change", () => setWakeEnabled(option.input.checked));
-  section.append(option.label,
+  section.append(option.label);
+  const help = el("details", "settings-help"); help.id = "voice-wake-help";
+  help.append(el("summary", "", "唤醒与隐私说明"),
     el("p", "hint", "随 App 启动开启，最小化或关闭到托盘后继续待机。说“你好奈克斯”或“Hey NEXUS”，听到提示音后提问；关闭此开关立即关麦，并记住选择。退出 App 后停止。"),
     el("p", "hint", "待机音频只在本机处理；唤醒后音频经 Core 发送至百炼，文字及获准工具结果交给聊天模型。沿用当前会话的上下文与工具设置，不自动开启主动播报。"));
   const status = el("p", "hint");
   status.id = "voice-wake-setting-status";
-  section.append(status);
+  section.append(status, help);
   body.append(section);
   renderStatus();
 }
 
 async function syncResident() {
   if (!native?.voiceWake) return;
+  if (gameModeActive()) return;
   if (!state.ready) {
     if (residentRequested) await stopVoice();
     residentSignature = "";
@@ -102,12 +106,12 @@ function renderStatus(event = {}) {
   if (event.event === "state") latest = event.state;
   const indicator = document.getElementById("voice-wake-indicator");
   const settingStatus = document.getElementById("voice-wake-setting-status");
-  const summary = residentRequested ? (residentMessage || LABEL[latest] || "唤醒待机") : "语音唤醒已关闭";
+  const summary = gameModeActive() ? "游戏模式：语音与唤醒已暂停" : residentRequested ? (residentMessage || LABEL[latest] || "唤醒待机") : "语音唤醒已关闭";
   if (indicator) { indicator.hidden = !residentRequested; indicator.textContent = latest === "standby" ? "唤醒待机 · 关麦" : "语音 · 关麦"; indicator.title = summary; }
   if (settingStatus) settingStatus.textContent = summary;
   const bar = document.getElementById("voice-status");
   if (!bar) return;
-  bar.hidden = !active && !starting && !residentRequested;
+  bar.hidden = gameModeActive() || (!active && !starting && !residentRequested);
   bar.dataset.state = latest;
   bar.querySelector("strong").textContent = LABEL[latest] || "语音连接中";
   const detail = bar.querySelector(".voice-detail");
@@ -199,6 +203,7 @@ function deviceSelect(title, devices, direction) {
 }
 
 async function openVoice(wakeByDefault = false) {
+  if (gameModeActive()) return;
   if (starting) return;
   if (!state.ready) { notify("请先登录 Core", true); return; }
   if (!native?.voiceStart) { notify("Windows 实时语音请在更新后的 NEXUS Windows App 中使用", true); return; }
@@ -257,6 +262,7 @@ async function openVoice(wakeByDefault = false) {
         renderStatus();
         try {
           const requestId = crypto.randomUUID();
+          if (gameModeActive()) throw new Error("游戏模式已开启，语音已暂停");
           active = await api("/api/v1/voice/sessions", { method: "POST", body: JSON.stringify({
             request_id: requestId, node_id: local.node_id, conversation_id: conversationId,
             allow_audio_model: true, allow_model: true, include_context: context.input.checked,
@@ -280,6 +286,13 @@ async function openVoice(wakeByDefault = false) {
 export function initVoice(value) {
   hooks = value;
   native = window.__NEXUS_NATIVE__;
+  window.addEventListener("nexus-game-mode-change", () => {
+    if (gameModeActive()) {
+      const old = active; active = null; latest = "stopped";
+      if (old && !old.resident && state.ready) api(`/api/v1/voice/sessions/${old.voice_session_id}/stop`, { method: "POST", body: "{}" }).catch(() => {});
+    }
+    renderStatus();
+  });
   if (native?.voiceWake) {
     const indicator = button("唤醒待机 · 关麦", "quiet", () => setWakeEnabled(false));
     indicator.id = "voice-wake-indicator";
@@ -316,6 +329,7 @@ export function initVoice(value) {
     const poll = async () => {
       try {
         await syncResident();
+        if (gameModeActive()) { renderStatus(); return; }
         if (residentRequested) {
           const local = await native.voiceStatus();
           active = local.resident?.session || null;

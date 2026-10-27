@@ -1,0 +1,88 @@
+{
+  "task": "P97",
+  "status": "deployed_technical_verification_complete_user_acceptance_pending",
+  "core": {
+    "release": "/opt/nexus/releases/continuous-reminders-20261025-3c839c77",
+    "wheel_sha256": "3c839c77b0827bdc66387c56df34f580ee38119bd36f16d7d0583ecc9dbe4b2c",
+    "schema": 40,
+    "resources": 300,
+    "changed_resources": 15,
+    "single_active": true,
+    "paused": false,
+    "historical_tables_checked": 49,
+    "historical_records_preserved": true,
+    "updated_bundled_plugins": {
+      "builtin.goal": {
+        "version": "1.2.0",
+        "digest": "ec4484ae89fcc44a6e0b133b525e9ce907fe60b6c621ae7d339ab2a92f5e1a94"
+      },
+      "builtin.schedule": {
+        "version": "1.1.0",
+        "digest": "401b8ccdfad6e14b212439b8ca717811cf979a37e2f14d958614f159c46b8c6d"
+      }
+    },
+    "model_calls_before_and_after": 343,
+    "prior_unknown_costs_preserved": 6,
+    "backup": "/var/backups/nexus/before-continuous-reminders-20261025T113610Z",
+    "backup_sha256": "7b37e66f64be62e2505988e1a4168b8a9f953299b9b2de659becab60bd30bbe4"
+  },
+  "downloads": [
+    {
+      "filename": "NEXUS_0.1.21_x64-setup.exe",
+      "sha256": "1d700f69652bd6cdfb763f30359f04b9e65548d904012069a3096d959913bb66",
+      "bytes": 116499848,
+      "url": "https://core.example.com/static/downloads/NEXUS_0.1.21_x64-setup.exe"
+    },
+    {
+      "filename": "NEXUS-Android-0.1.9-debug.apk",
+      "sha256": "bce2c0953d008634f48ba9bacf3b163aaa4f11abb599b68ca778d245313e0254",
+      "bytes": 12212663,
+      "url": "https://core.example.com/static/downloads/NEXUS-Android-0.1.9-debug.apk"
+    }
+  ],
+  "windows": {
+    "version": "0.1.21",
+    "installed": true,
+    "normal_restart": true,
+    "databases_preserved": 3,
+    "tables_preserved": 13,
+    "configuration_preserved": true,
+    "node_online": true,
+    "voice_resident_standby_verified": true,
+    "native_reminder_registered": true,
+    "core_delivery_receipt": true,
+    "system_history_readback": true,
+    "reminders_restored_after_restart": true,
+    "temporary_debug_port_closed": true
+  },
+  "android": {
+    "version": "0.1.9",
+    "version_code": 10,
+    "package": "ai.nexus.android",
+    "same_signer_as_0_1_8": true,
+    "screenshot_recording_allowed": true,
+    "phone_installation_performed": false,
+    "redmagic_real_device_verified": false
+  },
+  "tests": {
+    "fixed_windows_core_passed": 84,
+    "fixed_linux_passed": 79,
+    "fixed_linux_platform_skipped": 5,
+    "fixed_rust_passed": 8,
+    "fixed_node_process_passed": 1,
+    "fixed_edge_surfaces": [
+      "web",
+      "windows"
+    ],
+    "fixed_edge_widths": [
+      1280,
+      390
+    ],
+    "schema39_to40_production_copy_preserved": true,
+    "recovery_runtime_reads_schema40": true,
+    "previous_android_locked_doze_test_passed": 1,
+    "test_batches_overlap": true
+  },
+  "server_temporary_materials_archived_and_removed": true,
+  "real_model_calls_by_this_release": 0
+}

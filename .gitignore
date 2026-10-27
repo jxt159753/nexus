@@ -32,3 +32,23 @@ htmlcov/
 /apps/windows/src-tauri/binaries/*.exe
 /apps/windows/src-tauri/binaries/voice-models/
 /apps/windows/src-tauri/gen/
+
+# Local dependencies, configuration, credentials and editor leftovers
+node_modules/
+.DS_Store
+*.orig
+*.rej
+*.log
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+/config/*.local.toml
+/config/*.private.toml
+/nul

@@ -130,9 +130,8 @@ async def restore(conn, conversation):
     if not conversation['cold_archived']:
         return
     # Restoring cannot silently evade the original hot-store limits.
-    count=(await one(conn,'SELECT count(*) FROM conversations WHERE cold_archived=0'))[0]
     turns=(await one(conn,'SELECT count(*) FROM chat_turns t JOIN conversations c USING(conversation_id) WHERE c.cold_archived=0 OR c.conversation_id=?',(conversation['conversation_id'],)))[0]
-    if count>=100 or turns>=10000:
+    if turns>=10000:
         raise AccessDenied('ARCHIVE_RESTORE_CAPACITY')
     rows=await conn.execute_fetchall('SELECT * FROM cold_payloads WHERE conversation_id=?',(conversation['conversation_id'],))
     extra=sum(row['original_bytes'] for row in rows)

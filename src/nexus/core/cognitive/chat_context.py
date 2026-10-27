@@ -93,10 +93,10 @@ def history_message(records):
     return {"role":"user","content":"较早对话的确定性摘录（不完整，原文按 turn_id 保留）：\n"+canonical(list(reversed(records)))}
 
 
-def fit_work_context(config, messages, catalog, *, allow_tools=True, work_limit=4, generate_title=False, history_summary=None, auto_memory=False):
+def fit_work_context(config, messages, catalog, *, allow_tools=True, work_limit=4, generate_title=False, history_summary=None, auto_memory=False, assistant_style=None):
     """Drop whole old chat rounds, then excerpt results; preserve every call/id."""
     output = copy.deepcopy(messages)
-    options = {"allow_tools": allow_tools, "work_catalog": catalog, "work_limit": work_limit, "generate_title": generate_title, "auto_memory": auto_memory}
+    options = {"allow_tools": allow_tools, "work_catalog": catalog, "work_limit": work_limit, "generate_title": generate_title, "auto_memory": auto_memory, "assistant_style": assistant_style}
 
     def fits():
         return pressure(config, output, **options)["fits"]

@@ -170,16 +170,16 @@ class TaskRepository:
                 if (source["sha256"] != args.sha256 or source["size_bytes"] != args.size_bytes
                         or args.path != receiving_path(request.request_id,source["filename"])):
                     raise Conflict("FILE_TRANSFER_BINDING_CHANGED")
-            if request.intent in {"write_file","edit_file"}:
+            if request.intent in {"write_file","edit_file","android_file_write"}:
                 from nexus.contracts.basic import text_digest
                 preview = await one(conn, "SELECT * FROM tasks WHERE task_id=? AND owner_id=? AND node_id=?", (str(request.arguments.preview_task_id), str(owner_id), str(node_id)))
                 if preview is None or preview["status"] != "succeeded" or preview["execution_outcome"] != "known" or not preview["verification"] or not preview["result_json"]:
                     raise Conflict("WRITE_PREVIEW_REQUIRED")
                 data = json.loads(preview["result_json"])
-                if (json.loads(preview["action_json"])["tool"] != ("filesystem.write_preview" if request.intent == "write_file" else "filesystem.edit_preview") or preview["project_id"] != (str(request.project_id) if request.project_id else None)
-                        or json.loads(preview["action_json"])["arguments"].get("access_root") != request.arguments.access_root
-                        or data["root_id"] != request.arguments.root_id or data["path"] != request.arguments.path
-                        or data["content_sha256"] != (text_digest(request.arguments.content) if request.intent == "write_file" else request.arguments.content_sha256) or data["previous_sha256"] != request.arguments.expected_sha256
+                if (json.loads(preview["action_json"])["tool"] != {"write_file":"filesystem.write_preview","edit_file":"filesystem.edit_preview","android_file_write":"android.file_preview"}[request.intent] or preview["project_id"] != (str(request.project_id) if request.project_id else None)
+                        or json.loads(preview["action_json"])["arguments"].get("access_root") != getattr(request.arguments,"access_root",None)
+                        or data.get("root_id",data.get("tree_id")) != getattr(request.arguments,"root_id",getattr(request.arguments,"tree_id",None)) or data["path"] != request.arguments.path
+                        or data["content_sha256"] != (text_digest(request.arguments.content) if request.intent in {"write_file","android_file_write"} else request.arguments.content_sha256) or data["previous_sha256"] != request.arguments.expected_sha256
                         or data["preview_digest"] != request.arguments.preview_digest):
                     raise Conflict("WRITE_PREVIEW_REQUIRED")
                 if request.intent == "edit_file":

@@ -1,0 +1,25 @@
+name: 问题反馈
+description: 报告可复现的功能或界面问题
+body:
+  - type: markdown
+    attributes:
+      value: 请先检查是否已有相同问题。安全漏洞请按 SECURITY.md 私密报告；截图和日志请先脱敏。
+  - type: input
+    id: version
+    attributes:
+      label: 版本与环境
+      placeholder: Core commit、Windows / Android / 浏览器版本
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 包含期望结果和实际结果。
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 脱敏日志或截图
+      description: 请移除令牌、个人会话、真实服务地址和设备身份。

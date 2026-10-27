@@ -1,0 +1,84 @@
+{
+  "task": "P107",
+  "date": "2026-10-26",
+  "status": "deployed_technical_checks_passed_pending_user_acceptance",
+  "core": {
+    "release": "/opt/nexus/releases/device-permissions-20261026-bdfce080",
+    "wheel_sha256": "bdfce080579d46460e86c81c624ece0c0cbaa9ab0d1eb936107db0272545801a",
+    "changed_resources": [
+      "nexus/core/cognitive/device_commands.py",
+      "nexus/core/security/devices.py",
+      "nexus/core/storage/migrations/044_device_permission_sync.sql"
+    ],
+    "resource_count": 314,
+    "schema": 44,
+    "single_active_core": true,
+    "paused_at_verification": false,
+    "existing_tables_preserved": 53,
+    "backup": "/var/backups/nexus/before-device-permissions-20261026T143636Z",
+    "backup_sha256": "9335c6590a40c84ea872027afa90a9affc20bc7d2638eed803e3f8413e245fc0",
+    "configuration_unchanged": true,
+    "rollback_reads_schema44": true,
+    "new_production_grants": 0,
+    "new_model_calls": 0
+  },
+  "frozen_candidate_tests": {
+    "windows_passed": 112,
+    "windows_seconds": 48.71,
+    "linux_passed": 112,
+    "linux_seconds": 66.76,
+    "android_unit_passed": 14,
+    "android_lint_errors": 0,
+    "android_lint_warnings": 21,
+    "android_lint_hints": 1
+  },
+  "native": {
+    "initial_integration_passed": 2,
+    "fixed_core_and_apk_restart_passed": 1,
+    "upgrade": "0.1.14 -> 0.1.15",
+    "same_signing_certificate": true,
+    "private_files_preserved": 8,
+    "checks": [
+      "native Compose switch -> owner HTTP -> Core grants",
+      "no system accessibility => no advertised executable action",
+      "register -> explicit permission question -> bare reply -> ready file target",
+      "natural rename",
+      "actual emulator loopback disconnect/reconnect",
+      "local off saved while offline",
+      "new app process retains identity and permissions",
+      "schema043 -> 044 backup and full table preservation",
+      "retries and unrelated switches preserve remote revocation"
+    ],
+    "physical_phone_tested": false,
+    "fixture_processes_stopped": true
+  },
+  "https": {
+    "downloads": [
+      {
+        "filename": "NEXUS-Android-0.1.15-debug.apk",
+        "sha256": "3c844a0f73e72a5a33df39ed6b36c1624503dca2b992218ed0fd874ae8513753",
+        "bytes": 12295956,
+        "https_verified": true
+      }
+    ],
+    "existing_web_resources_preserved": true,
+    "permission_sync": {
+      "route_present": true,
+      "unbound_installation_rejected": true,
+      "invalid_revision_rejected": true,
+      "production_permission_changes": 0
+    },
+    "cross_client_snapshot_equal": true
+  },
+  "cleanup": {
+    "archive": "E:\\NEXUS\\var\\node-permission-sync\\device-permissions-validation-bdfce080.tar.gz",
+    "sha256": "04dc4c1375d6450231c48b312a00be0a2d87431c29bf898f5acf0408eadcad0e",
+    "bytes": 57502569,
+    "temporary_server_data_removed": true
+  },
+  "verification_note": "Initial post-deploy snapshot checks overlapped the separate game-mode deployment pause; both checks passed after it restored service.",
+  "limits": [
+    "Physical Android phone remains for user acceptance.",
+    "Common deterministic expressions are supported; arbitrary natural-language understanding is not claimed."
+  ]
+}

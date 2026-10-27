@@ -224,7 +224,7 @@ function text(value) {
   return value === null || value === undefined || value === "" ? "—" : String(value);
 }
 
-export function initVisualization(container) {
+export function initVisualization(container, gameModeActive = () => false) {
   if (!container) return null;
   if (!window.WebGLRenderingContext || !window.WebGL2RenderingContext) {
     container.append(Object.assign(document.createElement("p"), { className: "viz-fallback", textContent: "这台设备暂不支持动态画面，聊天和设备功能仍可使用。" }));
@@ -1024,7 +1024,7 @@ export function initVisualization(container) {
   }
 
   function animate(now) {
-    if (!visible) {
+    if (!visible || gameModeActive()) {
       previousFrame = null;
       return;
     }
@@ -1104,6 +1104,11 @@ export function initVisualization(container) {
   drawerClose?.addEventListener("click", onCloseDrawer);
   resize();
   setCamera();
+  const onGameMode = () => {
+    cancelAnimationFrame(frame); previousFrame = null;
+    if (visible && !gameModeActive()) frame = requestAnimationFrame(animate);
+  };
+  window.addEventListener("nexus-game-mode-change", onGameMode);
   frame = requestAnimationFrame(animate);
 
   const bridge = {
@@ -1133,12 +1138,13 @@ export function initVisualization(container) {
       visible = value;
       previousFrame = null;
       cancelAnimationFrame(frame);
-      if (visible) frame = requestAnimationFrame(animate);
+      if (visible && !gameModeActive()) frame = requestAnimationFrame(animate);
     },
     resize,
     input: bridge,
     close: () => closeDrawer(),
     destroy() {
+      window.removeEventListener("nexus-game-mode-change", onGameMode);
       cancelAnimationFrame(frame);
       resizeObserver.disconnect();
       drawerClose?.removeEventListener("click", onCloseDrawer);

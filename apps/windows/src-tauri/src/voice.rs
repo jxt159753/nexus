@@ -146,6 +146,9 @@ pub fn voice_devices(app: AppHandle) -> Result<Value, String> {
 #[tauri::command]
 pub fn voice_start(app: AppHandle, state: State<'_, VoiceManager>, bridge: State<'_, BridgeState>,
                    config: VoiceLaunch) -> Result<(), String> {
+    if app.state::<crate::game_mode::GameMode>().active() {
+        return Err("游戏模式已开启，语音已暂停".into());
+    }
     app.state::<crate::wake::WakeManager>().disable();
     state.stop();
     launch(&app, &state, &bridge, config)
@@ -184,6 +187,9 @@ pub(crate) fn launch(app: &AppHandle, state: &VoiceManager, bridge: &BridgeState
         startup["wake_keywords"] = json!(resources.join("keywords.txt").to_string_lossy());
     }
     let mut inner = state.inner.lock().map_err(|_| "语音状态不可用")?;
+    if app.state::<crate::game_mode::GameMode>().active() {
+        return Err("游戏模式已开启，语音已暂停".into());
+    }
     if inner.child.as_mut().map(|child| matches!(child.try_wait(), Ok(None))).unwrap_or(false) {
         return Err("语音已在运行，请先结束当前会话".into());
     }

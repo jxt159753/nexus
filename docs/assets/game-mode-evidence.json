@@ -1,0 +1,136 @@
+{
+  "date": "2026-10-26",
+  "status": "deployed_technical_checks_passed_user_acceptance_pending",
+  "game_mode_pytest": {
+    "passed": 11,
+    "seconds": 5.35,
+    "report": "var/game-mode/pytest-game-final.xml"
+  },
+  "rust_tests": {
+    "passed": 11,
+    "command": "cargo test --offline --manifest-path apps/windows/src-tauri/Cargo.toml --lib -- --include-ignored",
+    "windows_api_called": true,
+    "silent_toast_posted_and_removed": true
+  },
+  "related_python_batch": {
+    "passed": 27,
+    "failed": 2,
+    "failures": "legacy voice UI fixtures; corrected and rechecked"
+  },
+  "voice_browser_recheck": {
+    "passed": 2,
+    "native_audio": "simulated",
+    "core": "temporary real HTTP Core",
+    "real_model_calls": 0
+  },
+  "node_client_regression": {
+    "passed": 7
+  },
+  "browser": [
+    {
+      "surface": "web",
+      "cameraReleased": true,
+      "lateCameraReleased": true,
+      "pluginSandboxStopped": true,
+      "animationPaused": true,
+      "preferencesPersist": true,
+      "noAutomaticCameraRestart": true,
+      "noNotice": true,
+      "errors": []
+    },
+    {
+      "surface": "windows",
+      "cameraReleased": true,
+      "lateCameraReleased": true,
+      "pluginSandboxStopped": true,
+      "animationPaused": true,
+      "preferencesPersist": true,
+      "noAutomaticCameraRestart": true,
+      "noNotice": true,
+      "errors": []
+    }
+  ],
+  "existing_extension_browser": {
+    "surfaces": [
+      "web",
+      "windows"
+    ],
+    "passed": true,
+    "camera": "synthetic",
+    "recognition_model": "real bundled WASM/model"
+  },
+  "emulator": {
+    "shutdown_seconds": 4.48,
+    "owned_processes_stopped": true,
+    "restart_blocked": true,
+    "no_automatic_restart": true,
+    "userdata_preserved": true
+  },
+  "limits": [
+    "Automatic full-screen detection was API-tested; actual games were not tested.",
+    "No human microphone/camera or third-party account tested.",
+    "No actual LLM calls.",
+    "Installed-app verification retained the user-disabled resident microphone; live human audio was not exercised."
+  ],
+  "deployment": {
+    "core_release": "/opt/nexus/releases/game-mode-20261026-ea96252d",
+    "core_wheel_sha256": "ea96252d454d4cad4c95ab050f3f3bbafbe028439a461bfc9bf25d7dc5a5330e",
+    "schema": 44,
+    "runtime_resources_checked": 316,
+    "backup": "/var/backups/nexus/before-game-mode-20261026T144658Z",
+    "historical_tables_preserved": 54,
+    "latest_device_permission_release_preserved": true,
+    "windows": {
+      "version": "0.1.29",
+      "installed_hashes": {
+        "nexus-windows.exe": "e0bfb0b9c44f8b4ad45f0c1a1e635bcfad00ec58f2a3b5865a15d76d1987f62c",
+        "binaries/nexus-node.exe": "a42f787765f27c80c6cc2f945a82e8c3020c040a67bb4a2ec8a7c666be0c6d41",
+        "binaries/nexus-voice.exe": "5c13916a66bd1dafbc02c5ce6aec4996cdd93436511b8a44d38906919dbb6879"
+      },
+      "configuration_preserved": true,
+      "databases_preserved": 3,
+      "phone_files_preserved": 33
+    },
+    "download": {
+      "filename": "NEXUS_0.1.29_x64-setup.exe",
+      "sha256": "69a369e23441f51952864943a6e279ee0f3e75db661bae015796e36dfc04b80d",
+      "bytes": 117328504,
+      "https_verified": true
+    },
+    "fixed_windows_tests": {
+      "passed": 49,
+      "seconds": 25.29
+    },
+    "fixed_linux_tests": {
+      "passed": 43,
+      "skipped_windows_only": 6,
+      "seconds": 19.29
+    },
+    "fixed_native_tests": {
+      "passed": 11
+    },
+    "single_core": true,
+    "paused": false,
+    "online_nodes": 2,
+    "game_mode_advertised": true,
+    "model_calls_added": 0,
+    "new_grants": 0,
+    "native_ui": {
+      "manual_controls": true,
+      "refresh_persists": true,
+      "process_restart_persists": true,
+      "active_startup_does_not_show_main": true,
+      "voice_remains_stopped": true,
+      "existing_resident_preference_preserved": true,
+      "restored_mode": "auto",
+      "temporary_debug_port_closed": true
+    },
+    "server_temp_archive": "02e7ab1da861bba24d0cc9b0f78be53c16265d60c64d9d27527841dc7c4c36ac",
+    "superseded_candidate": {
+      "sha256": "46493b762c0473dbe8f5d79a4188c892be445fac4df0556a455254719f53c99f",
+      "bytes": 30245886,
+      "never_activated": true,
+      "unused_candidate_removed": true
+    }
+  }
+}

@@ -383,6 +383,7 @@ pub async fn api_request(
         use tauri::Manager;
         app.state::<crate::wake::WakeManager>().disable();
         app.state::<crate::voice::VoiceManager>().stop();
+        crate::reminders::reminders_stop(app.state::<crate::reminders::Reminders>())?;
     }
     let (response, cookie) = exchange(
         &state.client,

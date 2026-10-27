@@ -41,7 +41,7 @@ async def body(request: Request, model, *, max_bytes: int = 4096):
             try:
                 parsed = json.loads(value)
                 intent = parsed.get("request", {}).get("intent")
-                if isinstance(intent, str) and intent not in {"receive_file", "android_device_status", "android_notification_digest", "get_system_info", "list_directory", "read_file", "find_files", "preview_file_write", "write_file", "run_command", "read_file_lines", "glob_files", "search_file_content", "preview_file_edit", "edit_file", "observe_target", "interact_target"}:
+                if isinstance(intent, str) and intent not in {"android_screen_observe","android_screen_act","android_ui_observe","android_ui_act","android_files","android_file_preview","android_file_write","receive_file", "android_device_status", "android_notification_digest", "get_system_info", "list_directory", "read_file", "find_files", "preview_file_write", "write_file", "run_command", "read_file_lines", "glob_files", "search_file_content", "preview_file_edit", "edit_file", "observe_target", "interact_target"}:
                     raise HTTPException(400, detail="UNSUPPORTED_TASK")
             except (ValueError, AttributeError):
                 pass

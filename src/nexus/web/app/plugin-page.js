@@ -58,6 +58,7 @@ import {
   waitPluginTest,
 } from "./plugins.js";
 import { uiPluginRow } from "./plugin-ui.js";
+import { renderAndroidEmulator } from "./android-emulator.js";
 
 const $ = (id) => document.getElementById(id);
 let activeTab = "permissions";
@@ -419,6 +420,7 @@ export async function renderPluginPage() {
   if (tabs) tabs.replaceChildren(
     tabButton("permissions", "权限"),
     tabButton("plugins", "插件"),
+    tabButton("phone", "虚拟手机"),
     tabButton("author", "自写插件"),
     tabButton("automation", "目标与提醒"),
   );
@@ -434,6 +436,10 @@ export async function renderPluginPage() {
   body.replaceChildren();
   if (activeTab === "permissions") renderPermissionsTab(body);
   else if (activeTab === "plugins") renderPluginsTab(body);
+  else if (activeTab === "phone") {
+    body.append(conversationSelect(() => renderPluginPage()));
+    renderAndroidEmulator(body, pluginState.list.find((item) => item.plugin_id === 'builtin.android_emulator' && item.enabled), pluginConversationId);
+  }
   else if (activeTab === "author") renderAuthorTab(body);
   else renderAutomationTab(body);
 }
@@ -488,6 +494,7 @@ function pluginRow(item, conversationSelectNode) {
     box.append(execution);
   }
   const actions = el("div", "actions");
+  if (item.plugin_id === 'builtin.android_emulator') actions.append(button('打开虚拟手机', 'primary', () => openPluginPage('phone')));
   actions.append(button("查看详情", "quiet", () => openPluginDetail(item.version_id)));
   const target = () => conversationSelectNode?.value || pluginConversationId || state.conversation?.conversation_id;
   if (!item.builtin && item.test_status !== "passed") {

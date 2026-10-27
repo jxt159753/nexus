@@ -56,7 +56,16 @@ class NodeClient:
             await ws.send(text)
 
     async def _connected(self, ws) -> None:
-        hello = NodeHello(node_id=self.config.node_id, node_version="0.1.0", boot_id=self.runtime.boot_id,plugin_digest=self.runtime.config.plugin_digest(),plugin_tools=self.runtime.config.plugins.features(self.runtime.config.interaction_targets),
+        plugin_tools = self.runtime.config.plugins.features(self.runtime.config.interaction_targets)
+        if 'builtin.game_mode' in plugin_tools:
+            from nexus.plugins.game_mode import status
+            try:
+                available = status(self.runtime.config.data_dir)['available']
+            except (OSError, ValueError):
+                available = False
+            if not available:
+                plugin_tools['builtin.game_mode'] = []
+        hello = NodeHello(node_id=self.config.node_id, node_version="0.1.0", boot_id=self.runtime.boot_id,plugin_digest=self.runtime.config.plugin_digest(),plugin_tools=plugin_tools,
             mcp_execution_timeout_seconds=self.runtime.config.mcp_execution_timeout_seconds,
             tools=[ToolCapability(tool=key.split("@")[0], tool_version=1) for key in sorted(self.runtime.config.allowed_tools)],
             roots=sorted(self.runtime.config.roots), interaction_digests={key:value.digest() for key,value in self.runtime.config.interaction_targets.items()}, command_digests={key: value.digest() for key,value in self.runtime.config.commands.items()})

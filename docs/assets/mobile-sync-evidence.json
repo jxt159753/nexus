@@ -1,0 +1,239 @@
+{
+  "task": "P93",
+  "date": "2026-10-25",
+  "status": "deployed_windows_upgraded_apk_published_pending_user_acceptance",
+  "android": {
+    "version": "0.1.6",
+    "version_code": 7,
+    "apk_bytes": 12403205,
+    "apk_sha256": "d86ed594193a827b83218d5250d82af93ef3c6ff97ad0e5aef7fa413cd23b56a",
+    "build": "passed",
+    "unit_tests": 2,
+    "lint": {
+      "errors": 0,
+      "warnings": 11,
+      "hints": 1
+    },
+    "core_integration_tests": 2,
+    "layouts": [
+      "phone 411dp",
+      "tablet landscape 1280dp",
+      "split 600dp"
+    ],
+    "verified": [
+      "latest tasks after 125 historical records",
+      "loaded pages retained",
+      "global activity independent of selected chat",
+      "device reads during a slow UI action",
+      "pause state",
+      "background polling stops",
+      "foreground refresh and cancellation",
+      "send consent retained",
+      "WebGL renders devices",
+      "hidden scene stops drawing",
+      "visible soft keyboard does not cover send",
+      "rotation preserves draft",
+      "narrow overview keeps devices visible"
+    ],
+    "download_url": "https://core.example.com/static/downloads/NEXUS-Android-0.1.6-debug.apk"
+  },
+  "python_and_browser": {
+    "passed": 21,
+    "final_scene_recheck_passed": 2,
+    "batches_overlap": true
+  },
+  "schema_changes": false,
+  "new_dependencies": false,
+  "real_model_calls": 0,
+  "production_access": true,
+  "physical_device_installation": false,
+  "not_verified": [
+    "physical Android device and vendor keyboard",
+    "user acceptance"
+  ],
+  "logs": "var/mobile-sync/",
+  "deployment": {
+    "baseline": "P92 Windows 0.1.15",
+    "release": "/opt/nexus/releases/mobile-sync-20261025-dd0c7fa5",
+    "wheel_sha256": "dd0c7fa564331e1f9a61c2a47cb06f5fe92484382a9b296c701e8d260440ac2c",
+    "runtime_files": 292,
+    "changed_files": [
+      "nexus/web/app/api.js",
+      "nexus/web/app/main.js",
+      "nexus/web/app/visualization.js",
+      "nexus/core/cognitive/chat.py",
+      "nexus/core/link/clients.py",
+      "nexus/core/storage/client_events.py"
+    ],
+    "schema": 38,
+    "backup": "/var/backups/nexus/before-mobile-sync-20261025T071503Z",
+    "backup_sha256": "64c3dee7833fce09213b8800585a6726fe2dc2d73b313221a115ec30de83bc87",
+    "historical_records_preserved": true,
+    "single_core_pid": 3910686,
+    "dispatch_resumed": true,
+    "fixed_package_tests": {
+      "windows_passed": 70,
+      "linux_passed": 70
+    },
+    "public_https_hashes": {
+      "/static/downloads/NEXUS_0.1.16_x64-setup.exe": {
+        "sha256": "e5ce4e62846564c8211de8383a64daf5b4b106ecc72cf60edf33ff1615cebb04",
+        "bytes": 116433216,
+        "status": 200,
+        "cache_control": "no-store",
+        "csp": "default-src 'self'; script-src 'self' 'sha256-UaO1DKdOZTH3g72w3U/IhBu3y5cxME0JyJYosMMMerQ=' 'sha256-jH4JDM+p01kuu6ou/A4MgTq6B9+X7dUZGHEdH52L4GY='; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
+      },
+      "/static/downloads/NEXUS-Android-0.1.6-debug.apk": {
+        "sha256": "d86ed594193a827b83218d5250d82af93ef3c6ff97ad0e5aef7fa413cd23b56a",
+        "bytes": 12403205,
+        "status": 200,
+        "cache_control": "no-store",
+        "csp": "default-src 'self'; script-src 'self' 'sha256-UaO1DKdOZTH3g72w3U/IhBu3y5cxME0JyJYosMMMerQ=' 'sha256-jH4JDM+p01kuu6ou/A4MgTq6B9+X7dUZGHEdH52L4GY='; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
+      },
+      "/static/app/api.js": {
+        "sha256": "379d4aa81644d6bb400bff8cf116067fd35cc241f3e187be935f1d5a084afa59",
+        "bytes": 21514,
+        "status": 200,
+        "cache_control": "no-store",
+        "csp": "default-src 'self'; script-src 'self' 'sha256-UaO1DKdOZTH3g72w3U/IhBu3y5cxME0JyJYosMMMerQ=' 'sha256-jH4JDM+p01kuu6ou/A4MgTq6B9+X7dUZGHEdH52L4GY='; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
+      },
+      "/static/app/main.js": {
+        "sha256": "f99e6bbc124cf08c59a51c081683ee9aedbd4d76d6e83076e6bfe861e7d698d2",
+        "bytes": 37896,
+        "status": 200,
+        "cache_control": "no-store",
+        "csp": "default-src 'self'; script-src 'self' 'sha256-UaO1DKdOZTH3g72w3U/IhBu3y5cxME0JyJYosMMMerQ=' 'sha256-jH4JDM+p01kuu6ou/A4MgTq6B9+X7dUZGHEdH52L4GY='; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
+      },
+      "/static/app/visualization.js": {
+        "sha256": "eadfb00fd5abc178d404bbbf0d3d69e3646d3144634237acd4829e71e0acef85",
+        "bytes": 48121,
+        "status": 200,
+        "cache_control": "no-store",
+        "csp": "default-src 'self'; script-src 'self' 'sha256-UaO1DKdOZTH3g72w3U/IhBu3y5cxME0JyJYosMMMerQ=' 'sha256-jH4JDM+p01kuu6ou/A4MgTq6B9+X7dUZGHEdH52L4GY='; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
+      }
+    },
+    "temporary_server_materials_archived_and_removed": true,
+    "core_data_and_model_ledger_checked_before_followup_user_activity": true,
+    "final_model_calls_including_user_activity": 333
+  },
+  "windows": {
+    "version": "0.1.16",
+    "databases": {
+      "node\\plugins.sqlite3": {
+        "preserved": true,
+        "tables": 4
+      },
+      "node\\receipts.sqlite3": {
+        "preserved": true,
+        "tables": 5
+      },
+      "node-manual\\receipts.sqlite3": {
+        "preserved": true,
+        "tables": 4
+      }
+    },
+    "configuration_preserved": true,
+    "installed_hashes": {
+      "nexus-windows.exe": "7e485897245aa27e8a57e9b9a6b110a66cd2de0abe49fd719a488ec3587d3fd3",
+      "binaries/nexus-node.exe": "35108720450332014e03e6c815a69b3271e59e9de73c94bb09b40555be2a91ed",
+      "binaries/nexus-voice.exe": "5c13916a66bd1dafbc02c5ce6aec4996cdd93436511b8a44d38906919dbb6879"
+    },
+    "nsis_bundle_marker_verified": true,
+    "webview": "155.0.4283.62",
+    "native_sync_verified": true,
+    "independent_poll_verified": true,
+    "page_errors": [],
+    "normal_restart": {
+      "debugging": false,
+      "bundled_node_running": true,
+      "pid": 51972,
+      "version": "0.1.16"
+    },
+    "history_after_user_activity": {
+      "node\\plugins.sqlite3": {
+        "processes": {
+          "before_rows": 29,
+          "current_rows": 35,
+          "missing_or_changed": 0,
+          "added_or_changed": 6
+        },
+        "directories": {
+          "before_rows": 0,
+          "current_rows": 0,
+          "missing_or_changed": 0,
+          "added_or_changed": 0
+        },
+        "calls": {
+          "before_rows": 32,
+          "current_rows": 38,
+          "missing_or_changed": 0,
+          "added_or_changed": 6
+        },
+        "subcalls": {
+          "before_rows": 0,
+          "current_rows": 0,
+          "missing_or_changed": 0,
+          "added_or_changed": 0
+        }
+      },
+      "node\\receipts.sqlite3": {
+        "schema_migrations": {
+          "before_rows": 3,
+          "current_rows": 3,
+          "missing_or_changed": 0,
+          "added_or_changed": 0
+        },
+        "node_identity": {
+          "before_rows": 1,
+          "current_rows": 1,
+          "missing_or_changed": 0,
+          "added_or_changed": 0
+        },
+        "execution_receipts": {
+          "before_rows": 69,
+          "current_rows": 75,
+          "missing_or_changed": 0,
+          "added_or_changed": 6
+        },
+        "cancellation_tombstones": {
+          "before_rows": 1,
+          "current_rows": 1,
+          "missing_or_changed": 0,
+          "added_or_changed": 0
+        },
+        "receipt_archives": {
+          "before_rows": 0,
+          "current_rows": 0,
+          "missing_or_changed": 0,
+          "added_or_changed": 0
+        }
+      },
+      "node-manual\\receipts.sqlite3": {
+        "schema_migrations": {
+          "before_rows": 2,
+          "current_rows": 2,
+          "missing_or_changed": 0,
+          "added_or_changed": 0
+        },
+        "node_identity": {
+          "before_rows": 1,
+          "current_rows": 1,
+          "missing_or_changed": 0,
+          "added_or_changed": 0
+        },
+        "execution_receipts": {
+          "before_rows": 0,
+          "current_rows": 0,
+          "missing_or_changed": 0,
+          "added_or_changed": 0
+        },
+        "cancellation_tombstones": {
+          "before_rows": 0,
+          "current_rows": 0,
+          "missing_or_changed": 0,
+          "added_or_changed": 0
+        }
+      }
+    }
+  }
+}

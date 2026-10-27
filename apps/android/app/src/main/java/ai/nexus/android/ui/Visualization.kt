@@ -18,11 +18,15 @@ import java.io.ByteArrayInputStream
         put("nodes", JsonArray(model.nodes.take(64).map { node -> buildJsonObject {
             for(key in listOf("node_id","label","online","tools","roots")) node[key]?.let { put(key,it) }
         } }))
-        put("tasks", JsonArray(model.tasks.take(100).map { task -> buildJsonObject {
-            for(key in listOf("task_id","node_id","status","created_at")) task[key]?.let { put(key,it) }
-            put("request",buildJsonObject { put("intent",task.text("intent")) })
+        put("tasks", JsonArray(model.sceneTasks.map { task -> buildJsonObject {
+            for(key in listOf("task_id","node_id","status","created_at","execution_outcome")) task[key]?.let { put(key,it) }
+            put("request",buildJsonObject { put("intent",task.objectAt("request").text("intent")) })
         } }))
         put("activeTurn",model.activeTurn)
+        model.activity?.let { put("activeTurns",JsonArray(it.objects("turns"))) }
+        put("paused",model.control.text("paused") == "true")
+        put("nodesFresh",model.nodesFresh)
+        put("activityFresh",model.activityFresh)
         // Restored history is not a new send event: do not replay message pulses.
         put("messageKey","")
     }.toString()
@@ -30,7 +34,9 @@ import java.io.ByteArrayInputStream
     var view by remember { mutableStateOf<WebView?>(null) }
     fun update(web:WebView) {
         val data=JSONObject.quote(current).replace("<","\\u003c").replace("\u2028","\\u2028").replace("\u2029","\\u2029")
-        web.evaluateJavascript("window.updateScene && window.updateScene(JSON.parse($data))",null)
+        // WebView can finish navigation before the module graph has initialized.
+        // Keep the latest read-only snapshot for entry.js to consume when ready.
+        web.evaluateJavascript("window.sceneSnapshot = JSON.parse($data); window.updateScene && window.updateScene(window.sceneSnapshot)",null)
     }
     DisposableEffect(view) {
         val web=view

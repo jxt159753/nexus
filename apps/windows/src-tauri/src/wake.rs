@@ -131,6 +131,7 @@ pub fn start(app: &tauri::AppHandle) {
                 prepared = None;
                 request_id = Uuid::new_v4();
             }
+            if app.state::<crate::game_mode::GameMode>().active() { continue; }
             let Some(scope) = scope else { continue; };
             let result = async {
                 let connection = bridge::VoiceConnection::new(&app.state::<bridge::BridgeState>(), &scope.core).await?;

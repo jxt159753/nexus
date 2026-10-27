@@ -1,0 +1,10 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <activity android:name="ai.nexus.android.PhoneFixtureActivity" android:exported="true" />
+        <activity android:name="ai.nexus.android.PhoneScreenFixtureActivity" android:exported="true" />
+        <provider android:name="ai.nexus.android.PhoneFixtureDocuments" android:authorities="ai.nexus.android.test.documents"
+            android:exported="true" android:grantUriPermissions="true" android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter><action android:name="android.content.action.DOCUMENTS_PROVIDER" /></intent-filter>
+        </provider>
+    </application>
+</manifest>

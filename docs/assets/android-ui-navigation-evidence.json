@@ -1,0 +1,111 @@
+{
+  "recorded_at": "2026-10-26T05:18:36.929185+00:00",
+  "status": "deployed_awaiting_redmagic_user_test",
+  "reported_failure": {
+    "confirmed_home_tasks": 3,
+    "reason": "Whole-page digest rejected HOME when NEXUS chat content refreshed before action."
+  },
+  "behavior": {
+    "home_recents": "Latest known observation within 120 seconds, same foreground package and window; text changes allowed.",
+    "back_and_control_actions": "Current whole-page digest must still match; supported node actions only.",
+    "unchanged": "Authentication, per-device grants, local and system permission intersection, locked-screen rejection, execution receipts and no retry after unknown effects."
+  },
+  "core": {
+    "release": "android-ui-20261026-ef874c64",
+    "schema": 42,
+    "wheel_sha256": "ef874c64b8fc3227a35896b650d24d1d879e1820c67c2bb6a011485d87f3bd1a",
+    "changed_resources": [
+      "nexus/core/cognitive/work_catalog.py"
+    ],
+    "runtime_resources": 307,
+    "backup": "/var/backups/nexus/before-android-ui-20261026T051659Z",
+    "backup_sha256": "3054648c35cdf41004407d1cd5252c123bb44457299e408ddb052ac15324c136",
+    "history_tables_preserved": 53,
+    "preserved_rows": {
+      "tasks": 248,
+      "task_attempts": 241,
+      "conversations": 95,
+      "chat_turns": 167,
+      "identities": 5,
+      "grants": 42,
+      "model_calls": 472,
+      "device_clients": 2,
+      "managed_node_profiles": 2,
+      "device_owner_grants": 7
+    },
+    "config_unchanged": true,
+    "new_grants": 0,
+    "model_calls_added": 0,
+    "single_active_core": true,
+    "paused": false,
+    "online_nodes": 2,
+    "cross_client_snapshot": {
+      "equal": true,
+      "latest_tasks": 20,
+      "active_tasks": 0,
+      "active_turns": 0
+    }
+  },
+  "validation": {
+    "windows": {
+      "passed": 57,
+      "seconds": 41.43
+    },
+    "linux": {
+      "passed": 57,
+      "seconds": 39.56
+    },
+    "android_unit_tests": 14,
+    "lint": {
+      "Warning": 18,
+      "Hint": 1
+    },
+    "android_instrumentation": {
+      "passed": 5,
+      "seconds": 245.068,
+      "navigation_checks": [
+        "HOME succeeds after changing real NEXUS UI text",
+        "RECENTS succeeds after changing real NEXUS UI text",
+        "BACK with stale digest rejected",
+        "HOME after foreground window change rejected"
+      ]
+    },
+    "database_copy_preserved": true,
+    "rollback_reads_schema42": true,
+    "test_fixture_repair": "First native run hit HTTP 429 because the batch wait was measured from batch start. Wait now starts after all previous requests; production rate limits unchanged."
+  },
+  "android": {
+    "version": "0.1.13",
+    "version_code": 14,
+    "url": "https://core.example.com/static/downloads/NEXUS-Android-0.1.13-debug.apk",
+    "filename": "NEXUS-Android-0.1.13-debug.apk",
+    "sha256": "0f1c478b52d6f069d6e2c038e1018973b4a33f4c0763689ae83f86df6b919af2",
+    "bytes": 12279524,
+    "signing": "existing_debug_key",
+    "certificate_sha256": "4aae1191da4be22ca8b49c65e770426763db177df293672aa830b37ca76486cd",
+    "upgrade_from": "0.1.12",
+    "private_files_preserved": 9,
+    "emulator": "API37.2 x86_64 / 16 KiB"
+  },
+  "public": {
+    "downloads": [
+      {
+        "filename": "NEXUS-Android-0.1.13-debug.apk",
+        "sha256": "0f1c478b52d6f069d6e2c038e1018973b4a33f4c0763689ae83f86df6b919af2",
+        "bytes": 12279524,
+        "https_verified": true
+      }
+    ],
+    "existing_web_resources_preserved": true
+  },
+  "cleanup": {
+    "archive": "E:\\NEXUS\\var\\android-ui-fix\\android-ui-validation-ef874c64.tar.gz",
+    "sha256": "043aae99144061328def054e53fe2a2168110e8d5f4d13be6a03694615ac72cb",
+    "bytes": 20925667,
+    "temporary_server_data_removed": true
+  },
+  "limitations": [
+    "No real phone installation or operation, no real model calls; RedMagic WeChat opening remains for user verification.",
+    "Contextual BACK and node actions still require a matching current screen; arbitrary coordinates and application private data are unsupported."
+  ]
+}

@@ -6,11 +6,11 @@
   <meta name="color-scheme" content="dark">
   <title>NEXUS · 对话</title>
   <link rel="icon" type="image/svg+xml" href="/static/app/favicon.svg">
-  <link rel="stylesheet" href="/static/app/app.css?v=20261024-ui">
+  <link rel="stylesheet" href="/static/app/app.css?v=20261027-public">
   <script type="importmap">
     {"imports": {"three": "/static/app/vendor/three.module.js", "three/addons/": "/static/app/vendor/addons/"}}
   </script>
-  <script type="module" src="/static/app/main.js?v=20261024-ui"></script>
+  <script type="module" src="/static/app/main.js?v=20261027-public"></script>
 </head>
 <body>
   <div id="login" class="login" hidden>
@@ -38,17 +38,27 @@
 
   <div id="shell" class="shell" hidden>
     <header class="topbar">
-      <button id="home-button" class="brand" type="button" aria-label="返回过程视图">
+      <button id="home-button" class="brand" type="button" aria-label="返回动态视图">
         <span class="brand-mark small" aria-hidden="true">N</span>
         <span>NEXUS</span>
       </button>
+      <nav class="view-switch" aria-label="主要视图">
+        <button id="view-home" type="button" aria-current="page">动态</button>
+        <button id="dock-expand" type="button">对话</button>
+      </nav>
       <div class="topbar-spacer"></div>
       <span id="connection" class="connection" role="status">连接中</span>
       <button id="pending-button" class="pending" type="button" hidden>
         待处理 <span id="pending-count">0</span>
       </button>
       <button id="notifications-button" class="icon-button" type="button" aria-label="通知中心">◉</button>
-      <button id="plugins-button" hidden class="icon-button" type="button" aria-label="权限与插件">▣</button>
+      <details id="tools-menu" class="tools-menu">
+        <summary class="icon-button" aria-label="工具菜单" title="工具">⋯</summary>
+        <div id="quick-tools" class="tools-popover">
+          <span class="tools-caption">工具与扩展</span>
+          <button id="plugins-button" class="quiet" type="button">权限与插件</button>
+        </div>
+      </details>
       <button id="settings-button" class="icon-button" type="button" aria-label="设置">⚙</button>
     </header>
 
@@ -72,6 +82,7 @@
             <span class="chev" aria-hidden="true">›</span>
           </button>
           <span id="dock-state" class="hint">就绪</span>
+          <button id="dock-new" type="button" class="quiet">新会话</button>
         </div>
         <div id="dock-thread" class="dock-thread"></div>
         <div id="dock-pending" class="pending-card" hidden></div>
@@ -84,8 +95,6 @@
             <button id="dock-attach" type="button" class="quiet attach-button" aria-label="添加附件" title="添加文件或粘贴图片">＋</button>
             <button id="dock-scope" type="button" class="quiet">对话选项</button>
             <button id="dock-stop" type="button" class="quiet danger" hidden>停止回复</button>
-            <button id="dock-new" type="button" class="quiet">新会话</button>
-            <button id="dock-expand" type="button" class="quiet">完整对话</button>
             <button id="dock-send" type="submit" class="primary">发送</button>
           </div>
         </form>
@@ -106,7 +115,6 @@
 
       <section class="chat-main">
         <header class="chat-head">
-          <button id="chat-back" class="icon-button" type="button" aria-label="返回过程视图">←</button>
           <button id="chat-drawer" class="icon-button mobile-only" type="button" aria-label="打开会话列表">☰</button>
           <div class="chat-title-wrap">
             <h1 id="chat-title">对话</h1>

@@ -1,4 +1,5 @@
 // Trusted host for data-only scene commands. Generated code never runs here.
+import { gameModeActive } from "./game-mode.js";
 const fields = { rotate: ["dx", "dy"], zoom: ["delta"], select: ["x", "y"], reset: [] };
 
 export function validateCommands(commands) {
@@ -42,6 +43,7 @@ export async function verifyBundle(bundle, digest) {
 
 export async function loadExtension(bundle, digest) {
   await verifyBundle(bundle, digest);
+  if (gameModeActive()) throw Error("游戏模式：插件已暂停");
   const frame = document.createElement("iframe");
   frame.hidden = true;
   frame.setAttribute("sandbox", "allow-scripts");
@@ -51,9 +53,12 @@ export async function loadExtension(bundle, digest) {
   let serial = 0, pending = null, dead = false;
   const close = () => {
     dead = true;
+    window.removeEventListener("nexus-game-mode-change", onGameMode);
     if (pending) { clearTimeout(pending.timer); pending.reject(Error("插件已停止")); pending = null; }
     channel.port1.close(); frame.remove();
   };
+  const onGameMode = () => { if (gameModeActive()) close(); };
+  window.addEventListener("nexus-game-mode-change", onGameMode);
   const request = (kind, data) => new Promise((resolve, reject) => {
     if (dead || pending) return reject(Error("插件当前不可执行"));
     const id = ++serial;

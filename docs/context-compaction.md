@@ -20,11 +20,13 @@ P88 增加短引用回取：摘要的 `ctx:` 指向获准历史原文，大型�
 
 ```toml
 chat_context_window_tokens = 1000000
-chat_input_tokens = 32768
-chat_input_bytes = 32768
+chat_input_tokens = 1000000
+chat_input_bytes = 8388608
 chat_compaction_threshold_percent = 80
 chat_compaction_retain_percent = 16
-chat_compaction_headroom_tokens = 512
+chat_compaction_headroom_tokens = 65536
 ```
 
-模型容量、输出预留与本地费用/传输上限共同约束请求。配置只能收紧当前实现的本地限额；不因填写大窗口自动提高预算。具体设计与边界见 [ADR 0022](decisions/0022-dsh-context-compaction.md)，当前版本与验证查 [路线图](ROADMAP.md)。
+容量按 DSH 的 100 万 token 输入＋输出总窗口计算；保留 256000 输出后，单次输入最多 744000 token，默认在 678464 token 触发压力处理，近期原文保留目标为 119040 token。完整 system、历史、工具定义、参数和结果共同计量；8 MiB 是独立的序列化传输上限，不是 token 数。达到任一实际上限仍明确停止，不删除原始工具证据。
+
+以上数值适用于已关闭金额限额的配置。`cost_limits_enabled=true` 仍沿用原 32768 输入 token 费用预留及按剩余费用收紧输出；关闭时按扩大的窗口记录预留和实际用量，不恢复累计调用或金额额度。压缩仍需本轮同意、每轮最多一次辅助请求、摘要输出最多 1024 token；未同意时仍使用近期最多 10 轮原文及更早摘录，只取消旧的 24 KiB 历史截断。显式配置的较小输入/字节上限继续生效，旧部署不会因源码默认值变化自动覆盖配置。设计见 [ADR 0022](decisions/0022-dsh-context-compaction.md)，本轮交付与上线状态见 [P99](ROADMAP.md#p99-context-capacity)。

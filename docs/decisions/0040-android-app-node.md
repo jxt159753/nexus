@@ -4,6 +4,8 @@
 
 ## 决定
 
+2026-10-25 用户追加要求允许 Android 截屏／录屏，窗口不再设置 `FLAG_SECURE`；替代旧草案的防截屏建议，交付纳入 [P97](../ROADMAP.md#p97-continuous-reminders)。
+
 - Kotlin / Compose 单 APK，`:app` 与纯 JVM `:protocol` 两模块；App 内按 HTTP、UI、Node、凭证、语音分包。暂不创建草案中的六个模块或 Room 缓存层，避免少量首版功能产生空抽象。Node 回执用 SQLiteOpenHelper，UI 仅内存投影。
 - 执行服务和通知监听使用独立 `:node` 进程。单执行槽、接收先落盘、结果先落盘、确认后保留幂等墓碑；重启的 received/started 变 unknown，不重新执行。每个原生只读调用有超时；Android Binder/存储卡住时 watchdog 只结束本 App 的专用 Node 进程，回执留待 Core 对账。
 - 复用协议 v1，新增 `android.device_status@1` / `android.notification_digest@1` 与精确资源 `android:device` / `android:notifications`。静态配置、owner/node 持久授权、运行时广告和本机策略取交集。不把 workspace 授权扩展到手机资源。

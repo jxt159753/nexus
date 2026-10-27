@@ -12,17 +12,9 @@ from nexus.core.models.config import CHAT_MAX_TEXT_BYTES
 from nexus.core.security.types import AccessDenied
 from nexus.core.models.chat_format import ChatText, TOOLS, parse_proposal, skill_tool
 
-ASSISTANT_PERSONA = """你是 NEXUS，用户的个人助手。沉稳、机智、可靠，有自己的判断，也有朋友般的亲近感。
-通常用中文，以“我”和“你”自然交流；称呼与正式程度随用户明确偏好调整，不默认叫“主人”或“先生”。
-先回应用户此刻真正想聊的事。闲聊可以自然接话、有好奇心；用户倾诉时先回应具体感受，不急着列解决清单或说教。
-用户明确要做事时利落推进，在现有授权内用好工具；工具可用不代表每句话都是任务，不为闲聊硬造计划、工具调用或工作总结。
-给出有依据的看法与取舍，必要时温和反对；承认不确定和错误，不迎合、不夸大能力，不为了显得可靠而装作知道。
-幽默应轻巧、偶尔、合乎语境，用户烦恼或事情出错时先认真回应；不强行抖机灵、反复套话或每次都以追问结尾。
-短问题简洁回答，复杂问题讲清楚；用自然段为主，列表和标题按需要使用。完成工作后先说实际结果，保留相关失败与限制。
-结合本轮提供的上下文承接话题、明确偏好与纠正；一时情绪只作为当时语境，不推断成固定性格或诊断。
-亲近感来自认真倾听和可靠行动，不编造共同经历、未提供的记忆、人的生活经历或离线关注，也不承诺未经授权的后台跟进。
-性格与交流偏好不授予权限；以下工具、事实、记忆同意和输出格式规则始终适用。
-"""
+from nexus.core.models.personality import persona_prompt
+
+ASSISTANT_PERSONA = persona_prompt()
 
 
 SYSTEM = """Use the supplied conversation context to answer follow-up questions. Be clear about uncertainty.
@@ -74,7 +66,7 @@ Stop on completion, user stop, a real authority/runtime blocker or a material us
 """
 
 
-def build_request(config, messages, *, generate_title=False, allow_tools=False, final_result=False, skill_catalog=None, work_catalog=None, work_limit=4, compact=False, auto_memory=False, output_budget_microunits=None):
+def build_request(config, messages, *, generate_title=False, allow_tools=False, final_result=False, skill_catalog=None, work_catalog=None, work_limit=4, compact=False, auto_memory=False, output_budget_microunits=None, assistant_style=None):
     """One assembly path for admission, context sizing and the actual exchange."""
     from nexus.contracts.images import validate_image_messages
     try:
@@ -218,7 +210,7 @@ A candidate's category is one of preference/background/ongoing; scope is one of 
         if generate_title:
             system += '\nInclude a concise title of at most 24 characters in this metadata object.'
     if not compact:
-        system = ASSISTANT_PERSONA + "\n" + system
+        system = persona_prompt(assistant_style) + "\n" + system
     output_limit = config.chat_output_limit(output_budget_microunits, compact=compact)
     if output_limit < 32:
         raise ProviderFailure("MODEL_BUDGET_INVALID")
@@ -248,8 +240,8 @@ class DeepSeekChatProvider:
     def __init__(self, key, config, *, transport=None):
         self.key, self.config, self.transport = key, config, transport
 
-    async def invoke(self, messages: list[dict], on_delta: Callable[[str], Awaitable[None]], *, generate_title: bool = False, allow_tools: bool = False, final_result: bool = False, skill_catalog: list[dict] | None = None, work_catalog: list[dict] | None = None, work_limit: int = 4, compact: bool = False, auto_memory: bool = False, output_budget_microunits: int | None = None) -> ModelReply:
-        body = request_body(self.config, messages, generate_title=generate_title, allow_tools=allow_tools, final_result=final_result, skill_catalog=skill_catalog, work_catalog=work_catalog, work_limit=work_limit, compact=compact, auto_memory=auto_memory, output_budget_microunits=output_budget_microunits)
+    async def invoke(self, messages: list[dict], on_delta: Callable[[str], Awaitable[None]], *, generate_title: bool = False, allow_tools: bool = False, final_result: bool = False, skill_catalog: list[dict] | None = None, work_catalog: list[dict] | None = None, work_limit: int = 4, compact: bool = False, auto_memory: bool = False, output_budget_microunits: int | None = None, assistant_style: dict | None = None) -> ModelReply:
+        body = request_body(self.config, messages, generate_title=generate_title, allow_tools=allow_tools, final_result=final_result, skill_catalog=skill_catalog, work_catalog=work_catalog, work_limit=work_limit, compact=compact, auto_memory=auto_memory, output_budget_microunits=output_budget_microunits, assistant_style=assistant_style)
         output_limit = self.config.chat_output_limit(output_budget_microunits, compact=compact)
         text, usage, finish, reported_model = ChatText(generate_title,on_delta,auto_memory=auto_memory,
             allow_progress=work_catalog is not None and allow_tools), None, None, None

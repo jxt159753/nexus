@@ -27,12 +27,13 @@ from nexus.plugins.schema import checked, bounded
 
 
 class HostProcess:
-    def __init__(self,argv,cwd,job_name,*,pty=False):
+    def __init__(self,argv,cwd,job_name,*,pty=False,environment=None,buffer_limit=32768):
         self.identifier=uuid4().hex
         self.job_name=job_name
         self.job=WindowsJob(job_name) if os.name=='nt' else None
         self.process=None
         self.buffer=bytearray()
+        self.buffer_limit=buffer_limit
         self.offset=0
         self.base=0
         self.truncated=False
@@ -42,7 +43,7 @@ class HostProcess:
         self.pty=pty
         try:
             launcher=([sys.executable,'--plugin-process'] if getattr(sys,'frozen',False) else [sys.executable,'-B','-m','nexus.plugins.process_worker'])
-            environment={key:value for key,value in os.environ.items() if not key.upper().startswith(('NEXUS_','DEEPSEEK_','OPENAI_','ANTHROPIC_'))}
+            environment={**{key:value for key,value in os.environ.items() if not key.upper().startswith(('NEXUS_','DEEPSEEK_','OPENAI_','ANTHROPIC_'))},**(environment or {})}
             self.process=subprocess.Popen(launcher,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
                 env=environment,shell=False,close_fds=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0),start_new_session=os.name!='nt',bufsize=0)
             if self.job: self.job.assign(self.process)
@@ -58,8 +59,8 @@ class HostProcess:
             while data:=self.process.stdout.read(1024):
                 with self.lock:
                     self.buffer.extend(data)
-                    if len(self.buffer)>32768:
-                        removed=len(self.buffer)-32768
+                    if len(self.buffer)>self.buffer_limit:
+                        removed=len(self.buffer)-self.buffer_limit
                         del self.buffer[:removed]
                         self.base+=removed
                         self.truncated=True
@@ -121,6 +122,8 @@ class PluginRuntime:
         self.closed=False
         self.invocation=threading.local()
         self.uploader=None
+        self.emulator=None
+        self.game_mode_error=''
         self.db_path=config.data_dir/'plugins.sqlite3'
         with self.db() as conn:
             conn.executescript('CREATE TABLE IF NOT EXISTS processes(id TEXT PRIMARY KEY,context_id TEXT NOT NULL,kind TEXT NOT NULL,job_name TEXT NOT NULL,state TEXT NOT NULL,result TEXT NOT NULL);'
@@ -158,8 +161,16 @@ class PluginRuntime:
         return local_directory(path)
 
     def _reap(self):
+        next_game_check = 0.0
         while not self.closed:
             try:
+                if time.monotonic() >= next_game_check:
+                    next_game_check = time.monotonic() + 1
+                    try:
+                        self._apply_game_mode()
+                        self.game_mode_error=''
+                    except (OSError, ValueError, ExecutionStopped) as error:
+                        self.game_mode_error=str(error)
                 with self.lock:
                     for identifier,(context,kind,process) in list(self.processes.items()):
                         if process.process.poll() is not None or time.monotonic()-process.started>self.policy.max_job_seconds:
@@ -176,8 +187,24 @@ class PluginRuntime:
                 return
             time.sleep(.1)
 
+    def _apply_game_mode(self):
+        from nexus.plugins.game_mode import blocked
+        if self.emulator is None:
+            return
+        # Only the dedicated NEXUS phone is affected. Keep its owned processes
+        # until normal shutdown confirms completion; never terminate other apps.
+        if blocked(self.config.data_dir):
+            with self.emulator.lock:
+                if self.emulator.managed:
+                    deadline = time.monotonic() + 10
+                    if not self.emulator.stopping:
+                        self.emulator.stop(deadline, threading.Event())
+                    else:
+                        self.emulator.status(deadline, threading.Event())
+
     def close(self):
         self.closed=True
+        if self.emulator is not None: self.emulator.close()
         with self.lock:
             for _,_,process in self.processes.values(): process.stop()
             self.processes.clear()
@@ -256,6 +283,20 @@ class PluginRuntime:
     def call(self,plugin_id,name,value,context,deadline,cancel,release=None):
         if cancel.is_set(): raise ExecutionStopped('cancelled')
         if time.monotonic()>=deadline: raise ExecutionStopped('timeout')
+        if plugin_id=='builtin.game_mode':
+            from nexus.plugins.game_mode import execute
+            return {**execute(self.config.data_dir,name,value,deadline,cancel), 'emulator_error':self.game_mode_error}
+        if plugin_id=='builtin.android_emulator':
+            from nexus.plugins.android_emulator import AndroidEmulator
+            from nexus.plugins.config import MuMuConfig
+            from nexus.plugins.mumu import MuMu
+            from nexus.plugins.game_mode import blocked
+            if name not in {'status','stop'} and blocked(self.config.data_dir):
+                raise ValueError('游戏模式已开启，虚拟手机已暂停；请先关闭游戏模式后再操作。')
+            with self.lock:
+                if self.emulator is None:
+                    self.emulator=(MuMu if isinstance(self.config.plugins.android_emulator,MuMuConfig) else AndroidEmulator)(self.config)
+            return self.emulator.execute(name,value,context,deadline,cancel)
         if plugin_id=='builtin.shell':
             return self.shell(name,value,context,deadline,cancel)
         if plugin_id in {'builtin.terminal','builtin.jobs'}:

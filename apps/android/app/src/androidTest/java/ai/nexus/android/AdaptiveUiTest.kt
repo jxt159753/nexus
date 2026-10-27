@@ -36,7 +36,10 @@ class AdaptiveUiTest {
         lateinit var model:AppModel
         fun web(view:View):WebView? { if(view is WebView)return view;if(view is ViewGroup)for(n in 0 until view.childCount)web(view.getChildAt(n))?.let{return it};return null }
         fun nodes(node:AccessibilityNodeInfo?):List<AccessibilityNodeInfo> = if(node==null)emptyList() else listOf(node)+(0 until node.childCount).flatMap{nodes(node.getChild(it))}
-        fun all()=nodes(i.uiAutomation.rootInActiveWindow)
+        fun all():List<AccessibilityNodeInfo> {
+            if(android.os.Build.VERSION.SDK_INT>=33) i.uiAutomation.clearCache()
+            return nodes(i.uiAutomation.rootInActiveWindow)
+        }
         fun click(text:String) { val node=all().filter{it.text?.toString()==text}.maxByOrNull{Rect().also(it::getBoundsInScreen).centerX()} ?: error("Missing control: $text");var current:AccessibilityNodeInfo?=node;while(current!=null && !current.isClickable)current=current.parent;assertTrue("Click $text",current?.performAction(AccessibilityNodeInfo.ACTION_CLICK)==true) }
         suspend fun script(code:String):String { val latch=CountDownLatch(1);var result="";i.runOnMainSync{val w=web(activity.window.decorView);if(w==null)latch.countDown() else w.evaluateJavascript(code){result=it;latch.countDown()}};assertTrue(latch.await(4,TimeUnit.SECONDS));return result }
         val name=InstrumentationRegistry.getArguments().getString("layoutName") ?: "layout"
@@ -47,13 +50,23 @@ class AdaptiveUiTest {
             i.runOnMainSync {
                 model.foreground(false);model.page=0
                 model.nodes=listOf(obj("node_id" to str("computer"),"label" to str("书房电脑"),"online" to JsonPrimitive(true),"tools" to JsonArray(listOf(str("system.info@1")))),obj("node_id" to str("phone"),"label" to str("随身手机"),"online" to JsonPrimitive(false)))
-                model.tasks=listOf(obj("task_id" to str("layout-task"),"node_id" to str("computer"),"status" to str("running"),"created_at" to str("2026-10-24T00:00:00Z")))
+                model.sceneTasks=listOf(obj("task_id" to str("layout-task"),"node_id" to str("computer"),"status" to str("running"),"created_at" to str("2026-10-24T00:00:00Z"),"request" to obj("intent" to str("get_system_info"))))
                 model.history=obj();model.editDraft("平板、横屏和分屏中保留这份草稿")
             }
             var ready=false
             repeat(60){if(!ready){ready=script("window.sceneReady === true && document.querySelectorAll('canvas').length > 0")=="true";if(!ready)delay(250)}}
             assertTrue("Bundled WebGL scene must render",ready)
+            withTimeout(5000) { while(all().none{it.isEditable}) delay(50) }
             capture("loaded")
+            if(context.resources.configuration.screenWidthDp<840) {
+                val sceneBounds=Rect();val inputBounds=Rect()
+                i.runOnMainSync { web(activity.window.decorView)!!.getGlobalVisibleRect(sceneBounds) }
+                val sceneInput=all().firstOrNull{it.isEditable}
+                assertNotNull("Floating input must be accessible: "+all().mapNotNull{it.text?.toString()}.joinToString(" / "),sceneInput)
+                sceneInput!!.getBoundsInScreen(inputBounds)
+                assertTrue("Scene extends behind floating input",sceneBounds.bottom>=inputBounds.bottom)
+                assertTrue("Scene remains wider than input",sceneBounds.left<inputBounds.left && sceneBounds.right>inputBounds.right)
+            }
             assertEquals(script("JSON.stringify({bridge:typeof window.Android,height:document.getElementById('visual-canvas').clientHeight,width:innerWidth,url:location.href})"),"true",script("!window.Android && document.getElementById('visual-canvas').clientHeight > 80"))
             assertEquals("true",script("(()=>{window.draws=0;for(const name of ['drawArrays','drawElements']){const fn=WebGL2RenderingContext.prototype[name];WebGL2RenderingContext.prototype[name]=function(...args){window.draws++;return fn.apply(this,args)}}window.sceneVisible(true);return true})()"))
             delay(800);val running=script("window.draws").toInt();assertTrue("scene renders frames",running>0)
@@ -65,12 +78,37 @@ class AdaptiveUiTest {
             assertFalse(all().any{it.text?.toString()?.contains("succeeded")==true})
             assertEquals("平板、横屏和分屏中保留这份草稿",model.draft)
             if(context.resources.configuration.screenWidthDp<900) { click("动态");delay(800);assertTrue(script("window.sceneReady === true")=="true");click("对话");delay(300) }
-            val editor=all().firstOrNull{it.isEditable};assertNotNull(editor);editor!!.performAction(AccessibilityNodeInfo.ACTION_CLICK);delay(700)
+            val editor=all().firstOrNull{it.isEditable};assertNotNull(editor)
+            val editorBounds=Rect().also(editor!!::getBoundsInScreen)
+            val tappedAt=android.os.SystemClock.uptimeMillis()
+            for(action in listOf(android.view.MotionEvent.ACTION_DOWN,android.view.MotionEvent.ACTION_UP)) {
+                val event=android.view.MotionEvent.obtain(tappedAt,android.os.SystemClock.uptimeMillis(),action,editorBounds.centerX().toFloat(),editorBounds.centerY().toFloat(),0)
+                i.uiAutomation.injectInputEvent(event,true);event.recycle()
+            }
+            var keyboardHeight=0
+            withTimeout(5000) {
+                while(keyboardHeight==0) {
+                    i.runOnMainSync { keyboardHeight=activity.window.decorView.rootWindowInsets?.getInsets(android.view.WindowInsets.Type.ime())?.bottom ?: 0 }
+                    delay(100)
+                }
+            }
             val send=all().first{it.text?.toString()=="发送"};val rect=Rect();send.getBoundsInScreen(rect)
-            assertTrue("Send remains within window",rect.top>=0 && rect.bottom<=context.resources.displayMetrics.heightPixels)
+            assertTrue("Send remains above the visible keyboard",rect.top>=0 && rect.bottom<=context.resources.displayMetrics.heightPixels-keyboardHeight)
             capture("keyboard")
             i.uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK);delay(300)
             i.runOnMainSync{model.page=2};delay(500)
+            assertFalse(all().any{it.text?.toString()=="允许无障碍操作"})
+            click("手机操作与文件");delay(300)
+            repeat(4) {
+                if(all().none{it.text?.toString()=="允许无障碍操作"}) {
+                    all().firstOrNull{it.isScrollable}?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
+                    delay(200)
+                }
+            }
+            capture("permissions-open")
+            assertTrue("Expanded permissions missing: "+all().mapNotNull{it.text?.toString()}.joinToString(" / "),all().any{it.text?.toString()=="允许无障碍操作"})
+            repeat(4) { all().firstOrNull{it.isScrollable}?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);delay(100) }
+            click("手机操作与文件");delay(300)
             assertFalse(all().any{it.text?.toString()?.contains("文件传输")==true});capture("devices")
             i.uiAutomation.setRotation(android.app.UiAutomation.ROTATION_FREEZE_90);delay(1500)
             i.runOnMainSync {

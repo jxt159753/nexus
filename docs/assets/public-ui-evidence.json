@@ -1,0 +1,62 @@
+{
+  "date": "2026-10-27",
+  "task": "P109",
+  "release": "public-ui-wide-20261027-94476a9d",
+  "wheel_sha256": "94476a9d676f3cef1c90b8b5ead270af499647ae3bb53fb818c56737562bc575",
+  "schema": 44,
+  "runtime_resources_checked": 317,
+  "historical_tables_preserved": 54,
+  "single_active_core": true,
+  "configuration_preserved": true,
+  "new_real_model_calls": 0,
+  "downloads": [
+    {
+      "filename": "NEXUS_0.1.32_x64-setup.exe",
+      "sha256": "e9934bb4cebdaed1b268f3fc5a989115a803962e23f5cc2c9f5652142b1101b3",
+      "bytes": 117327199,
+      "https_verified": true
+    },
+    {
+      "filename": "NEXUS-Android-0.1.16-debug.apk",
+      "sha256": "5a67bfb1bff26e0ed9fbc7468f522b1b50b34e19f7f3ecdc10eca22d9bd2201c",
+      "bytes": 12575094,
+      "https_verified": true
+    }
+  ],
+  "windows": {
+    "version": "0.1.32",
+    "installed": true,
+    "normal_restart": true,
+    "debug_port_closed": true,
+    "node_online": true,
+    "full_canvas_interaction": true,
+    "ui_resources_checked": 8,
+    "databases_preserved": 3,
+    "virtual_phone_files_preserved": 33
+  },
+  "android": {
+    "version": "0.1.16",
+    "version_code": 17,
+    "same_signing_certificate": true,
+    "upgrade_from": "0.1.15",
+    "upgrade_private_files_preserved": 9,
+    "jvm_tests_passed": 14,
+    "lint_errors": 0,
+    "lint_warnings": 21,
+    "emulator_checks": [
+      "phone layout, keyboard, rotation, permission disclosure",
+      "tablet layout, keyboard, rotation, permission disclosure",
+      "local Core send flow",
+      "personality, emoji, save and revision conflict"
+    ],
+    "physical_device_tested": false
+  },
+  "fixed_core_tests": {
+    "windows_passed": 45,
+    "linux_passed": 45
+  },
+  "browser_layout_cases": 8,
+  "temporary_server_verification_data_archived_and_removed": true,
+  "published_to_github": false,
+  "user_accepted": false
+}

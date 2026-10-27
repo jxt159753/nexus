@@ -1,0 +1,134 @@
+{
+  "date": "2026-10-27",
+  "technical_verification": "passed",
+  "user_acceptance": "pending",
+  "backend": {
+    "name": "MuMu",
+    "version": "6.7.2.0",
+    "android": "15",
+    "instance": 0,
+    "existing_userdata_preserved": true,
+    "old_sdk_data_preserved": true
+  },
+  "plugin_version": "1.1.0",
+  "core": {
+    "release": "/opt/nexus/releases/mumu-phone-20261027-625ba54a",
+    "schema": 44,
+    "resources": 317,
+    "backup": "/var/backups/nexus/before-mumu-phone-20261027T003544Z",
+    "historical_records_preserved": true,
+    "model_calls_before_after": [
+      745,
+      745
+    ],
+    "single_active": true,
+    "paused": false
+  },
+  "windows": {
+    "version": "0.1.30",
+    "installed_hashes": {
+      "nexus-windows.exe": "50884b0a26c02fe7d6f31278bdf76965162a96431f9962551f0b940ab1b473ce",
+      "binaries/nexus-node.exe": "9c3aba336213247d0a706337e692ee363b060bba9b49b38a757be5fcf143d6e9",
+      "binaries/nexus-voice.exe": "5c13916a66bd1dafbc02c5ce6aec4996cdd93436511b8a44d38906919dbb6879"
+    },
+    "configuration_preserved_except_mumu_binding": true,
+    "databases_preserved": 3,
+    "phone_files_preserved": 33
+  },
+  "fixed_tests": {
+    "windows_passed": 60,
+    "linux_passed": 54,
+    "linux_windows_only_skipped": 6
+  },
+  "frozen_runtime": {
+    "ready": true,
+    "real_frozen_parent": true,
+    "unicode_verified": true,
+    "timings": {
+      "start": 2.03328509999983,
+      "status": 1.2816940000000159,
+      "observe": 2.660094000000072,
+      "act": 3.0786929000000782,
+      "type_text": 5.711340000000064,
+      "game_mode_stop": 3.7231136000000333
+    }
+  },
+  "installed_ui": {
+    "version": "0.1.30",
+    "real_status": true,
+    "real_screen": true,
+    "real_home_action": true,
+    "errors": []
+  },
+  "graceful_stop": {
+    "version": "0.1.30",
+    "node_stopped": true,
+    "seconds": 7.456
+  },
+  "apps": {
+    "click_unicode": true,
+    "apps": [
+      {
+        "package": "com.tencent.mm",
+        "sha256": "f2a725bc04302ad218a563533ae79356e66b64aa711b275bc919a8d432f7e15d",
+        "focus": "com.tencent.mm",
+        "login_tested": false
+      },
+      {
+        "package": "com.ss.android.ugc.aweme.mobile",
+        "sha256": "46a3ebd3cf4b9a5020ebcea3aee02facaa80a7baae492b2c12090e5e0999baf0",
+        "focus": "com.ss.android.ugc.aweme.mobile",
+        "login_tested": false
+      },
+      {
+        "package": "com.max.xiaoheihe",
+        "sha256": "a55772e86f673d6ee8a4aff717e7995836a0f2ab4ab5b8f554959b9ad205433e",
+        "focus": "com.max.xiaoheihe",
+        "login_tested": false
+      }
+    ],
+    "restart_preserves_data": true,
+    "packages_after_restart": [
+      "ai.nexus.android",
+      "ai.nexus.android.test",
+      "ai.nexus.emulatorinput",
+      "com.max.xiaoheihe",
+      "com.ss.android.ugc.aweme.mobile",
+      "com.tencent.mm"
+    ]
+  },
+  "downloads": [
+    {
+      "filename": "NEXUS_0.1.30_x64-setup.exe",
+      "sha256": "cb56811561fe980ed313bea2118d3d3892f8b22262657ceef25609aca672cefc",
+      "bytes": 117330861
+    }
+  ],
+  "temporary_server_data_archived": {
+    "archive": "E:\\NEXUS\\var\\mumu-phone\\mumu-phone-validation-625ba54a.tar.gz",
+    "sha256": "cedeaa9596ac8ebda971af4bffdb717fade0d2cd3038be1cb4cfa2cece4c8dc7",
+    "bytes": 31030368,
+    "temporary_server_data_removed": true
+  },
+  "unused_candidate_archived": {
+    "archive": "E:\\NEXUS\\var\\mumu-phone\\mumu-unused-92a1753b.tar.gz",
+    "sha256": "b98db17329aa9ac7c5d436044787191be6ead2035fd5bff61b52b80a3bda90af",
+    "removed": [
+      "/var/tmp/nexus-mumu-phone-20261027-92a1753b",
+      "/opt/nexus/validation/mumu-phone-20261027-92a1753b",
+      "/opt/nexus/releases/mumu-phone-20261027-92a1753b"
+    ]
+  },
+  "debug_port_closed": true,
+  "accounts_registered": false,
+  "accounts_logged_in": false,
+  "test_packages_retained": [
+    "ai.nexus.android",
+    "ai.nexus.android.test"
+  ],
+  "limitations": [
+    "第三方账号登录和业务流程尚未验收",
+    "MuMu 测试UI抓取退出139后已校验XML；产品使用截图",
+    "自动审批拒绝测试应用卸载，采用不卸载的替代验证"
+  ]
+}

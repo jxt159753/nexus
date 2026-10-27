@@ -64,6 +64,9 @@ export const state = {
   usage: null,
   control: { paused: false, revision: 0 },
   conversations: [],
+  conversationsBefore: null,
+  conversationsLoading: false,
+  archivingConversations: new Set(),
   archived: false,
   conversation: null,
   turns: new Map(),
@@ -203,6 +206,10 @@ export function resetState() {
   state.usage = null;
   state.control = { paused: false, revision: 0 };
   state.conversations = [];
+  ++conversationListEpoch;
+  state.conversationsBefore = null;
+  state.conversationsLoading = false;
+  state.archivingConversations.clear();
   state.archived = false;
   state.conversation = null;
   state.turns.clear();
@@ -238,6 +245,7 @@ export async function loadCore() {
   state.usage = usage;
   state.control = control;
   state.conversations = conversations.conversations || [];
+  state.conversationsBefore = state.conversations.length === 20 ? state.conversations.at(-1).cursor : null;
   state.tasks.clear();
   for (const task of [...(snapshot.tasks || []), ...(snapshot.active_tasks || [])]) state.tasks.set(task.task_id, { task });
   state.activity = snapshot.activity || null;
@@ -275,11 +283,25 @@ export async function loadControl() {
   return state.control;
 }
 
-export async function loadConversations(archived = state.archived) {
-  const value = await api(`/api/v1/chat/conversations?archived=${archived ? "true" : "false"}`);
-  state.archived = archived;
-  state.conversations = value.conversations || [];
-  return state.conversations;
+let conversationListEpoch = 0;
+export async function loadConversations(archived = state.archived, more = false) {
+  if (more && (state.conversationsLoading || !state.conversationsBefore)) return;
+  const epoch = ++conversationListEpoch;
+  const before = more ? `&before=${state.conversationsBefore}` : "";
+  state.conversationsLoading = true;
+  try {
+    const value = await api(`/api/v1/chat/conversations?archived=${archived ? "true" : "false"}${before}`);
+    if (epoch !== conversationListEpoch) return;
+    const rows = value.conversations || [];
+    state.archived = archived;
+    state.conversations = more
+      ? [...new Map([...state.conversations, ...rows].map(row => [row.conversation_id, row])).values()]
+      : rows;
+    state.conversationsBefore = rows.length === 20 ? rows.at(-1).cursor : null;
+    return state.conversations;
+  } finally {
+    if (epoch === conversationListEpoch) state.conversationsLoading = false;
+  }
 }
 
 export async function createConversation(projectId = null) {
@@ -301,7 +323,8 @@ export async function createConversation(projectId = null) {
 let selectionEpoch = 0;
 export async function selectConversation(conversationId) {
   const epoch = ++selectionEpoch;
-  const value = await api(`/api/v1/chat/conversations/${conversationId}/turns`);
+  const value = conversationId ? await api(`/api/v1/chat/conversations/${conversationId}/turns`)
+    : { conversation: null, turns: [], active_turn_id: null };
   if (epoch !== selectionEpoch) return null;
   state.turns.clear();
   state.turnOrder = [];
@@ -314,7 +337,7 @@ export async function selectConversation(conversationId) {
   const known = state.conversations.find((item) => item.conversation_id === conversationId);
   if (known) Object.assign(known, state.conversation);
   if (state.prefs.lastConversationId !== conversationId) {
-    state.prefs.lastConversationId = conversationId;
+    state.prefs.lastConversationId = conversationId || "";
     savePrefs();
   }
   await syncTasksForTurns();
@@ -595,7 +618,10 @@ export async function archiveConversation(conversationId, archived) {
     method: "PATCH",
     body: JSON.stringify({ archived: !!archived }),
   });
-  await loadConversations(state.archived);
+  ++conversationListEpoch;
+  state.conversationsLoading = false;
+  state.conversations = state.conversations.filter(row => row.conversation_id !== conversationId);
+  if (state.conversation?.conversation_id === conversationId) state.conversation = value.conversation;
   return value.conversation;
 }
 

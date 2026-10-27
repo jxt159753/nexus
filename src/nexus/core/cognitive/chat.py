@@ -14,6 +14,7 @@ from nexus.core.cognitive import chat_skills, chat_journal, chat_compaction, cha
 from nexus.core.cognitive.chat_work import WorkService
 from nexus.core.cognitive.attachments import AttachmentService
 from nexus.core.cognitive.chat_context import history_message, pressure, prune_tools
+from nexus.core.cognitive.personality import preferences as assistant_preferences
 from nexus.core.memory import context as memory_context
 from nexus.core.memory import automatic as auto_memory
 from nexus.core.memory.service import project_owned
@@ -41,6 +42,7 @@ FROM chat_turns t LEFT JOIN (
 
 def public_turn(row: sqlite3.Row, *, detail: bool = False) -> dict:
     value = dict(row)
+    value["assistant_style"] = json.loads(value.pop("assistant_style_json"))
     value["history_summary"] = json.loads(value.pop("history_summary_json"))
     value["references"] = json.loads(value.pop("references_json"))
     value["attachments"] = json.loads(value.pop("attachments_json"))
@@ -118,8 +120,6 @@ class ChatService:
                     raise Conflict("IDEMPOTENCY_CONFLICT")
                 return dict(old)
             await project_owned(conn, value.project_id, principal.identity_id)
-            if (await one(conn, "SELECT count(*) FROM conversations WHERE cold_archived=0"))[0] >= 100:
-                raise Conflict("BUSY")
             identifier, now = str(uuid4()), utc_now()
             await conn.execute("INSERT INTO conversations(conversation_id,owner_id,request_id,title,created_at,auto_title) VALUES(?,?,?,'新会话',?,1)", (identifier, str(principal.identity_id), str(value.request_id), timestamp(now)))
             await conn.execute("UPDATE conversations SET project_id=? WHERE conversation_id=?", (str(value.project_id) if value.project_id else None, identifier))
@@ -306,6 +306,9 @@ class ChatService:
             history_summary = []
             available = 0
             options = {"generate_title": count == 0 and bool(conversation["auto_title"]), "allow_tools": value.allow_tools}
+            style = await assistant_preferences(conn, principal.identity_id)
+            style.pop('revision')
+            options['assistant_style'] = style
             if auto_revision and not value.compact_only:
                 options["auto_memory"] = True
             if work_grant_id:
@@ -355,6 +358,7 @@ class ChatService:
                 turn_id, str(conversation_id), str(principal.identity_id), str(value.request_id), encoded, value.text, context,
                 hashlib.sha256(context.encode()).hexdigest(), selected, int(available > selected), timestamp(now), timestamp(now+timedelta(minutes=5))))
             await conn.execute("UPDATE chat_turns SET skill_catalog_json=? WHERE turn_id=?", (canonical(skills), turn_id))
+            await conn.execute("UPDATE chat_turns SET assistant_style_json=? WHERE turn_id=?", (canonical(style), turn_id))
             await conn.execute("UPDATE chat_turns SET auto_memory_revision=?,auto_memory_refs_json=?,auto_memory_expires_at=? WHERE turn_id=?",
                                (auto_revision, canonical(auto_refs), min(memory_expirations, default=None), turn_id))
             await conn.execute("UPDATE chat_turns SET memory_refs_json=?,queue_after_turn_id=?,history_summary_json=?,references_json=? WHERE turn_id=?", (canonical(refs),previous[0] if previous else None,canonical(history_summary),canonical(references),turn_id))
@@ -536,7 +540,8 @@ class ChatService:
         request = json.loads(row["request_json"])
         summary = row["phase"] == "summary"
         options = {"generate_title": not summary and bool(row.get("generate_title",False)),
-                   "allow_tools": not summary and request.get("allow_tools",False)}
+                   "allow_tools": not summary and request.get("allow_tools",False),
+                   "assistant_style": json.loads(row["assistant_style_json"])}
         if row.get("auto_memory_revision") and not summary and not request.get("compact_only"):
             options["auto_memory"] = True
         if not summary and request.get("allow_skills"):

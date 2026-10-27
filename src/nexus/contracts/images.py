@@ -77,6 +77,14 @@ class RasterImage(StrictContract):
         return self
 
 
+class ScreenImage(RasterImage):
+    """Readable phone crop within the existing 32 KiB result transport."""
+    width: StrictInt = Field(ge=1, le=1600)
+    height: StrictInt = Field(ge=1, le=1600)
+    size_bytes: StrictInt = Field(ge=1, le=16384)
+    data_base64: StrictStr = Field(min_length=4, max_length=21848)
+
+
 class ImageSnapshot(StrictContract):
     source_sha256: CommandDigest
     source_size_bytes: StrictInt = Field(ge=1, le=MAX_SOURCE_BYTES)
@@ -109,8 +117,8 @@ class ImageReadResult(ImageSnapshot):
         return self
 
 
-def image_url(image: dict) -> str:
-    checked = RasterImage.model_validate(image)
+def image_url(image: dict, *, screen: bool = False) -> str:
+    checked = (ScreenImage if screen else RasterImage).model_validate(image)
     return f"data:{checked.media_type};base64,{checked.data_base64}"
 
 
@@ -130,11 +138,11 @@ def validate_image_messages(messages: list[dict], enabled: bool) -> int:
             if set(block) != {"type", "image_url"} or block["type"] != "image_url" or set(block["image_url"]) != {"url", "detail"} or block["image_url"]["detail"] != "original":
                 raise ValueError("bounded inline image required")
             prefix, separator, encoded = block["image_url"]["url"].partition(";base64,")
-            if not separator or prefix not in {"data:image/png", "data:image/jpeg"} or len(encoded) > 10924:
+            if not separator or prefix not in {"data:image/png", "data:image/jpeg"} or len(encoded) > 21848:
                 raise ValueError("remote or oversized image refused")
             raw = base64.b64decode(encoded, validate=True)
             width, height = raster_dimensions(raw, prefix[5:])
-            RasterImage(media_type=prefix[5:], width=width, height=height, size_bytes=len(raw),
+            ScreenImage(media_type=prefix[5:], width=width, height=height, size_bytes=len(raw),
                         sha256=hashlib.sha256(raw).hexdigest(), data_base64=encoded)
             count += 1
     if count > 4:

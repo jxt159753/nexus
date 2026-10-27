@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <application android:label="NEXUS" android:icon="@drawable/ic_nexus" android:allowBackup="false" android:dataExtractionRules="@xml/no_transfer" android:usesCleartextTraffic="false"
         android:theme="@android:style/Theme.Material.NoActionBar" android:supportsRtl="true">
         <activity android:name=".MainActivity" android:exported="true" android:windowSoftInputMode="adjustResize">
@@ -17,10 +19,18 @@
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.received" android:exported="false" android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/received_paths" />
         </provider>
+        <service android:name=".reminders.ReminderService" android:exported="false"  android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-enabled personal reminder delivery without Google services, with visible ongoing notification and explicit stop control" />
+        </service>
         <service android:name=".node.NodeService" android:exported="false" android:process=":node"
             android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="User-enabled authenticated device command channel with durable execution receipts and an explicit stop action" />
+        </service>
+        <service android:name=".node.PhoneAccessibility" android:exported="true" android:process=":node"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:label="NEXUS 手机操作">
+            <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/phone_accessibility" />
         </service>
         <service android:name=".node.NotificationAccess" android:exported="false" android:process=":node"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">

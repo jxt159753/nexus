@@ -294,10 +294,10 @@ function renderAttachmentComposers() {
       for (const item of items) list.append(renderDraftItem(item));
       fragment.append(list);
     }
-    if (attachmentState.supported === true) {
+    if (items.length && attachmentState.supported === true) {
       const caps = attachmentState.capabilities || {};
       const hint = el("p", "attachment-limits",
-        `附件保存在 Core：单个最多 ${formatBytes(caps.max_file_bytes)} · 本轮最多 ${maxFiles()} 个 · 任意扩展名与空文件`);
+        `单个最多 ${formatBytes(caps.max_file_bytes)} · 每次最多 ${maxFiles()} 个文件`);
       fragment.append(hint);
       if (items.some((item) => item.attachment?.preview_kind === "image")) {
         const enabled = caps.image_model_enabled !== false;
@@ -308,7 +308,7 @@ function renderAttachmentComposers() {
     }
     host.replaceChildren(fragment);
     host.dataset.view = view;
-    host.hidden = !items.length && !attachmentState.notice && attachmentState.supported !== true;
+    host.hidden = !items.length && !attachmentState.notice;
   }
   for (const id of ["chat-attach", "dock-attach"]) {
     const node = document.getElementById(id);

@@ -1,0 +1,155 @@
+{
+  "date": "2026-10-25",
+  "status": "deployed_restarted_and_verified_user_long_task_acceptance_pending",
+  "production_baseline": "chat-reminders-20261025-c819e035",
+  "failure": {
+    "turn_id": "a7757faa-6db1-4c28-b531-a34cfeac9d77",
+    "request_bytes": 71550,
+    "estimated_tokens": 17634,
+    "error": "MODEL_INPUT_LIMIT",
+    "configured_bytes": 65536,
+    "allow_compaction": false,
+    "completed_model_exchanges": 9,
+    "replayed": false,
+    "request_size_scope": "saved work projection; final persisted tool result excluded until read-only reconstruction below"
+  },
+  "dsh": {
+    "source": "https://github.com/deepseek-ai/deepseek-harness/tree/687f282e8625c6b8d11ff58211a90524be2e4317",
+    "installed_archive_read": true,
+    "window": 1000000,
+    "max_output": 256000,
+    "headroom": 65536,
+    "threshold_percent": 80,
+    "retain_percent": 16
+  },
+  "new_capacity": {
+    "chat_input_tokens": 1000000,
+    "chat_input_bytes": 8388608,
+    "effective_input_tokens": 744000,
+    "pressure_tokens": 678464,
+    "retain_tokens": 119040,
+    "same_failed_messages_fit_without_trimming": true,
+    "byte_ceiling_origin": "NEXUS transport choice, not DSH default"
+  },
+  "checks": {
+    "initial_focused_passed": 53,
+    "compatibility_first": {
+      "passed": 184,
+      "failed": 3,
+      "reason": "Old-capacity tests relied on previous default; made small limit explicit"
+    },
+    "final": {
+      "passed": 171,
+      "failed": 0,
+      "seconds": 91.44
+    },
+    "initial_sandbox_run": "stalled at SQLite-backed tests; interrupted, completed using isolated temporary databases outside sandbox",
+    "syntax_files": 8,
+    "example_config": "passed",
+    "fixed_candidate_windows": {
+      "passed": 199,
+      "failed": 0,
+      "seconds": 104.57
+    },
+    "fixed_candidate_linux": {
+      "passed": 199,
+      "failed": 0,
+      "seconds": 148.43
+    },
+    "fixed_candidate_notes": "Same 13 modules on both platforms; production baseline with P99 only, no P88, no real model calls"
+  },
+  "unchanged_scope": [
+    "No frontend, Node or client-package changes",
+    "No schema migration or dependency changes",
+    "No real model call or failed-task replay",
+    "Identity, permissions, historical records and existing disabled cumulative limits preserved"
+  ],
+  "pending": [
+    "User verification of a new long-running task"
+  ],
+  "failed_turns_readonly_reconstruction": [
+    {
+      "turn_id": "a7757faa-6db1-4c28-b531-a34cfeac9d77",
+      "status_unchanged": "stopped",
+      "saved_results": 11,
+      "succeeded_steps": 8,
+      "restored_result_messages_for_readonly_sizing": 1,
+      "estimated_tokens": 17724,
+      "threshold_tokens": 678464,
+      "request_bytes": 71910,
+      "pressured": false,
+      "fits": true
+    },
+    {
+      "turn_id": "dccffa8d-dcf6-4c11-b9fe-50b29e47754e",
+      "status_unchanged": "stopped",
+      "saved_results": 10,
+      "succeeded_steps": 8,
+      "restored_result_messages_for_readonly_sizing": 1,
+      "estimated_tokens": 16215,
+      "threshold_tokens": 678464,
+      "request_bytes": 65782,
+      "pressured": false,
+      "fits": true
+    }
+  ],
+  "workspace_runtime_sha256_at_initial_validation": {
+    "src/nexus/core/models/config.py": "cbc5739da47a8767d7616314f77c8f4030c45b474375cc8363d9724177327592",
+    "src/nexus/core/models/chat.py": "c6f0f4425de288907d1ac278228f259eaff03126d9af732ab12bcd344efb71e6",
+    "src/nexus/core/cognitive/chat_context.py": "07a16e251eb4c1960089196d244938908db4dcc640f1b92cf729f689a634efd1",
+    "src/nexus/core/cognitive/chat_compaction.py": "8fd724490938a6180eceaff69d6a4c9c48be3311ad4bac26d8d193eafb83306b",
+    "src/nexus/core/cognitive/chat.py": "fd4043e68b88def04856c837cdeb0e98b7a437ce50f9f1998b14e86d25e87eac",
+    "src/nexus/core/cognitive/chat_results.py": "8159c0dfa65ddbfe88151e40c0e3085c3097cdc9317fddb213e49e02724d35b7",
+    "src/nexus/core/cognitive/chat_journal.py": "c2f2529955d68b9d5b09ff41f509fa443ce518b1cbcd2d30b6fa85139bf4c9ac"
+  },
+  "deployment": {
+    "started_at": "2026-10-25T23:57:30+08:00",
+    "release": "/opt/nexus/releases/context-capacity-20261025-ade0086b",
+    "wheel_sha256": "ade0086b5bc4c87d4fd6319ee0cc04b83790fb4511a9100cfe7a6631d2fd5221",
+    "backup": "/var/backups/nexus/before-context-capacity-20261025T155730Z",
+    "backup_sha256": "14b675909dbce07831e82bd878f9b593f5eb837d63bc78c2f00344f092a5939c",
+    "schema": 40,
+    "history_tables_preserved": 52,
+    "runtime_resources_verified": 300,
+    "runtime_changed": {
+      "nexus/core/cognitive/chat.py": "14ec662a552ce5d3e7bfd2922d97fb28550a1ccae705034e1fd98e4aa2a551ff",
+      "nexus/core/cognitive/chat_compaction.py": "556ad9bf7c0c4e43e7626685383e8dbcabc2c37f17c5d8d59fbbf1adc27a55e1",
+      "nexus/core/cognitive/chat_context.py": "d429eea51b10bf738590ee222b2553d1238875c82e8ef52a8c9f99b0732ffba7",
+      "nexus/core/cognitive/chat_journal.py": "7aaffc2be59359e63c6f396a6fccd56a9012536e737348dd689ec3231ec983cd",
+      "nexus/core/cognitive/chat_results.py": "8159c0dfa65ddbfe88151e40c0e3085c3097cdc9317fddb213e49e02724d35b7",
+      "nexus/core/models/chat.py": "d0c356735f9c5cc1e4aee34dc2ca5f107d0b67f9565d13c2ca4ad385af9c7b04",
+      "nexus/core/models/config.py": "cbc5739da47a8767d7616314f77c8f4030c45b474375cc8363d9724177327592"
+    },
+    "other_runtime_resources_unchanged": 293,
+    "configuration": {
+      "chat_context_window_tokens": 1000000,
+      "chat_input_tokens": 1000000,
+      "chat_input_bytes": 8388608,
+      "chat_max_output_tokens": 256000,
+      "chat_compaction_headroom_tokens": 65536,
+      "cost_limits_enabled": false,
+      "call_limits_enabled": false
+    },
+    "single_core_pid": 1944239,
+    "paused": false,
+    "online_nodes": 2,
+    "cross_client_snapshot": {
+      "equal": true,
+      "latest_tasks": 20,
+      "active_tasks": 0,
+      "active_turns": 0
+    },
+    "https_and_authenticated_api": "passed",
+    "model_calls_unchanged": 400,
+    "preexisting_unknown_cost_calls_unchanged": 6,
+    "new_grants": 0,
+    "archive": {
+      "sha256": "f6d2af2d37b9edd046bd86b4e8763b257dd8f5edde786749ee0c00d0a521eea7",
+      "bytes": 52015225
+    },
+    "cleanup": {
+      "temporary_server_materials_removed": true,
+      "runtime_backups_retained": true
+    }
+  }
+}

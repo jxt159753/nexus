@@ -8,6 +8,7 @@ name = "nexus"
 version = "0.1.0"
 description = "NEXUS - One Mind, Many Bodies"
 readme = "README.md"
+license = {file = "LICENSE"}
 requires-python = ">=3.12"
 dependencies = [
     "aiosqlite==0.22.1",
@@ -38,6 +39,9 @@ dev = [
     "pytest>=8,<10",
 ]
 
+[tool.setuptools]
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["nexus*"]
@@ -45,7 +49,8 @@ include = ["nexus*"]
 [tool.setuptools.package-data]
 "nexus.core.storage" = ["migrations/*.sql"]
 "nexus.node" = ["migrations/*.sql", "tools/*.ps1"]
-"nexus.web" = ["*.html", "*.css", "*.js", "app/*", "app/vendor/*", "app/vendor/addons/postprocessing/*", "app/vendor/addons/shaders/*", "app/vendor/markdown/*"]
+"nexus.plugins" = ["emulator_assets/*.apk", "emulator_assets/*.json"]
+"nexus.web" = ["*.html", "*.css", "*.js", "app/*", "app/vendor/*", "app/vendor/addons/postprocessing/*", "app/vendor/addons/shaders/*", "app/vendor/markdown/*", "app/vendor/mediapipe/*", "app/vendor/mediapipe/wasm/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

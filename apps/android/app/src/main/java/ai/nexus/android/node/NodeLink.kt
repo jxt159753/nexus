@@ -38,7 +38,8 @@ class NodeLink(private val context: Context, private val config: NodeConfig, pri
     private var messageLimit = MAX_MESSAGE
     private fun now() = serverTime.plusMillis(SystemClock.elapsedRealtime() - clockStart)
     @Volatile private var activeTransfer: Triple<String,String,FileReceiver>? = null
-    fun stop() { stopping = true; activeTransfer?.third?.cancel(); socket?.cancel() }
+    @Volatile private var activePhone: Triple<String,String,PhoneOperation>? = null
+    fun stop() { stopping = true; activeTransfer?.third?.cancel(); activePhone?.third?.cancel(); socket?.cancel() }
     private fun send(type: String, payload: JsonObject, correlation: String? = null) {
         val encoded = message(type,payload,correlation)
         require(encoded.toByteArray().size <= messageLimit)
@@ -53,6 +54,7 @@ class NodeLink(private val context: Context, private val config: NodeConfig, pri
         val watchdog=Executors.newSingleThreadScheduledExecutor()
         val store = ReceiptStore(context, sha256("${coreUrl(config.url)}:${config.nodeId}"))
         val tools = DeviceTools(context)
+        val access = PhoneAccess(context)
         NotificationAccess.configure(config.packages)
         var delaySeconds = 1L
         try {
@@ -67,15 +69,18 @@ class NodeLink(private val context: Context, private val config: NodeConfig, pri
                         // Network reads run synchronously in the sole executor. Deliver cancellation
                         // immediately from this authenticated socket; persist it on the executor next.
                         val active=activeTransfer
-                        if(active!=null) runCatching {
+                        val phone=activePhone
+                        if(active!=null || phone!=null) runCatching {
                             val incoming=parseEnvelope(text);val p=incoming.payload
-                            if(incoming.type=="command.cancel" && p.keys==setOf("session_id","attempt_id","reason") &&
-                                p["session_id"]==str(active.first) && p["attempt_id"]==str(active.second)) active.third.cancel()
+                            if(incoming.type=="command.cancel" && p.keys==setOf("session_id","attempt_id","reason")) {
+                                if(active!=null && p["session_id"]==str(active.first) && p["attempt_id"]==str(active.second)) active.third.cancel()
+                                if(phone!=null && p["session_id"]==str(phone.first) && p["attempt_id"]==str(phone.second)) phone.third.cancel()
+                            }
                         }
                         if(!events.trySend(Event(text=text)).isSuccess) webSocket.cancel()
                     }
                     override fun onClosing(webSocket: WebSocket, code: Int, reason: String) { events.trySend(Event(code=code)); webSocket.close(code,null) }
-                    override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) { events.trySend(Event(code=response?.code ?: 1006)); events.close() }
+                    override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) { activePhone?.third?.cancel();events.trySend(Event(code=response?.code ?: 1006)); events.close() }
                 })
                 socket = ws
                 messageLimit = MAX_MESSAGE
@@ -86,10 +91,13 @@ class NodeLink(private val context: Context, private val config: NodeConfig, pri
                         throw IllegalStateException("connect")
                     }
                     val notificationEnabled = config.packages.isNotEmpty() && NotificationAccess.connected
-                    val registered = (if(notificationEnabled) listOf(DEVICE,NOTIFICATIONS) else listOf(DEVICE)) + (if(config.receiveFiles) listOf(RECEIVE) else emptyList())
-                    send("node.hello", obj("node_id" to str(config.nodeId), "node_version" to str("android-0.1.3"), "boot_id" to str(boot),
+                    val phoneTools = access.tools()
+                    val registered = (if(notificationEnabled) listOf(DEVICE,NOTIFICATIONS) else listOf(DEVICE)) + (if(config.receiveFiles) listOf(RECEIVE) else emptyList()) + phoneTools
+                    val roots = listOf("android:device") + (if(notificationEnabled) listOf("android:notifications") else emptyList()) +
+                        (if(config.receiveFiles) listOf("workspace") else emptyList()) + (if(UI_OBSERVE in phoneTools) listOf("android:ui") else emptyList()) + (if(FILES in phoneTools) listOf("android:files") else emptyList())
+                    send("node.hello", obj("node_id" to str(config.nodeId), "node_version" to str("android-${ai.nexus.android.BuildConfig.VERSION_NAME}"), "boot_id" to str(boot),
                         "tools" to JsonArray(registered.map { obj("tool" to str(it), "tool_version" to JsonPrimitive(1)) }),
-                        "roots" to JsonArray((if(notificationEnabled) listOf("android:device","android:notifications") else listOf("android:device") + emptyList()) .let { it + if(config.receiveFiles) listOf("workspace") else emptyList() }.map(::str))))
+                        "roots" to JsonArray(roots.map(::str))))
                     val hello = withTimeout(5000) { parseEnvelope(requireNotNull(events.receive().text)) }
                     require(hello.type == "node.welcome")
                     val welcome = hello.payload
@@ -120,6 +128,7 @@ class NodeLink(private val context: Context, private val config: NodeConfig, pri
                     while (!stopping) {
                         val clock = SystemClock.elapsedRealtime()
                         if (notificationEnabled != (config.packages.isNotEmpty() && NotificationAccess.connected)) break // Re-register reduced/increased local capabilities.
+                        if(phoneTools != access.tools()) break
                         if (clock >= nextHeartbeat) { send("node.heartbeat",obj("session_id" to str(session),"active_attempt_id" to JsonNull)); nextHeartbeat = clock+heartbeat }
                         if (clock >= nextReplay) {
                             val pending = store.pending(replayCursor)
@@ -165,23 +174,43 @@ class NodeLink(private val context: Context, private val config: NodeConfig, pri
                                     },command.execution_timeout_seconds.toLong(),TimeUnit.SECONDS)
                                     result = when(command.tool) {
                                         DEVICE -> tools.status()
+                                        in PHONE_TOOLS -> {
+                                            val operation=PhoneOperation { !stopping && now().isBefore(deadline) && access.enabled(if(command.tool in setOf(UI_OBSERVE,UI_ACT)+SCREEN_TOOLS) "accessibility" else "files") && (command.tool !in SCREEN_TOOLS || access.enabled("vision")) }
+                                            activePhone=Triple(session,command.attempt_id,operation)
+                                            operation.check()
+                                            val arguments=phoneArguments(command.tool,command.arguments)
+                                            when(command.tool) {
+                                                UI_OBSERVE,UI_ACT,SCREEN_OBSERVE,SCREEN_ACT -> PhoneAccessibility.execute(command.tool,arguments,operation)
+                                                FILES -> PhoneDocuments(context,operation).query(arguments)
+                                                FILE_PREVIEW -> PhoneDocuments(context,operation).preview(arguments)
+                                                else -> PhoneDocuments(context,operation).write(arguments)
+                                            }
+                                        }
                                         RECEIVE -> {
                                             val receiver=FileReceiver(context,config,client)
                                             activeTransfer=Triple(session,command.attempt_id,receiver)
                                             if(stopping) receiver.cancel()
                                             receiver.receive(command)
                                         }
-                                        else -> NotificationAccess.digest(command.arguments["limit"]?.jsonPrimitive?.int ?: 10)
+                                        NOTIFICATIONS -> NotificationAccess.digest(command.arguments["limit"]?.jsonPrimitive?.int ?: 10)
+                                        else -> error("Unsupported tool")
                                     }
                                     require(result.toString().toByteArray().size <= maxResult)
                                     require(now().isBefore(deadline) && SystemClock.elapsedRealtime()-start < command.execution_timeout_seconds*1000)
+                                } catch (unknown: PhoneEffectUnknown) {
+                                    report(unknown.message ?: "操作结果待核对")
+                                    store.phase(command.attempt_id,"unknown");status(command.attempt_id,incoming.message_id);continue
                                 } catch (cancelled: ReceiveCancelled) {
                                     store.phase(command.attempt_id,"cancelled");status(command.attempt_id,incoming.message_id);continue
                                 } catch (failure: android.database.SQLException) { throw failure }
                                 catch (failure: Exception) {
+                                    if(command.tool in setOf(UI_ACT,SCREEN_ACT,FILE_WRITE) && result!=null) {
+                                        store.phase(command.attempt_id,"unknown");status(command.attempt_id,incoming.message_id);continue
+                                    }
                                     result = null
-                                    error = obj("code" to str("POLICY_DENIED"),"message" to str("设备操作未完成，请核对权限、连接、空间及执行记录；文件不会自动重发。"),"retryable" to JsonPrimitive(false))
-                                } finally { activeTransfer=null;executing.set(false);deadlineWatch?.cancel(false) }
+                                    val detail=if(command.tool in PHONE_TOOLS && failure is IllegalArgumentException || command.tool in PHONE_TOOLS && failure is IllegalStateException) failure.message?.take(300) else null
+                                    error = obj("code" to str("POLICY_DENIED"),"message" to str(detail ?: "设备操作未完成，请核对权限、连接、空间及执行记录；文件不会自动重发。"),"retryable" to JsonPrimitive(false))
+                                } finally { activeTransfer=null;activePhone=null;executing.set(false);deadlineWatch?.cancel(false) }
                                 val resultPayload = obj("session_id" to str(session),"task_id" to str(command.task_id),"attempt_id" to str(command.attempt_id),
                                     "command_digest" to str(command.command_digest),"tool" to str(command.tool),"tool_version" to JsonPrimitive(1),"observed_at" to str(utc(now())),
                                     "outcome" to str(if(result != null) "succeeded" else "failed"),"result" to (result ?: JsonNull),"error" to (error ?: JsonNull))

@@ -1,0 +1,122 @@
+{
+  "task": "P96 conversation routing",
+  "released_at": "2026-10-25T16:17:50+08:00",
+  "core": {
+    "release": "/opt/nexus/releases/conversation-routing-20261025-d5355f63",
+    "wheel_sha256": "d5355f63d2576d8b3ec18ddc70e7a121b39d1a75a8e4d9d5a6a97acd92e0382f",
+    "backup": "/var/backups/nexus/before-conversation-routing-20261025T081750Z",
+    "backup_sha256": "7f6114a09e8b8a663ff927d524a02930290d0d0ddb8df5335d5c00f6f8f94d35",
+    "schema": 38,
+    "historical_records_preserved": true,
+    "runtime_resources_checked": 294
+  },
+  "baseline": "effef57e0194aa65020387406558c2fd9a332e9ff9f65631fbb0a24556f88268",
+  "preserved_mcp_fix": true,
+  "fixed_windows_tests": 71,
+  "fixed_linux_tests": 115,
+  "browser_surfaces": [
+    "web",
+    "windows",
+    "legacy regression"
+  ],
+  "browser_checks": [
+    "source cards",
+    "HTML escaped titles",
+    "conversation drafts",
+    "stale history suppression",
+    "initiating client only",
+    "navigation consumed once"
+  ],
+  "android": {
+    "version": "0.1.7",
+    "version_code": 8,
+    "build": true,
+    "unit_tests": true,
+    "lint_errors": 0,
+    "lint_warnings": 6,
+    "lint_hints": 1,
+    "physical_device_installed": false,
+    "enrollment_excluded": true
+  },
+  "windows": {
+    "version": "0.1.18",
+    "databases": {
+      "node\\plugins.sqlite3": {
+        "preserved": true,
+        "tables": 4
+      },
+      "node\\receipts.sqlite3": {
+        "preserved": true,
+        "tables": 5
+      },
+      "node-manual\\receipts.sqlite3": {
+        "preserved": true,
+        "tables": 4
+      }
+    },
+    "configuration_preserved": true,
+    "installed_hashes": {
+      "nexus-windows.exe": "60827a01f95df7014709bedebb3eb1577d89a91e5cd1c8550666f9bc0425ee1e",
+      "binaries/nexus-node.exe": "6f8c63e80273ba92b880df72468c838c8a3f64a3fe939dc32c14da15a768a116",
+      "binaries/nexus-voice.exe": "5c13916a66bd1dafbc02c5ce6aec4996cdd93436511b8a44d38906919dbb6879"
+    },
+    "nsis_bundle_marker_verified": true
+  },
+  "native": {
+    "version": "0.1.18",
+    "webview": "155.0.4283.62",
+    "ready": true,
+    "nodesFresh": true,
+    "activityFresh": true,
+    "polled": true,
+    "globalActivityMatches": true,
+    "controlMatches": true,
+    "latestTasksMatch": true,
+    "activeTasksMatch": true,
+    "activeTurns": 0,
+    "canvas": true,
+    "resources": {
+      "api.js": "b1f5c57b44d0bb55c15b32206f1a8b55766f19598bf8341a81acc0b47c4824e8",
+      "main.js": "076417a94562a99a569a547618691ce415746d02d0603e5bd7fdeffaa7c999e6",
+      "render.js": "4aa26c44d0e0a7a7f29327d302ccefa8d8aa05a939b857f08e790e741e63b217"
+    },
+    "pageErrors": [],
+    "realModelCalls": 0
+  },
+  "normal_restart_pid": 56612,
+  "temporary_debug_port_closed": true,
+  "production": {
+    "schema": 38,
+    "paused": 0,
+    "calls_total": 338,
+    "unknown_costs": 6,
+    "permission_defaults": [
+      "full",
+      2
+    ],
+    "permission_history_preserved": true,
+    "active_tasks": 0,
+    "core_processes": [
+      "4137062"
+    ]
+  },
+  "historical_table_count": 45,
+  "downloads": [
+    {
+      "filename": "NEXUS_0.1.18_x64-setup.exe",
+      "bytes": 116429219,
+      "sha256": "c84c951c89ef9682797d32d253bc3f2dd8075b1da67c58f1a59f49487f9b1c39"
+    },
+    {
+      "filename": "NEXUS-Android-0.1.7-debug.apk",
+      "bytes": 12163244,
+      "sha256": "58579af9f18fac633abf1fdbd3701e73e46351e04e8ba09431273cb0562de9fa"
+    }
+  ],
+  "real_model_calls": 0,
+  "public_tls_hashes_verified": true,
+  "server_temporary_files_cleaned": true,
+  "limitations": [
+    "Real-model answer quality and physical Android interaction await user acceptance; no live rollback drill."
+  ]
+}

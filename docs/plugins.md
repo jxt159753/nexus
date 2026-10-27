@@ -1,8 +1,12 @@
 # NEXUS 原生插件
 
+full 模式可在文件工具参数或 `plugin_execute` 外层提供 `access_root`，指定目标设备任意本地绝对目录；`path` 相对此目录，省略仍访问 workspace。例如 `{"plugin_id":"builtin.files","tool":"read","access_root":"C:/Users/name/Desktop","input":{"path":"note.txt"}}`。文件、图片、交付物、LSP 及组合调用共用本次根；Shell/终端支持原有宿主命令及 `workdir`。normal 不接受 `access_root`，工作区及原宿主确认语义保持；full 不提升操作系统账户权限。切换模式后须重新发起工作，不复用旧授权。设计见 [ADR 0046](decisions/0046-full-mode-host-roots.md)，实际上线版本查 [P91](ROADMAP.md#p91-full-host)。
+
 设计与批准边界见 [ADR 0028](decisions/0028-native-plugins-permission-modes.md)，实际验证和部署状态以 [ROADMAP](ROADMAP.md) 为准。这里说明接口与运行方式，不把注册表条目等同于已配置、已验证或已上线。
 
 原生 Skill 的 Shell 步骤，以及 MCP 配置登记、工具发现、重载与调用，见 [Skill 与受控 MCP](skill-mcp.md)。它们共用原 Harness、会话权限、Node 回执和取消协议。
+
+网页/Windows 的手势可视化插件使用独立的浏览器隔离运行契约，开发、宿主验证、自动升级和失败回退见[可视化插件](ui-extensions.md)。下文 Python 插件的执行权限和具体版本批准规则继续保留。
 
 ## 权限与执行
 

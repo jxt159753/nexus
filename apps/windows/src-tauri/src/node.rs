@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
@@ -137,7 +138,21 @@ impl NodeManager {
     pub fn stop(&self) {
         if let Ok(mut inner) = self.inner.lock() {
             if let Some(mut child) = inner.child.take() {
-                terminate_tree(&mut child);
+                // Let Node flush and close its persistent virtual phone first.
+                if let Some(mut input) = child.stdin.take() {
+                    let _ = input.write_all(b"shutdown\n");
+                }
+                let until = std::time::Instant::now() + std::time::Duration::from_secs(35);
+                loop {
+                    match child.try_wait() {
+                        Ok(Some(_)) => break,
+                        _ if std::time::Instant::now() >= until => {
+                            terminate_tree(&mut child);
+                            break;
+                        }
+                        _ => std::thread::sleep(std::time::Duration::from_millis(50)),
+                    }
+                }
             }
         }
     }
@@ -378,10 +393,11 @@ pub fn node_start(
 
     let mut command = Command::new(&executable);
     command
+        .arg("--parent-stdin")
         .arg("--config")
         .arg(&config_path)
         .env("NEXUS_NODE_TOKEN", &config.node_token)
-        .stdin(Stdio::null())
+        .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
     #[cfg(windows)]
@@ -404,10 +420,8 @@ pub fn node_start(
 
 #[tauri::command]
 pub fn node_stop(app: AppHandle, state: State<'_, NodeManager>) -> NodeStatus {
+    state.stop();
     let mut inner = state.inner.lock().expect("node state");
-    if let Some(mut child) = inner.child.take() {
-        terminate_tree(&mut child);
-    }
     inner.error = None;
     NodeManager::status_for(&app, &mut inner)
 }

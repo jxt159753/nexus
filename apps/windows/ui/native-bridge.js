@@ -29,6 +29,9 @@
     voiceStop: () => invoke("voice_stop"),
     voiceWake: (config) => invoke("voice_wake", { config }),
     voiceInterrupt: () => invoke("voice_interrupt"),
+    gameModeStatus: () => invoke("game_mode_status"),
+    gameModeSet: (mode) => invoke("game_mode_set", { mode }),
+    onGameMode: (listener) => tauri.event.listen("nexus-game-mode", (event) => listener(event.payload)),
     onVoice: (listener) => tauri.event.listen("nexus-voice", (event) => listener(event.payload)),
   };
   window.__NEXUS_NATIVE__ = native;

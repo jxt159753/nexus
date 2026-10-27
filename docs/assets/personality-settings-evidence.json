@@ -1,0 +1,644 @@
+{
+  "method": "Same current request builder/options/messages; replace only personality prefix with saved pre-task constant. Local estimator, not provider billing.",
+  "real_model_calls": 0,
+  "settings_model_calls": 0,
+  "old_persona": {
+    "bytes": 1507,
+    "estimated_tokens": 355
+  },
+  "presets": [
+    {
+      "personality": "nexus",
+      "emoji": "off",
+      "bytes": 1183,
+      "estimated_tokens": 282
+    },
+    {
+      "personality": "nexus",
+      "emoji": "natural",
+      "bytes": 1198,
+      "estimated_tokens": 286
+    },
+    {
+      "personality": "nexus",
+      "emoji": "expressive",
+      "bytes": 1220,
+      "estimated_tokens": 290
+    },
+    {
+      "personality": "companion",
+      "emoji": "off",
+      "bytes": 1201,
+      "estimated_tokens": 286
+    },
+    {
+      "personality": "companion",
+      "emoji": "natural",
+      "bytes": 1216,
+      "estimated_tokens": 290
+    },
+    {
+      "personality": "companion",
+      "emoji": "expressive",
+      "bytes": 1238,
+      "estimated_tokens": 294
+    },
+    {
+      "personality": "explorer",
+      "emoji": "off",
+      "bytes": 1195,
+      "estimated_tokens": 285
+    },
+    {
+      "personality": "explorer",
+      "emoji": "natural",
+      "bytes": 1210,
+      "estimated_tokens": 288
+    },
+    {
+      "personality": "explorer",
+      "emoji": "expressive",
+      "bytes": 1232,
+      "estimated_tokens": 293
+    },
+    {
+      "personality": "advisor",
+      "emoji": "off",
+      "bytes": 1210,
+      "estimated_tokens": 288
+    },
+    {
+      "personality": "advisor",
+      "emoji": "natural",
+      "bytes": 1225,
+      "estimated_tokens": 292
+    },
+    {
+      "personality": "advisor",
+      "emoji": "expressive",
+      "bytes": 1247,
+      "estimated_tokens": 296
+    }
+  ],
+  "requests": [
+    {
+      "style": {
+        "personality": "nexus",
+        "emoji": "off"
+      },
+      "entry": "chat",
+      "before_tokens": 1114,
+      "after_tokens": 1041,
+      "before_bytes": 4560,
+      "after_bytes": 4233
+    },
+    {
+      "style": {
+        "personality": "nexus",
+        "emoji": "off"
+      },
+      "entry": "tools",
+      "before_tokens": 1491,
+      "after_tokens": 1418,
+      "before_bytes": 6080,
+      "after_bytes": 5753
+    },
+    {
+      "style": {
+        "personality": "nexus",
+        "emoji": "off"
+      },
+      "entry": "summary",
+      "before_tokens": 1243,
+      "after_tokens": 1171,
+      "before_bytes": 5079,
+      "after_bytes": 4752
+    },
+    {
+      "style": {
+        "personality": "nexus",
+        "emoji": "off"
+      },
+      "entry": "compact",
+      "before_tokens": 422,
+      "after_tokens": 422,
+      "before_bytes": 1628,
+      "after_bytes": 1628
+    },
+    {
+      "style": {
+        "personality": "nexus",
+        "emoji": "natural"
+      },
+      "entry": "chat",
+      "before_tokens": 1114,
+      "after_tokens": 1044,
+      "before_bytes": 4560,
+      "after_bytes": 4248
+    },
+    {
+      "style": {
+        "personality": "nexus",
+        "emoji": "natural"
+      },
+      "entry": "tools",
+      "before_tokens": 1491,
+      "after_tokens": 1421,
+      "before_bytes": 6080,
+      "after_bytes": 5768
+    },
+    {
+      "style": {
+        "personality": "nexus",
+        "emoji": "natural"
+      },
+      "entry": "summary",
+      "before_tokens": 1243,
+      "after_tokens": 1174,
+      "before_bytes": 5079,
+      "after_bytes": 4767
+    },
+    {
+      "style": {
+        "personality": "nexus",
+        "emoji": "natural"
+      },
+      "entry": "compact",
+      "before_tokens": 422,
+      "after_tokens": 422,
+      "before_bytes": 1628,
+      "after_bytes": 1628
+    },
+    {
+      "style": {
+        "personality": "nexus",
+        "emoji": "expressive"
+      },
+      "entry": "chat",
+      "before_tokens": 1114,
+      "after_tokens": 1049,
+      "before_bytes": 4560,
+      "after_bytes": 4270
+    },
+    {
+      "style": {
+        "personality": "nexus",
+        "emoji": "expressive"
+      },
+      "entry": "tools",
+      "before_tokens": 1491,
+      "after_tokens": 1426,
+      "before_bytes": 6080,
+      "after_bytes": 5790
+    },
+    {
+      "style": {
+        "personality": "nexus",
+        "emoji": "expressive"
+      },
+      "entry": "summary",
+      "before_tokens": 1243,
+      "after_tokens": 1179,
+      "before_bytes": 5079,
+      "after_bytes": 4789
+    },
+    {
+      "style": {
+        "personality": "nexus",
+        "emoji": "expressive"
+      },
+      "entry": "compact",
+      "before_tokens": 422,
+      "after_tokens": 422,
+      "before_bytes": 1628,
+      "after_bytes": 1628
+    },
+    {
+      "style": {
+        "personality": "companion",
+        "emoji": "off"
+      },
+      "entry": "chat",
+      "before_tokens": 1114,
+      "after_tokens": 1045,
+      "before_bytes": 4560,
+      "after_bytes": 4251
+    },
+    {
+      "style": {
+        "personality": "companion",
+        "emoji": "off"
+      },
+      "entry": "tools",
+      "before_tokens": 1491,
+      "after_tokens": 1422,
+      "before_bytes": 6080,
+      "after_bytes": 5771
+    },
+    {
+      "style": {
+        "personality": "companion",
+        "emoji": "off"
+      },
+      "entry": "summary",
+      "before_tokens": 1243,
+      "after_tokens": 1175,
+      "before_bytes": 5079,
+      "after_bytes": 4770
+    },
+    {
+      "style": {
+        "personality": "companion",
+        "emoji": "off"
+      },
+      "entry": "compact",
+      "before_tokens": 422,
+      "after_tokens": 422,
+      "before_bytes": 1628,
+      "after_bytes": 1628
+    },
+    {
+      "style": {
+        "personality": "companion",
+        "emoji": "natural"
+      },
+      "entry": "chat",
+      "before_tokens": 1114,
+      "after_tokens": 1048,
+      "before_bytes": 4560,
+      "after_bytes": 4266
+    },
+    {
+      "style": {
+        "personality": "companion",
+        "emoji": "natural"
+      },
+      "entry": "tools",
+      "before_tokens": 1491,
+      "after_tokens": 1425,
+      "before_bytes": 6080,
+      "after_bytes": 5786
+    },
+    {
+      "style": {
+        "personality": "companion",
+        "emoji": "natural"
+      },
+      "entry": "summary",
+      "before_tokens": 1243,
+      "after_tokens": 1178,
+      "before_bytes": 5079,
+      "after_bytes": 4785
+    },
+    {
+      "style": {
+        "personality": "companion",
+        "emoji": "natural"
+      },
+      "entry": "compact",
+      "before_tokens": 422,
+      "after_tokens": 422,
+      "before_bytes": 1628,
+      "after_bytes": 1628
+    },
+    {
+      "style": {
+        "personality": "companion",
+        "emoji": "expressive"
+      },
+      "entry": "chat",
+      "before_tokens": 1114,
+      "after_tokens": 1053,
+      "before_bytes": 4560,
+      "after_bytes": 4288
+    },
+    {
+      "style": {
+        "personality": "companion",
+        "emoji": "expressive"
+      },
+      "entry": "tools",
+      "before_tokens": 1491,
+      "after_tokens": 1430,
+      "before_bytes": 6080,
+      "after_bytes": 5808
+    },
+    {
+      "style": {
+        "personality": "companion",
+        "emoji": "expressive"
+      },
+      "entry": "summary",
+      "before_tokens": 1243,
+      "after_tokens": 1183,
+      "before_bytes": 5079,
+      "after_bytes": 4807
+    },
+    {
+      "style": {
+        "personality": "companion",
+        "emoji": "expressive"
+      },
+      "entry": "compact",
+      "before_tokens": 422,
+      "after_tokens": 422,
+      "before_bytes": 1628,
+      "after_bytes": 1628
+    },
+    {
+      "style": {
+        "personality": "explorer",
+        "emoji": "off"
+      },
+      "entry": "chat",
+      "before_tokens": 1114,
+      "after_tokens": 1044,
+      "before_bytes": 4560,
+      "after_bytes": 4245
+    },
+    {
+      "style": {
+        "personality": "explorer",
+        "emoji": "off"
+      },
+      "entry": "tools",
+      "before_tokens": 1491,
+      "after_tokens": 1421,
+      "before_bytes": 6080,
+      "after_bytes": 5765
+    },
+    {
+      "style": {
+        "personality": "explorer",
+        "emoji": "off"
+      },
+      "entry": "summary",
+      "before_tokens": 1243,
+      "after_tokens": 1173,
+      "before_bytes": 5079,
+      "after_bytes": 4764
+    },
+    {
+      "style": {
+        "personality": "explorer",
+        "emoji": "off"
+      },
+      "entry": "compact",
+      "before_tokens": 422,
+      "after_tokens": 422,
+      "before_bytes": 1628,
+      "after_bytes": 1628
+    },
+    {
+      "style": {
+        "personality": "explorer",
+        "emoji": "natural"
+      },
+      "entry": "chat",
+      "before_tokens": 1114,
+      "after_tokens": 1047,
+      "before_bytes": 4560,
+      "after_bytes": 4260
+    },
+    {
+      "style": {
+        "personality": "explorer",
+        "emoji": "natural"
+      },
+      "entry": "tools",
+      "before_tokens": 1491,
+      "after_tokens": 1424,
+      "before_bytes": 6080,
+      "after_bytes": 5780
+    },
+    {
+      "style": {
+        "personality": "explorer",
+        "emoji": "natural"
+      },
+      "entry": "summary",
+      "before_tokens": 1243,
+      "after_tokens": 1177,
+      "before_bytes": 5079,
+      "after_bytes": 4779
+    },
+    {
+      "style": {
+        "personality": "explorer",
+        "emoji": "natural"
+      },
+      "entry": "compact",
+      "before_tokens": 422,
+      "after_tokens": 422,
+      "before_bytes": 1628,
+      "after_bytes": 1628
+    },
+    {
+      "style": {
+        "personality": "explorer",
+        "emoji": "expressive"
+      },
+      "entry": "chat",
+      "before_tokens": 1114,
+      "after_tokens": 1052,
+      "before_bytes": 4560,
+      "after_bytes": 4282
+    },
+    {
+      "style": {
+        "personality": "explorer",
+        "emoji": "expressive"
+      },
+      "entry": "tools",
+      "before_tokens": 1491,
+      "after_tokens": 1429,
+      "before_bytes": 6080,
+      "after_bytes": 5802
+    },
+    {
+      "style": {
+        "personality": "explorer",
+        "emoji": "expressive"
+      },
+      "entry": "summary",
+      "before_tokens": 1243,
+      "after_tokens": 1182,
+      "before_bytes": 5079,
+      "after_bytes": 4801
+    },
+    {
+      "style": {
+        "personality": "explorer",
+        "emoji": "expressive"
+      },
+      "entry": "compact",
+      "before_tokens": 422,
+      "after_tokens": 422,
+      "before_bytes": 1628,
+      "after_bytes": 1628
+    },
+    {
+      "style": {
+        "personality": "advisor",
+        "emoji": "off"
+      },
+      "entry": "chat",
+      "before_tokens": 1114,
+      "after_tokens": 1047,
+      "before_bytes": 4560,
+      "after_bytes": 4260
+    },
+    {
+      "style": {
+        "personality": "advisor",
+        "emoji": "off"
+      },
+      "entry": "tools",
+      "before_tokens": 1491,
+      "after_tokens": 1424,
+      "before_bytes": 6080,
+      "after_bytes": 5780
+    },
+    {
+      "style": {
+        "personality": "advisor",
+        "emoji": "off"
+      },
+      "entry": "summary",
+      "before_tokens": 1243,
+      "after_tokens": 1177,
+      "before_bytes": 5079,
+      "after_bytes": 4779
+    },
+    {
+      "style": {
+        "personality": "advisor",
+        "emoji": "off"
+      },
+      "entry": "compact",
+      "before_tokens": 422,
+      "after_tokens": 422,
+      "before_bytes": 1628,
+      "after_bytes": 1628
+    },
+    {
+      "style": {
+        "personality": "advisor",
+        "emoji": "natural"
+      },
+      "entry": "chat",
+      "before_tokens": 1114,
+      "after_tokens": 1050,
+      "before_bytes": 4560,
+      "after_bytes": 4275
+    },
+    {
+      "style": {
+        "personality": "advisor",
+        "emoji": "natural"
+      },
+      "entry": "tools",
+      "before_tokens": 1491,
+      "after_tokens": 1427,
+      "before_bytes": 6080,
+      "after_bytes": 5795
+    },
+    {
+      "style": {
+        "personality": "advisor",
+        "emoji": "natural"
+      },
+      "entry": "summary",
+      "before_tokens": 1243,
+      "after_tokens": 1180,
+      "before_bytes": 5079,
+      "after_bytes": 4794
+    },
+    {
+      "style": {
+        "personality": "advisor",
+        "emoji": "natural"
+      },
+      "entry": "compact",
+      "before_tokens": 422,
+      "after_tokens": 422,
+      "before_bytes": 1628,
+      "after_bytes": 1628
+    },
+    {
+      "style": {
+        "personality": "advisor",
+        "emoji": "expressive"
+      },
+      "entry": "chat",
+      "before_tokens": 1114,
+      "after_tokens": 1055,
+      "before_bytes": 4560,
+      "after_bytes": 4297
+    },
+    {
+      "style": {
+        "personality": "advisor",
+        "emoji": "expressive"
+      },
+      "entry": "tools",
+      "before_tokens": 1491,
+      "after_tokens": 1432,
+      "before_bytes": 6080,
+      "after_bytes": 5817
+    },
+    {
+      "style": {
+        "personality": "advisor",
+        "emoji": "expressive"
+      },
+      "entry": "summary",
+      "before_tokens": 1243,
+      "after_tokens": 1185,
+      "before_bytes": 5079,
+      "after_bytes": 4816
+    },
+    {
+      "style": {
+        "personality": "advisor",
+        "emoji": "expressive"
+      },
+      "entry": "compact",
+      "before_tokens": 422,
+      "after_tokens": 422,
+      "before_bytes": 1628,
+      "after_bytes": 1628
+    }
+  ],
+  "verification": {
+    "core_and_browser_regression": {
+      "passed": 165,
+      "seconds": 142.07,
+      "log": "var/personality-settings/core-final.log"
+    },
+    "provider_split_emoji": {
+      "passed": 1,
+      "seconds": 0.41
+    },
+    "android_ui": {
+      "passed": 1,
+      "seconds": 12.677,
+      "surface": "task-owned read-only Android emulator plus isolated actual Core",
+      "log": "var/personality-settings/android-ui-test.log"
+    },
+    "android_build": "offline debug, unit tests and lint passed; final error-message refinement rebuilt",
+    "lint": {
+      "errors": 0,
+      "warnings": 23,
+      "hints": 1
+    },
+    "limitations": [
+      "No real provider calls or natural-language personality quality evaluation",
+      "No production deployment, desktop installation or real phone installation"
+    ]
+  },
+  "screenshots": {
+    "personality-settings-web.png": "7a4b233ce1e97c8019e2e2e6a6ffa76621099f7d7980c3ae404f7ab7d2557d2f",
+    "personality-settings-android.png": "0e7cb2367f76eba20fda0c4da854f24101aaca60f178536421034626b91c244c"
+  }
+}

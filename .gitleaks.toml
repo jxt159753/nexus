@@ -1,0 +1,11 @@
+title = "NEXUS credential scan"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Published resource SHA-256 values, not credentials"
+condition = "AND"
+paths = ['''(^|/)docs/assets/(visualization-deployment|unlimited-usage|conversation-routing|conversation-list)-evidence\.json$''']
+regexTarget = "line"
+regexes = ['''^\s*"(?:binaries/voice-models/kws/tokens\.txt|(?:src/)?nexus/web/app/api\.js|apps/windows/ui/api\.js|api\.js)": "[a-f0-9]{64}",?\s*$''']

@@ -1,0 +1,75 @@
+{
+  "task": "P95 conversational Android enrollment",
+  "date": "2026-10-25",
+  "status": "deployed; physical Android device and user acceptance pending",
+  "runtime": {
+    "release": "/opt/nexus/releases/device-enrollment-20261025-66437f19",
+    "sha256": "66437f19b6c6f045f47c48361cefc81cc8bf9133717389a13aafdb20b1179b9b",
+    "schema": 39,
+    "resources": 297,
+    "single_active_pid": 4191873,
+    "paused": 0
+  },
+  "apk": {
+    "filename": "NEXUS-Android-0.1.8-debug.apk",
+    "bytes": 12179628,
+    "sha256": "e67293d4f2befe52fb19cc557d6e3910bb8b6c5f32e5724431a492d7ed6e457e"
+  },
+  "backup": {
+    "path": "/var/backups/nexus/before-device-enrollment-20261025T083141Z",
+    "sha256": "764b3f7cb6c4ba84f3db071201440d5326b0b1c32bde82192131fc04a31fb0e7",
+    "historical_tables_preserved": 42,
+    "tasks": 137,
+    "attempts": 130,
+    "turns": 140,
+    "model_calls": 338
+  },
+  "verification": {
+    "windows_source_regression": 112,
+    "prior_fixed_candidate": 134,
+    "rebased_windows_regression": 154,
+    "final_command_regression": 11,
+    "linux_passed": 177,
+    "linux_skipped": 8,
+    "android_build": "protocol tests, app unit tests, debug build, instrumentation build and lint passed; lint 0 errors, 6 warnings, 1 hint",
+    "android_integration": "final fixed APK + Core: registration, automatic Node connection, device task succeeded, file target authorized, rename, note, permission disable and repeated registration passed",
+    "apk_https_sha256_matched": true,
+    "owner_csrf_and_proof_guards": true,
+    "paid_model_calls_added": 0,
+    "linux_skip_reasons": [
+      "Windows COM apartments",
+      "real Windows Job Object worker",
+      "real Windows Job and subprocess cleanup"
+    ]
+  },
+  "boundaries": [
+    "Node secrets remain native encrypted storage; only hashes in Core",
+    "owner grants are limited to the selected node",
+    "OS notification and microphone permissions remain explicit",
+    "fresh enrollment tested on emulator only; no real-phone installation"
+  ],
+  "baseline_preserved": "P96 conversation routing d5355f63 plus latest MCP timeout fix",
+  "intermediate_failures": [
+    "initial fixture audit subject foreign key and duplicate shared lock corrected",
+    "test runner return type corrected",
+    "Linux test bundle pytest entry omission corrected; no production switch",
+    "deployment baseline changed during preparation; rebase performed before publication",
+    "emulator System UI ANR obscured first screenshots; system dialog dismissed and UI rechecked",
+    "final control-target check initially placed in status query; corrected and 11 tests passed"
+  ],
+  "server_cleanup": {
+    "validated_archive": {
+      "sha256": "fb75615138aac212a57422eb27421bf8138512e2935d0324a85871aca2f818e4",
+      "bytes": 24689269
+    },
+    "current_stage_removed": {
+      "temporary_server_materials_removed": true,
+      "runtime_rollback_backups_retained": true
+    },
+    "abandoned_candidate": {
+      "abandoned_candidate_removed": true,
+      "local_archive_verified": true,
+      "live_and_recovery_retained": true
+    }
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "status": "deployed_technical_checks_passed_user_acceptance_pending",
+  "core": {
+    "release": "android-emulator-20261026-859477f5",
+    "wheel_sha256": "859477f59466f102eff9d665f04d4150dfd93bda22a3c4281f8a6c74316cc7a6",
+    "schema": 43,
+    "single_active": true,
+    "history_preserved": true
+  },
+  "windows": {
+    "version": "0.1.28",
+    "download": {
+      "filename": "NEXUS_0.1.28_x64-setup.exe",
+      "sha256": "c88acf6c58b5172c99d7abae2f47bd0b6c3c3bd52d75737608d2671493f25e62",
+      "bytes": 117289328,
+      "https_verified": true
+    },
+    "configuration_and_databases_preserved": true,
+    "native_ui": {
+      "version": "0.1.28",
+      "real_status": true,
+      "real_screen": true,
+      "real_home_action": true,
+      "errors": []
+    },
+    "normal_node_stop": {
+      "version": "0.1.28",
+      "node_stopped": true,
+      "seconds": 6.158
+    },
+    "debug_port_closed": true
+  },
+  "runtime": {
+    "emulator": "36.6.11",
+    "android_api": 35,
+    "image_revision": "9",
+    "abi": "x86_64",
+    "memory_mb": 4096,
+    "cpu_cores": 4,
+    "adb_loopback_only": true,
+    "physical_devices_accessed": false
+  },
+  "tests": {
+    "windows_passed": 32,
+    "linux_passed": 29,
+    "linux_windows_only_skipped": 3,
+    "rust_node_tests_passed": 3,
+    "source_emulator_integration": {
+      "real_click": true,
+      "unicode_input": true,
+      "userdata_and_installed_app_survived_restart": true,
+      "graceful_shutdown": true
+    },
+    "frozen_emulator_ready": true,
+    "data_after_upgrade": {
+      "phase": "upgrade",
+      "data_bytes_preserved": true,
+      "sha256": "0a4d174cbfa5693952ffe60db346652c180bb9454ef87cac834d87c66e267acd",
+      "installed_apps_preserved": [
+        "com.tencent.mm",
+        "com.ss.android.ugc.aweme.mobile",
+        "com.max.xiaoheihe"
+      ],
+      "accounts_created": false
+    },
+    "data_after_node_restart": {
+      "phase": "node-restart",
+      "data_bytes_preserved": true,
+      "sha256": "0a4d174cbfa5693952ffe60db346652c180bb9454ef87cac834d87c66e267acd",
+      "installed_apps_preserved": [
+        "com.tencent.mm",
+        "com.ss.android.ugc.aweme.mobile",
+        "com.max.xiaoheihe"
+      ],
+      "accounts_created": false
+    }
+  },
+  "apps": [
+    {
+      "package": "com.tencent.mm",
+      "foreground": "com.google.android.apps.nexuslauncher",
+      "matches": false,
+      "accounts_created": false,
+      "account_login": "not_tested"
+    },
+    {
+      "package": "com.ss.android.ugc.aweme.mobile",
+      "foreground": "com.ss.android.ugc.aweme.mobile",
+      "matches": true,
+      "accounts_created": false,
+      "account_login": "not_tested"
+    },
+    {
+      "package": "com.max.xiaoheihe",
+      "foreground": "com.max.xiaoheihe",
+      "matches": true,
+      "accounts_created": false,
+      "account_login": "not_tested"
+    }
+  ],
+  "limitations": [
+    "微信8.0.79在当前镜像启动后崩溃；隔离环境原生退出栈涉及libndk_translation/libowl。",
+    "抖音、小黑盒仅验证至首次协议页面，未接受协议、注册或登录账号。",
+    "登录状态的持续有效性及第三方业务流程尚未验收。"
+  ],
+  "cleanup": {
+    "temporary_server_validation_archived_locally": true,
+    "intermediate_installers_archived_locally": true
+  },
+  "final_service": {
+    "paused": false,
+    "online_nodes": 2,
+    "verification_model_calls_added": 0
+  }
+}

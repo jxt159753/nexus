@@ -1,3 +1,11 @@
+from nexus.contracts.android_screen import AndroidScreenObserveArguments, AndroidScreenActArguments, AndroidScreenResult, AndroidScreenObserveCall, AndroidScreenActCall
+from nexus.contracts.android_control import (
+    AndroidUIObserveArguments,
+    AndroidUIActArguments,
+    AndroidFilesArguments,
+    AndroidFilePreviewArguments,
+    AndroidFileWriteArguments,
+)
 from nexus.contracts.host_access import HostAccess
 from nexus.contracts.file_transfer import FileReceiveArguments
 from nexus.plugins.contracts import PluginNodeArguments
@@ -131,7 +139,43 @@ class FileReceiveRequest(TaskMetadata):
     arguments: FileReceiveArguments
 
 
+class AndroidScreenObserveRequest(TaskMetadata):
+    intent: Literal["android_screen_observe"]
+    arguments: AndroidScreenObserveArguments
+
+
+class AndroidScreenActRequest(TaskMetadata):
+    intent: Literal["android_screen_act"]
+    arguments: AndroidScreenActArguments
+
+
+class AndroidUIObserveRequest(TaskMetadata):
+    intent: Literal["android_ui_observe"]
+    arguments: AndroidUIObserveArguments
+
+
+class AndroidUIActRequest(TaskMetadata):
+    intent: Literal["android_ui_act"]
+    arguments: AndroidUIActArguments
+
+
+class AndroidFilesRequest(TaskMetadata):
+    intent: Literal["android_files"]
+    arguments: AndroidFilesArguments
+
+
+class AndroidFilePreviewRequest(TaskMetadata):
+    intent: Literal["android_file_preview"]
+    arguments: AndroidFilePreviewArguments
+
+
+class AndroidFileWriteRequest(TaskMetadata):
+    intent: Literal["android_file_write"]
+    arguments: AndroidFileWriteArguments
+
+
 TaskRequest = Annotated[
+    AndroidScreenObserveRequest | AndroidScreenActRequest | AndroidUIObserveRequest | AndroidUIActRequest | AndroidFilesRequest | AndroidFilePreviewRequest | AndroidFileWriteRequest |
     SystemInfoRequest | ListDirectoryRequest | FileReadRequest | FileSearchRequest | FilePreviewRequest | FileWriteRequest | CommandRunRequest | FileLinesRequest | FileGlobRequest | FileGrepRequest | FileEditPreviewRequest | FileEditRequest | ObserveRequest | InteractRequest | ImageReadRequest | PluginNodeRequest | AndroidDeviceStatusRequest | AndroidNotificationDigestRequest | FileReceiveRequest,
     Field(discriminator="intent"),
 ]

@@ -8,8 +8,12 @@
 
 | 文档 | 能解决什么问题 |
 | --- | --- |
+| [Windows 游戏模式](game-mode.md) | 会话／自动／手动控制、暂停摄像头语音虚拟手机、静默提醒与恢复规则 |
+| [定时工作与跨设备提醒](continuous-reminders.md) | 持续到停止、任务控制、红魔后台设置、接收权限和提醒记录 |
 | [向设备发送文件](file-transfers.md) | 文件上传、选择 Node、收件箱、送达校验、权限和恢复 |
 | [聊天使用说明](m3-chat.md) | 多轮聊天、停止回复、工具确认、结果回传、历史和费用 |
+| [人格与表达](assistant-personality.md) | 可选人格、Emoji偏好、跨端保存与Core接口 |
+| [对话检索与会话路由](conversation-routing.md) | 查昨天/今天的工作、项目进度、来源卡片、会话跳转和草稿 |
 | [聊天中的多步流程](m5-chat-skills.md) | 可用流程目录、参数与计划确认、步骤审批/取消及结果解读 |
 | [项目、可控记忆与基础工具](m6-projects-tools.md) | 项目会话与待办、记忆保存/逐轮外发、受限文件读写/查找和固定命令 |
 | [自动长期记忆与 DSH 接入](automatic-memory.md) | 持续保存/使用同意、自动记忆范围、控制接口及前端接入要求 |
@@ -17,6 +21,8 @@
 | [DSH 图片与查询工具](dsh-builtin-tools.md) | 图片读取配置、时间和任务查询、Skill 说明及有界结果 |
 | [聊天附件](chat-attachments.md) | 任意文件上传、图片/文本预览、原件下载和逐轮外发同意 |
 | [原生插件与权限](plugins.md) | 普通/完全模式、会话覆盖、宿主终端、自写插件测试/启用与接口 |
+| [NEXUS 虚拟手机](android-emulator.md) | 本机独立安卓环境、应用与登录保留、画面操作和兼容性 |
+| [可视化插件与本地手势](ui-extensions.md) | 统一列表与版本/启停历史、会话授权、自主开发/验证/升级、失败回退及本地识别 |
 | [目标验收与持续运行](autonomy.md) | 依赖计划、证据、事件订阅、独立业务测试、归档健康接口及 DSH 工作单 |
 | [Skill Shell 与受控 MCP](skill-mcp.md) | 原生步骤、MCP 登记/发现/重载/调用、权限与兼容限制 |
 | [聊天工作与网页工具](chat-work.md) | 工作区默认读写、有限工具循环、DeepSeek 搜索/抓取、来源及费用 |
@@ -25,6 +31,7 @@
 | [自定义工具与流程](m4-usage.md) | 创建、测试、批准、启用、使用和停用能力；使用前先核对路线图中的限制 |
 | [部署、远程连接与恢复](s7-deployment.md) | 首次配置、可信加密连接、升级、备份及恢复 |
 | [Android App / Node 接入](../apps/android/README.md) | 构建、身份与资源配置、通知范围、Core 实时语音及联调方式 |
+| [手机操作与文件](android-node-control.md) | 无障碍点击／输入、授权目录、文本读写、预览备份及执行证据 |
 
 旧使用文档保留 S6、S7 等文件名，避免破坏已有链接。S 表示当时的开发子阶段，不是软件版本号；其中 M1 的零模型、单步、两个只读工具和逐次目录审批只适用于相应历史入口。当前工作区默认权限和有界工具循环先看[聊天工作](chat-work.md)，各能力是否上线仍查路线图。
 
@@ -47,6 +54,9 @@
 | 文档 | 内容 |
 | --- | --- |
 | [开发规范](../AGENTS.md) | 必读材料、授权范围、质量和交付要求 |
+| [参与开发](../CONTRIBUTING.md) | 环境准备、提交方式与相关验证 |
+| [公开仓库准备](public-repository.md) | 当前文件、历史、展示材料与发布检查 |
+| [安全报告](../SECURITY.md) / [第三方声明](../THIRD_PARTY_NOTICES.md) | 私密问题反馈与资源许可 |
 | [架构设计](ARCHITECTURE.md) | 中心服务与设备的分工、任务状态、权限、恢复、模型与扩展设计 |
 | [自迭代架构方案](ARCHITECTURE.md#self-iteration-design) | 范围预授权、可信隔离、独立评测、固定版本发布与数据兼容回退 |
 | [实时语音](realtime-voice.md) | Windows 按钮/唤醒、流式播报、打断/停止、Core 接口与独立主动权限 |
@@ -95,6 +105,8 @@ Core、Node、Tool、Skill 等词的解释见 [架构文档的名词说明](ARCH
 | Skill Shell 与受控 MCP P65 | [真实 Shell、stdio/HTTP/SSE、权限、独立 Core/Node 与重启证据](SKILL-MCP-VERIFICATION.md) |
 | 原生插件前端/权限/Windows 桥（本地） | [界面、会话覆盖、插件生命周期、工具卡、390px/键盘与安装版验证](PLUGINS-FRONTEND-VERIFICATION.md) |
 | P63 本地语音唤醒 | [手动开启、待机隐私、安装更新及延期真人验证](assets/voice-wake-evidence.json) |
+| P98 常驻语音唤醒 | [默认开启、设置关闭、原生续接和发布验证](assets/voice-resident-evidence.json) |
+| P103 语音输出减量 | [结果／确认／错误播报、实质进展和Token估算验证](assets/voice-output-evidence.json) |
 | P63 Windows语音补齐 | [部署、安装包、真人确认、测试层级与未验矩阵](assets/voice-completion-evidence.json) |
 | P63 实时语音合成音冒烟（非验收） | [百炼 TTS/ASR/Core 媒体代理时延与限制](assets/voice-bailian-smoke.json) |
 | P63 真实麦克风 ASR 冒烟（录音回放，非真人实时） | [Realtek 麦克风阵列采集 + Fun-ASR 时延](assets/voice-mic-human-smoke.json) |
@@ -147,6 +159,4 @@ DSH GitHub 架构/Harness 对照、上下文投影、工具清单与按需能力
 
 - [DSH 上下文压缩验证](CONTEXT-COMPACTION-VERIFICATION.md)：固定版本、测试、上线与限制。
 
-- [Windows 常驻语音唤醒验证](assets/voice-resident-evidence.json)
-
-- [语音内容选择与中间说明减量](assets/voice-output-evidence.json)
+- [full 模式宿主目录访问](decisions/0046-full-mode-host-roots.md)：full 的文件/插件访问根、normal 原边界及旧回执兼容；状态见路线图 P91。

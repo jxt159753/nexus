@@ -1,0 +1,150 @@
+{
+  "task": "P101 personality and Emoji settings",
+  "time": "2026-10-26 11:27 Asia/Shanghai",
+  "status": "deployed; technical checks complete; user acceptance pending",
+  "core": {
+    "release": "/opt/nexus/releases/personality-20261026-ce9e9e2c",
+    "wheel_sha256": "ce9e9e2ceaf4e5bdb5b2bf9fae62e13bd664133993dfdfee08302c91efa13d9d",
+    "schema": 41,
+    "backup": "/var/backups/nexus/before-personality-20261026T032730Z",
+    "backup_sha256": "61599e06a3ba7eedd741f67db506f467c184be147e1474e244e03af7c16a9ac6",
+    "runtime_resources_checked": 305
+  },
+  "retained_releases": [
+    "P100 unified prompt",
+    "P102 chat collapse",
+    "P103 voice output"
+  ],
+  "single_core": {
+    "main_pid": 298579,
+    "single_core": true,
+    "call_limits_enabled": false,
+    "cost_limits_enabled": false
+  },
+  "history": {
+    "initial_migration_tables": 52,
+    "final_release_tables": 53,
+    "preserved": true,
+    "rows": {
+      "tasks": 236,
+      "task_attempts": 229,
+      "conversations": 94,
+      "chat_turns": 163,
+      "model_calls": 456,
+      "identities": 5,
+      "grants": 37
+    },
+    "new_model_calls": 0,
+    "configuration_preserved": true,
+    "new_grants": 0
+  },
+  "windows": {
+    "version": "0.1.24",
+    "databases": {
+      "node\\plugins.sqlite3": {
+        "preserved": true,
+        "tables": 4
+      },
+      "node\\receipts.sqlite3": {
+        "preserved": true,
+        "tables": 5
+      },
+      "node-manual\\receipts.sqlite3": {
+        "preserved": true,
+        "tables": 4
+      }
+    },
+    "configuration_preserved": true,
+    "installed_hashes": {
+      "nexus-windows.exe": "0c9f66054c7d7cc7f39fb2ad7bfdf254d728a5347371f6c1c424028f5bad07f0",
+      "binaries/nexus-node.exe": "df5545e64b0dd852199807bab2456754cd9c7b23407ffa41f056daef87dea93f",
+      "binaries/nexus-voice.exe": "5c13916a66bd1dafbc02c5ce6aec4996cdd93436511b8a44d38906919dbb6879"
+    },
+    "nsis_bundle_marker_verified": true,
+    "normal_restart": true,
+    "debug_port_closed": true,
+    "pids": [
+      59312
+    ],
+    "native_ui": {
+      "version": "0.1.24",
+      "installed_webview": true,
+      "preview_emoji": true,
+      "saved_and_reopened": true,
+      "original_preferences_restored": true,
+      "ready": true,
+      "online_nodes": 2,
+      "voice": {
+        "running": true,
+        "resident_enabled": true,
+        "state": "standby"
+      },
+      "resources": {
+        "render.js": "1484b9ca37819a18df0d4f7f4393fbd90abb006b331457532a0a75d9d4677ac9",
+        "personality.js": "9c993ab16bba3a7ab53dce4063e1df1ad00febcf83954c463ec7c6502b34e762",
+        "app.css": "ce47ebe950842e52387cbb6b3fd9743c1ac2a170f22794f9acefdae898d69e48"
+      },
+      "pageErrors": []
+    }
+  },
+  "android": {
+    "version": "0.1.11",
+    "version_code": 12,
+    "instrumentation_passed": 1,
+    "duration_seconds": 13.024,
+    "same_signing_certificate_as_0_1_10": true,
+    "lint": {
+      "errors": 0,
+      "warnings": 18,
+      "hints": 1
+    },
+    "real_phone_installed": false
+  },
+  "checks": {
+    "fixed_windows_backend_passed": 261,
+    "fixed_linux_backend_passed": 260,
+    "fixed_linux_platform_skipped": 1,
+    "final_web_only_package_api_smoke_passed": 17,
+    "web_windows_refresh_draft_and_pending_save": true,
+    "widths": [
+      390,
+      1280
+    ],
+    "personality_emoji_combinations": 12,
+    "model_provider_calls": 0
+  },
+  "public": {
+    "downloads": [
+      {
+        "filename": "NEXUS_0.1.24_x64-setup.exe",
+        "sha256": "a6e37a66e6766662f072a4a423abfc1c9a072e28217b18af8f27fb9c288a3932",
+        "bytes": 116498909,
+        "https_verified": true
+      },
+      {
+        "filename": "NEXUS-Android-0.1.11-debug.apk",
+        "sha256": "87d819a3bef10c1349a0021107d791d3573d34bd22f1f5851d2c4d055471f27f",
+        "bytes": 12229051,
+        "https_verified": true
+      }
+    ],
+    "web_resources_verified": true
+  },
+  "cleanup": {
+    "archive": "E:\\NEXUS\\var\\personality-release\\personality-validation-ce9e9e2c.tar.gz",
+    "sha256": "a6c3c90929ede8488d92ac0278e6767e3beff6f23e7507d4a69df7c84e157caf",
+    "bytes": 103971334,
+    "temporary_server_data_removed": true
+  },
+  "preferences_restored": {
+    "personality": "nexus",
+    "emoji": "natural",
+    "revision": 2
+  },
+  "final_online_nodes": 2,
+  "limitations": [
+    "No real phone installation",
+    "No paid model expression-quality validation",
+    "Static examples do not prove model style quality"
+  ]
+}

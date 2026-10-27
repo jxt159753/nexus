@@ -9,13 +9,13 @@ from pydantic import Field, StrictBool, StrictInt, StrictStr, model_validator
 
 from nexus.contracts.base import CommandDigest, StrictContract
 
-ToolName = Literal["system.info", "filesystem.list", "filesystem.read", "filesystem.search", "filesystem.write_preview", "filesystem.write", "command.run", "filesystem.read_lines", "filesystem.glob", "filesystem.grep", "filesystem.edit_preview", "filesystem.edit", "interaction.observe", "interaction.act", "filesystem.read_image", "plugin.call", "android.device_status", "android.notification_digest", "filesystem.receive"]
-ToolKey = Literal["system.info@1", "filesystem.list@1", "filesystem.read@1", "filesystem.search@1", "filesystem.write_preview@1", "filesystem.write@1", "command.run@1", "filesystem.read_lines@1", "filesystem.glob@1", "filesystem.grep@1", "filesystem.edit_preview@1", "filesystem.edit@1", "interaction.observe@1", "interaction.act@1", "filesystem.read_image@1", "plugin.call@1", "android.device_status@1", "android.notification_digest@1", "filesystem.receive@1"]
-ResourceId = Literal["workspace", "android:device", "android:notifications"]
+ToolName = Literal["system.info", "filesystem.list", "filesystem.read", "filesystem.search", "filesystem.write_preview", "filesystem.write", "command.run", "filesystem.read_lines", "filesystem.glob", "filesystem.grep", "filesystem.edit_preview", "filesystem.edit", "interaction.observe", "interaction.act", "filesystem.read_image", "plugin.call", "android.device_status", "android.notification_digest", "filesystem.receive", "android.ui_observe", "android.ui_act", "android.screen_observe", "android.screen_act", "android.files", "android.file_preview", "android.file_write"]
+ToolKey = Literal["system.info@1", "filesystem.list@1", "filesystem.read@1", "filesystem.search@1", "filesystem.write_preview@1", "filesystem.write@1", "command.run@1", "filesystem.read_lines@1", "filesystem.glob@1", "filesystem.grep@1", "filesystem.edit_preview@1", "filesystem.edit@1", "interaction.observe@1", "interaction.act@1", "filesystem.read_image@1", "plugin.call@1", "android.device_status@1", "android.notification_digest@1", "filesystem.receive@1", "android.ui_observe@1", "android.ui_act@1", "android.screen_observe@1", "android.screen_act@1", "android.files@1", "android.file_preview@1", "android.file_write@1"]
+ResourceId = Literal["workspace", "android:device", "android:notifications", "android:ui", "android:files"]
 TOOL_RESOURCE = {name: "workspace" for name in get_args(ToolName)}
-TOOL_RESOURCE.update({"system.info": "", "android.device_status": "android:device", "android.notification_digest": "android:notifications"})
+TOOL_RESOURCE.update({"system.info": "", "android.device_status": "android:device", "android.notification_digest": "android:notifications", "android.ui_observe": "android:ui", "android.ui_act": "android:ui", "android.screen_observe": "android:ui", "android.screen_act": "android:ui", "android.files": "android:files", "android.file_preview": "android:files", "android.file_write": "android:files"})
 
-MUTATING_TOOLS = frozenset({"filesystem.receive", "filesystem.write", "filesystem.edit", "command.run", "interaction.act", "plugin.call"})
+MUTATING_TOOLS = frozenset({"android.ui_act", "android.screen_act", "android.file_write", "filesystem.receive", "filesystem.write", "filesystem.edit", "command.run", "interaction.act", "plugin.call"})
 CommandId = Annotated[StrictStr, Field(pattern=r"^[a-z][a-z0-9_-]{0,39}$")]
 
 

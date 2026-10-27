@@ -1,0 +1,131 @@
+{
+  "date": "2026-10-26",
+  "status": "deployed; RedMagic user acceptance pending",
+  "scope": "on-demand Android screenshots sent to existing DeepSeek with explicit consent; bound tap/long_press/swipe",
+  "core": {
+    "release": "/opt/nexus/releases/android-vision-20261026-205a177e",
+    "wheel_sha256": "205a177eaae4cc067e8a62071e3b8c44e47db39f47091f4b84282e8b277a1a3d",
+    "resources": 309,
+    "schema": 43,
+    "single_active": true,
+    "paused": false,
+    "backup": "/var/backups/nexus/before-android-vision-20261026T093745Z",
+    "backup_sha256": "5a6aee4e91d668b2536e387d7e30b7fd7cf12f3655dbbc08c78ca1dffca35111",
+    "historical_tables_preserved": 53,
+    "preserved_counts": {
+      "tasks": 333,
+      "task_attempts": 325,
+      "conversations": 103,
+      "chat_turns": 188,
+      "model_calls": 585,
+      "identities": 5,
+      "grants": 47
+    },
+    "new_grants": 0,
+    "chat_images_enabled": true,
+    "latest_conversation_list_release_preserved": true
+  },
+  "android": {
+    "unit_tests": 14,
+    "lint": {
+      "Warning": 21,
+      "Hint": 1
+    },
+    "apk": {
+      "filename": "NEXUS-Android-0.1.14-debug.apk",
+      "sha256": "6fa17be10c1d0c34629080ba7acff8290e881e2615a4e143812c62db3cebc101",
+      "bytes": 12295956
+    },
+    "version": "0.1.14",
+    "version_code": 15,
+    "previous_version": "0.1.13",
+    "certificate_sha256": "4aae1191da4be22ca8b49c65e770426763db177df293672aa830b37ca76486cd",
+    "private_files_preserved": 9,
+    "real_phone_installed": false
+  },
+  "validation": {
+    "windows_fixed": {
+      "passed": 133,
+      "skipped": 1,
+      "seconds": 49.08,
+      "skip": "existing Edge browser fixture not selected in fixed-package pytest"
+    },
+    "linux_fixed": {
+      "passed": 131,
+      "skipped": 3,
+      "seconds": 78.72,
+      "skips": "2 Windows-specific tests plus existing Edge browser fixture"
+    },
+    "android_instrumentation": {
+      "passed": 5,
+      "seconds": 407.037,
+      "device": "isolated API37.2 x86_64 16KiB emulator",
+      "verified": [
+        "real Core/Node transport",
+        "canvas-only target tap/long_press/swipe",
+        "cropped coordinate mapping",
+        "unrelated refresh accepted",
+        "target/window changes refused",
+        "self permission UI protected",
+        "local permission revocation",
+        "previous UI/SAF behavior and durable receipts"
+      ]
+    },
+    "real_provider": {
+      "started_at": "2026-10-26T09:34:12.570426+00:00",
+      "image_sha256": "8f38b1743832dc83918559ce997ba8625229bd4c7292f9d51e99f7b6be7638ba",
+      "synthetic_emulator_only": true,
+      "request_sha256": "45ddbd9418792473510b32af15ac5f8ab253abdd0dcd906ab10dc8aabbd5dd90",
+      "calls": 1,
+      "outcome": "completed",
+      "no_device_commands": true,
+      "model": "deepseek-flash",
+      "input_tokens": 1385,
+      "output_tokens": 22,
+      "content": "{\"tap\":[318,250],\"long_press\":[318,540],\"swipe\":[318,850]}",
+      "complete": true,
+      "estimated_cost_microunits": 442,
+      "finished_at": "2026-10-26T09:34:14.384697+00:00",
+      "coordinates_within_visible_targets": true
+    },
+    "public": {
+      "downloads": [
+        {
+          "filename": "NEXUS-Android-0.1.14-debug.apk",
+          "sha256": "6fa17be10c1d0c34629080ba7acff8290e881e2615a4e143812c62db3cebc101",
+          "bytes": 12295956,
+          "https_verified": true
+        }
+      ],
+      "existing_web_resources_preserved": true
+    }
+  },
+  "limitations": [
+    "No RedMagic or WeChat end-to-end acceptance yet",
+    "Synthetic-image model identification and actual gesture tests verified separately",
+    "One direct development provider check recorded in local model-smoke.json; production model ledger stayed at 585",
+    "Screenshots require manual local/system authorization and a separate Core vision grant; upgrades grant nothing"
+  ],
+  "corrections": [
+    "Initial SDK lint guards corrected before fixed build",
+    "Independent ADB connection resolved emulator authorization mismatch",
+    "Initial provider checks stopped before external call because images were disabled",
+    "Release guard prevented overwriting concurrently deployed conversation-list fix",
+    "Quoted TOML models header handled before candidate configuration was accepted"
+  ],
+  "local_evidence": "var/android-vision",
+  "cleanup": {
+    "cleanup-evidence.json": {
+      "archive": "E:\\NEXUS\\var\\android-vision\\android-vision-validation-205a177e.tar.gz",
+      "sha256": "562f85efba7baecf4491ce0de381e980539cb27a4b98073326db541211b14334",
+      "bytes": 46712376,
+      "temporary_server_data_removed": true
+    },
+    "cleanup-unused.json": {
+      "sha256": "3e58afac8a58b95b1fc2d1442a15533a6e326a85b15c2773697c0c90e155ef9e",
+      "bytes": 75450120,
+      "local_archive": "E:\\NEXUS\\var\\android-vision\\android-vision-unused-f997343f.tar.gz",
+      "unused_candidate_removed": true
+    }
+  }
+}

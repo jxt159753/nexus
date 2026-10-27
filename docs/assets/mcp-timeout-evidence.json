@@ -1,0 +1,120 @@
+{
+  "status": "deployed; browser verification deferred at user request",
+  "version": "0.1.17",
+  "scope": "MCP timeout and known failure propagation only; P93 retained",
+  "changed": [
+    "nexus/contracts/messages.py",
+    "nexus/core/config.py",
+    "nexus/node/config.py",
+    "nexus/node/link.py",
+    "nexus/node/runtime.py",
+    "nexus/core/harness/service.py",
+    "nexus/core/storage/execution.py"
+  ],
+  "wheel_sha256": "effef57e0194aa65020387406558c2fd9a332e9ff9f65631fbb0a24556f88268",
+  "node_sha256": "6f8c63e80273ba92b880df72468c838c8a3f64a3fe939dc32c14da15a768a116",
+  "downloads": [
+    {
+      "filename": "NEXUS_0.1.17_x64-setup.exe",
+      "bytes": 116431677,
+      "sha256": "e710fe7b885bc843ae6c7660d002c9a283026663a6a345f9e980be4d696c36e0"
+    }
+  ],
+  "runtime_resources": 292,
+  "frozen_modules_from_candidate": 63,
+  "release": "/opt/nexus/releases/mcp-timeout-20261025-effef57e",
+  "backup": "/var/backups/nexus/before-mcp-timeout-20261025T075344Z",
+  "backup_sha256": "cd61d55f235c8b18d92c038fecdcf478cf57156489f7c2f18614b212a6287f29",
+  "preserved_history_tables": 42,
+  "schema": 38,
+  "single_core": true,
+  "paused": false,
+  "permission_defaults": [
+    "full",
+    2
+  ],
+  "calls_total": 338,
+  "unknown_costs": 6,
+  "desktop": {
+    "version": "0.1.17",
+    "databases": {
+      "node\\plugins.sqlite3": {
+        "preserved": true,
+        "tables": 4
+      },
+      "node\\receipts.sqlite3": {
+        "preserved": true,
+        "tables": 5
+      },
+      "node-manual\\receipts.sqlite3": {
+        "preserved": true,
+        "tables": 4
+      }
+    },
+    "configuration_preserved": true,
+    "installed_hashes": {
+      "nexus-windows.exe": "a0f4e2179454d4c6b8fa3f914e119c5708b80e263620b9a13011978580918560",
+      "binaries/nexus-node.exe": "6f8c63e80273ba92b880df72468c838c8a3f64a3fe939dc32c14da15a768a116",
+      "binaries/nexus-voice.exe": "5c13916a66bd1dafbc02c5ce6aec4996cdd93436511b8a44d38906919dbb6879"
+    },
+    "nsis_bundle_marker_verified": true
+  },
+  "tests": {
+    "windows-tests.xml": {
+      "tests": "353",
+      "failures": "2",
+      "errors": "0",
+      "skipped": "0",
+      "time": "180.918"
+    },
+    "windows-recheck.xml": {
+      "tests": "26",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "9.583"
+    },
+    "frozen-tests.xml": {
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "57.137"
+    },
+    "linux": {
+      "passed": 281,
+      "skipped": 5
+    }
+  },
+  "real_model": {
+    "calls": 5,
+    "cost_microunits": 19389,
+    "cost_status": "calculated"
+  },
+  "mcp_receipts": [
+    {
+      "attempt_id": "165ee300-465f-4f5f-bec9-9da65e34fc0d",
+      "task_id": "ea886d0e-de66-45f0-bdd7-77908a9160f2",
+      "phase": "completed",
+      "execution_stopped": 1,
+      "acknowledged": 1,
+      "timeout": 60,
+      "mcp_tool": "Snapshot"
+    },
+    {
+      "attempt_id": "4d9350ab-cb79-4801-908e-f6a7f74d86f3",
+      "task_id": "f9a35e1f-2e2d-40e9-a6c8-25376d2fb120",
+      "phase": "completed",
+      "execution_stopped": 1,
+      "acknowledged": 1,
+      "timeout": 60,
+      "mcp_tool": "Wait"
+    }
+  ],
+  "browser_opened": false,
+  "reason": "USER_CONTROL; user confirmed still using computer and requested verification later",
+  "temporary_materials_archived_and_cleaned": {
+    "temporary_server_materials_removed": true,
+    "runtime_rollback_backups_retained": true
+  }
+}

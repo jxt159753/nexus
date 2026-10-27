@@ -76,6 +76,8 @@ S7 不改变信封、工具版本、摘要或消息字段。现有 Core 入口�
 - task.updated 的状态沿用架构状态集合。succeeded 必须有 result、execution_outcome=known 和 verification=node_report_schema_checked；result 和 error 不可同时存在。这只验证数据形状，不代替 P07 对真实归属、授权及证据的检查。
 - node.hello 的 tools 只接受当前严格 ToolName/版本集合，按 NodeHello 契约限制数量并拒绝重复，不再固定为两个；roots 最多包含 workspace。固定命令另校验同名模板摘要；空能力列表不授予权限，node_version 最多 50 字符。本地新增契约的发布状态另见路线图，不能只凭节点自报启用。
 - node.welcome 的心跳间隔为 1–10 秒、超时为 1–30 秒且大于间隔。limits 包含 max_message_bytes≤65536、max_result_bytes≤32768、execution_timeout_seconds≤10、max_concurrent_attempts=1；所有数值为正严格整数，结果字节限额必须小于消息限额。运行期收紧限额仍由 P05/P06 接入并执行。
+- `node.hello.mcp_execution_timeout_seconds` 为可选严格整数 1–60，缺省 10，表示本地 MCP 执行上限。新版 Node 从本地同名配置声明（默认60）；Core 取本地同名配置与声明的较小值，仅对 `plugin.call` 的 `builtin.mcp` 写入命令执行时限。其他工具及 `node.welcome.limits` 仍保持10秒，Android不受影响。命令摘要覆盖实际时限；Node再次取命令、本地MCP上限、授权剩余时间的最小值。发布顺序为先Core后Node；回退至不认识该声明的旧Core时须配套还原旧Node。
+- 已返回有效失败回执的修改类执行保留原始 `TOOL_TIMEOUT`／`BUSY`，结束尝试且不自动重试；真正无结果或停止未确认仍走原有未知执行对账。只读恢复重试上限保持。
 
 P02 只定义上述数据和无 I/O 的编解码。消息方向权限、当前认证会话、资源范围、动作摘要的计算与绑定、实际期限、状态转移、重试、持久化和工具验证分别由后续任务落实；模型解析通过不代表获得执行权限或任务已经成功。
 

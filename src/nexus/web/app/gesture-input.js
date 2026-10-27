@@ -1,4 +1,5 @@
 // Camera ownership stays in the trusted host and requires an explicit click.
+import { gameModeActive } from "./game-mode.js";
 export function gestureInput(onFrame, onError) {
   let worker = null, stream = null, video = null, timer = null, pending = null, epoch = 0, running = false;
   function stop() {
@@ -19,6 +20,7 @@ export function gestureInput(onFrame, onError) {
   async function start(deviceId = "") {
     stop(); const token = epoch;
     try {
+      if (gameModeActive()) throw Error("游戏模式已开启，摄像头识别已暂停");
       if (!navigator.mediaDevices?.getUserMedia) throw Error("此环境不支持摄像头，请使用受信任的 HTTPS 或 Windows 客户端");
       const acquired = await navigator.mediaDevices.getUserMedia({ video: { ...(deviceId ? { deviceId: { exact: deviceId } } : {}), width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15, max: 20 } }, audio: false });
       if (token !== epoch) { acquired.getTracks().forEach(track => track.stop()); return; }
@@ -54,5 +56,6 @@ export function gestureInput(onFrame, onError) {
       if (token === epoch) { stop(); throw error; }
     }
   }
+  window.addEventListener("nexus-game-mode-change", () => { if (gameModeActive()) stop(); });
   return { start, stop, get running() { return running; }, get label() { return stream?.getVideoTracks()[0]?.label || ""; } };
 }

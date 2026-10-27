@@ -1,0 +1,133 @@
+{
+  "task": "P91 full-mode host roots",
+  "date": "2026-10-25",
+  "status": "deployed; user acceptance pending",
+  "scope": {
+    "full": "current OS account on selected authorized device; explicit absolute access_root",
+    "normal": "existing workspace and host confirmation boundaries preserved",
+    "frontend_changed": false,
+    "new_dependencies": false,
+    "schema_changed": false
+  },
+  "core": {
+    "release": "/opt/nexus/releases/full-host-20261025-41cb7b35",
+    "wheel_sha256": "41cb7b35e6d9b00b01d486093af876d7f84d1663880e5232fd5b40e31ec71faa",
+    "runtime_resources_checked": 289,
+    "changed_resources": [
+      "nexus/contracts/basic.py",
+      "nexus/contracts/host_access.py",
+      "nexus/contracts/images.py",
+      "nexus/contracts/task.py",
+      "nexus/contracts/tools.py",
+      "nexus/contracts/work.py",
+      "nexus/plugins/contracts.py",
+      "nexus/plugins/node_runtime.py",
+      "nexus/node/tools/files.py",
+      "nexus/node/tools/registry.py",
+      "nexus/node/tools/workspace.py",
+      "nexus/core/cognitive/chat_feedback.py",
+      "nexus/core/cognitive/chat_work.py",
+      "nexus/core/cognitive/work_catalog.py",
+      "nexus/core/models/chat.py",
+      "nexus/core/plugins/service.py",
+      "nexus/core/security/service.py",
+      "nexus/core/security/work.py",
+      "nexus/core/storage/tasks.py"
+    ],
+    "schema": 37,
+    "single_core_pid": "3103135",
+    "paused": false,
+    "historical_tables_preserved": 39,
+    "backup": "/var/backups/nexus/before-full-host-20261025T034909Z",
+    "backup_sha256": "c1c943e975a6e42875b40db96641373fbae6a819ec08cf1dbe01b54946af496f",
+    "permission_defaults": [
+      "normal",
+      1
+    ],
+    "permission_history_preserved": true,
+    "model_calls": 291,
+    "new_model_calls": 0,
+    "historical_unknown_costs": 6
+  },
+  "tests": {
+    "windows_fixed": {
+      "passed": 192,
+      "seconds": 67.3
+    },
+    "frozen_windows_full_normal": {
+      "passed": 9,
+      "seconds": 31.67
+    },
+    "linux_fixed": {
+      "passed": 154,
+      "skipped": 15,
+      "seconds": 69.2
+    },
+    "overlapping_batches_not_summed": true,
+    "coverage": [
+      "normal denies access_root",
+      "full external read/write with actual preview and readback",
+      "mode downgrade rejects dispatch",
+      "plugin root binds to work step",
+      "real file plugin edit/glob/grep/regex",
+      "artifact bytes and SHA-256",
+      "host Shell outside workspace",
+      "nested program SDK inherits root",
+      "fixed EXE worker under Windows Job",
+      "duplicate receipt does not re-execute"
+    ],
+    "not_claimed": [
+      "real-model path selection in this task",
+      "Android upgrade",
+      "administrator privileges",
+      "production rollback rehearsal",
+      "user acceptance"
+    ]
+  },
+  "windows": {
+    "version": "0.1.14",
+    "node_sha256": "35108720450332014e03e6c815a69b3271e59e9de73c94bb09b40555be2a91ed",
+    "configuration_preserved": true,
+    "databases_preserved": 3,
+    "tables_preserved": 13,
+    "voice_preserved": true,
+    "installer": {
+      "filename": "NEXUS_0.1.14_x64-setup.exe",
+      "sha256": "d722d3a83da3a242a47905c21acd5987e1e78aee74507785338a40ef3fb0a719",
+      "bytes": 116426820
+    },
+    "node_online_after_upgrade": true,
+    "backup": "var/full-host/desktop-before-0.1.14"
+  },
+  "public_https": {
+    "/static/downloads/NEXUS_0.1.14_x64-setup.exe": {
+      "sha256": "d722d3a83da3a242a47905c21acd5987e1e78aee74507785338a40ef3fb0a719",
+      "bytes": 116426820,
+      "status": 200,
+      "cache_control": "no-store",
+      "csp": "default-src 'self'; script-src 'self' 'sha256-UaO1DKdOZTH3g72w3U/IhBu3y5cxME0JyJYosMMMerQ=' 'sha256-jH4JDM+p01kuu6ou/A4MgTq6B9+X7dUZGHEdH52L4GY='; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
+    },
+    "/static/app/gesture-input.js": {
+      "sha256": "e4e73fe086d3fe053027a4601a1baa380eb31534f7ef438fc5a13db308ea0600",
+      "bytes": 3035,
+      "status": 200,
+      "cache_control": "no-store",
+      "csp": "default-src 'self'; script-src 'self' 'sha256-UaO1DKdOZTH3g72w3U/IhBu3y5cxME0JyJYosMMMerQ=' 'sha256-jH4JDM+p01kuu6ou/A4MgTq6B9+X7dUZGHEdH52L4GY='; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
+    },
+    "/static/app/ui-extensions.js": {
+      "sha256": "f1f342c32b44a1414b109cf347fcc7e8bf5bb238f0e237bc05e40de90bf3c8d1",
+      "bytes": 12368,
+      "status": 200,
+      "cache_control": "no-store",
+      "csp": "default-src 'self'; script-src 'self' 'sha256-UaO1DKdOZTH3g72w3U/IhBu3y5cxME0JyJYosMMMerQ=' 'sha256-jH4JDM+p01kuu6ou/A4MgTq6B9+X7dUZGHEdH52L4GY='; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'"
+    }
+  },
+  "server_temporary_materials": {
+    "temporary_server_materials_removed": true,
+    "runtime_rollback_backups_retained": true
+  },
+  "local_server_archive": {
+    "sha256": "0cffba896c0c5943c2922dc7a936931df5d65ec595f20c53067e1febad48a443",
+    "bytes": 10084396
+  }
+}

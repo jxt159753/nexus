@@ -1,0 +1,47 @@
+// Trusted iframe bootstrap. Build the HTML with build_assets.py after editing.
+// Only this bootstrap touches the parent port. Candidate code lives in a Worker.
+"use strict";
+let connected = false;
+addEventListener("message", event => {
+  if (connected || event.source !== parent || event.data !== "nexus-extension-connect" || !event.ports[0]) return;
+  connected = true;
+  const port = event.ports[0];
+  let worker = null, timer = null, current = null, objectURL = null;
+  const stop = () => { clearTimeout(timer); worker?.terminate(); worker = null; if (objectURL) URL.revokeObjectURL(objectURL); objectURL = null; };
+  const fail = message => { stop(); port.postMessage({ id: current, error: String(message).slice(0, 300) }); current = null; };
+  port.onmessage = ({ data }) => {
+    if (!data || !Number.isSafeInteger(data.id) || current !== null) return;
+    current = data.id;
+    timer = setTimeout(() => fail("插件响应超时，已停止"), data.kind === "load" ? 3000 : 500);
+    if (data.kind === "load") {
+      if (worker || typeof data.source !== "string" || new TextEncoder().encode(data.source).length > 20000) return fail("插件源码无效");
+      const program = '"use strict";\n(() => {\n' +
+        'const send = self.postMessage.bind(self); let state = {}; let candidate;\n{\n' + data.source +
+        '\n; candidate = update;\n}\n' +
+        'if (typeof candidate !== "function") throw Error("缺少 update 函数");\n' +
+        'self.onmessage = ({data}) => { const result = candidate(data.frame, state);' +
+        'if (!result || typeof result !== "object" || result.then) throw Error("插件必须同步返回结果");' +
+        'if (!result.state || typeof result.state !== "object" || Array.isArray(result.state)) throw Error("插件状态必须是对象");' +
+        'const encoded = JSON.stringify(result.state);' +
+        'if (!encoded || new TextEncoder().encode(encoded).length > 4096) throw Error("插件状态过大");' +
+        'state = JSON.parse(encoded); send({commands: result.commands}); };\n' +
+        'send({ready: true});\n})();';
+      objectURL = URL.createObjectURL(new Blob([program], { type: "text/javascript" }));
+      try { worker = new Worker(objectURL); } catch (error) { return fail(error.message); }
+      worker.onerror = event => { event.preventDefault(); fail(event.message || "插件执行错误"); };
+      worker.onmessage = ({ data: value }) => {
+        if (current === null) return;
+        // Bound the evidence before forwarding it across the trust boundary.
+        try { if (JSON.stringify(value).length > 4096) return fail("插件输出过大"); }
+        catch { return fail("插件输出无效"); }
+        clearTimeout(timer);
+        port.postMessage({ id: current, value });
+        current = null;
+      };
+    } else if (data.kind === "frame" && worker) {
+      worker.postMessage({ frame: data.frame });
+    } else { fail("插件未加载"); }
+  };
+  port.start();
+  port.postMessage({ connected: true });
+});

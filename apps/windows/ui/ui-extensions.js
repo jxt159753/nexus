@@ -2,6 +2,7 @@ import { api, state } from "./api.js";
 import { el, button, openSheet, closeSheet, errorText, notify, runAction } from "./render.js";
 import { loadExtension, evaluateExtension, applyCommands } from "./extension-runtime.js";
 import { gestureInput } from "./gesture-input.js";
+import { gameModeActive } from "./game-mode.js";
 
 export function initUIExtensions(getVisualization) {
   const key = "nexus.ui-extension.client.v1";
@@ -49,13 +50,28 @@ export function initUIExtensions(getVisualization) {
     } catch (error) { notify(cameraError(error), true); }
   }
   function stopCamera() { camera.stop(); cameraStarting = false; draw(); }
+  window.addEventListener("nexus-game-mode-change", () => {
+    if (gameModeActive()) {
+      epoch++;
+      stopCamera(); const old = runtime; runtime = null; old?.close();
+      status = "游戏模式：摄像头与插件已暂停"; draw();
+    }
+  });
   function clear() {
     epoch++; stopCamera(); runtime?.close(); runtime = null; active = null; policy = null;
     pendingReceipt = null; conversation = null; status = "尚未授权";
   }
   function draw() {
     const entry = document.getElementById("gestures-button");
-    if (entry) { entry.textContent = camera.running ? "停止手势" : "手势"; entry.title = status; }
+    if (entry) {
+      entry.textContent = camera.running ? "停止手势" : "手势"; entry.title = status;
+      // Active capture keeps its stop control visible outside the tools menu.
+      const target = camera.running ? document.querySelector(".topbar") : document.getElementById("quick-tools");
+      if (target && entry.parentElement !== target) {
+        if (camera.running) document.getElementById("settings-button").before(entry);
+        else target.append(entry);
+      }
+    }
     if (!panel?.isConnected) return;
     panel.querySelector("[data-status]").textContent = status;
     panel.querySelector("[data-version]").textContent = active ? `当前版本 ${active.version}` : "尚无可用插件";
@@ -64,11 +80,12 @@ export function initUIExtensions(getVisualization) {
     toggle.disabled = !conversation;
     const start = panel.querySelector("[data-camera]");
     start.textContent = camera.running || cameraStarting ? "停止摄像头" : "开启摄像头手势";
-    start.disabled = !runtime || active?.status !== "accepted" || state.view !== "home";
+    start.disabled = gameModeActive() || !runtime || active?.status !== "accepted" || state.view !== "home";
     panel.querySelector("[data-camera-device]").disabled = cameraStarting;
   }
   async function poll() {
     if (polling) return;
+    if (gameModeActive()) { stopCamera(); status = "游戏模式：摄像头与插件验证已暂停"; draw(); return; }
     const id = state.ready && state.conversation?.conversation_id;
     if (id !== conversation) { clear(); conversation = id || null; }
     if (!id || document.hidden) { stopCamera(); return; }
@@ -83,6 +100,7 @@ export function initUIExtensions(getVisualization) {
       }
       const response = await send(endpoint(id) + "/poll", client);
       if (token !== epoch || state.conversation?.conversation_id !== id) return;
+      if (gameModeActive()) return;
       if (policy && response.policy?.revision !== policy.revision) stopCamera();
       lastPoll = Date.now(); policy = response.policy;
       if (!response.active) {
@@ -95,6 +113,7 @@ export function initUIExtensions(getVisualization) {
           const loaded = await loadExtension(candidate.bundle, candidate.bundle_digest);
           if (token !== epoch) { loaded.close(); return; }
           const commands = await loaded.update({ time_ms: 0, hands: [] });
+          if (token !== epoch) { loaded.close(); return; }
           if (commands.length || !getVisualization()?.input) { loaded.close(); throw Error("插件空闲检查或可视化接口未就绪"); }
           runtime = loaded;
           pendingReceipt = { kind: "ready", conversation: id, version: candidate, error: "" };
@@ -169,7 +188,7 @@ export function initUIExtensions(getVisualization) {
   }
   const entry = document.createElement("button"); entry.id = "gestures-button"; entry.className = "quiet"; entry.type = "button"; entry.textContent = "手势";
   entry.onclick = () => { if (camera.running || cameraStarting) { stopCamera(); status = "摄像头已停止"; draw(); } else open(); };
-  document.getElementById("settings-button").before(entry);
+  document.getElementById("quick-tools").append(entry);
   const interval = setInterval(poll, 2000);
   navigator.mediaDevices?.addEventListener("devicechange", refreshCameras);
   document.addEventListener("visibilitychange", () => { if (document.hidden) stopCamera(); else poll(); });

@@ -49,8 +49,8 @@
 
 ```powershell
 $env:NEXUS_TEST_OPENSSL='C:\Program Files\Git\usr\bin\openssl.exe'
-$env:NEXUS_TEST_NODE='C:\Users\User\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe'
-$env:NODE_PATH='C:\Users\User\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\node_modules'
+$env:NEXUS_TEST_NODE='C:\Users\example\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe'
+$env:NODE_PATH='C:\Users\example\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\node_modules'
 & ./.venv/Scripts/python.exe -B -m pytest -q --basetemp=E:/NEXUS/var/m6-complete-final --junitxml=E:/NEXUS/var/m6-complete-final.xml
 # 上述完整运行保留 744/1 记录；修正浏览器测试等待后分别独立复测通过。
 $env:PYTHONPATH='E:\NEXUS\var\m6-delivery-installed'

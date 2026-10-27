@@ -172,6 +172,8 @@ def create_app(config: CoreConfig) -> FastAPI:
     from nexus.core.security.devices import DeviceHTTP
     app.include_router(DeviceHTTP(chat.devices, guards).router)
     app.include_router(PermissionHTTP(chat, guards).router)
+    from nexus.core.cognitive.personality import PersonalityHTTP
+    app.include_router(PersonalityHTTP(database, guards).router)
     app.include_router(PluginHTTP(chat.plugins, guards).router)
     app.include_router(UIExtensionHTTP(chat.plugins.ui_extensions, guards).router)
     from nexus.core.plugins.autonomy_http import AutonomyHTTP

@@ -1,0 +1,170 @@
+{
+  "date": "2026-10-25",
+  "scope": "P90 isolated visualization plugin development/build/test/upgrade/rollback",
+  "verification": {
+    "workspace_regression": {
+      "passed": 78
+    },
+    "fixed_candidate_regression": {
+      "passed": 79,
+      "seconds": 64.79
+    },
+    "schema36_to_37_backup_migration": {
+      "passed": 1
+    },
+    "responsive_layout": {
+      "passed": 8
+    },
+    "browser": {
+      "passed": true,
+      "browser": "156.0.4314.42",
+      "evidence": [
+        {
+          "surface": "web",
+          "cases": [
+            "idle",
+            "rotate",
+            "zoom",
+            "select",
+            "reset"
+          ],
+          "isolation": true,
+          "invalidCodeStopped": true,
+          "digestVerified": true,
+          "scene": {
+            "rotated": true,
+            "zoomed": true,
+            "reset": true,
+            "selected": true
+          },
+          "recognition": {
+            "localModelLoaded": true,
+            "hands": 0,
+            "stopped": true
+          }
+        },
+        {
+          "surface": "windows",
+          "cases": [
+            "idle",
+            "rotate",
+            "zoom",
+            "select",
+            "reset"
+          ],
+          "isolation": true,
+          "invalidCodeStopped": true,
+          "digestVerified": true,
+          "scene": {
+            "rotated": true,
+            "zoomed": true,
+            "reset": true,
+            "selected": true
+          },
+          "recognition": {
+            "localModelLoaded": true,
+            "hands": 0,
+            "stopped": true
+          }
+        }
+      ],
+      "webcam": "synthetic browser camera only",
+      "real_model_calls": 0
+    },
+    "live_core": {
+      "passed": true,
+      "real_http": true,
+      "scripted_model": true,
+      "first_install": true,
+      "failed_test_keeps_baseline": true,
+      "upgrade": true,
+      "runtime_error_rolls_back": true,
+      "camera_stopped_on_scene_exit": true,
+      "revoke_unloads": true,
+      "real_model_calls": 0
+    },
+    "native_webview2": {
+      "passed": true,
+      "native": true,
+      "version": "0.1.11",
+      "webview": "155.0.4283.62",
+      "runtime": {
+        "error": "",
+        "cases": 5,
+        "commands": []
+      },
+      "recognition": {
+        "hands": 2,
+        "landmarks": [
+          21,
+          21
+        ],
+        "local": true
+      },
+      "camera": {
+        "hands": 0,
+        "stopped": true
+      },
+      "real_model_calls": 0,
+      "human_camera": false
+    }
+  },
+  "artifacts": {
+    "baseline_sha256": "461eef1aaad48edd34817e83100bf8391edca7753a9bc6be1267322c31bf473c",
+    "wheel_sha256": "e6f6ca966949d3e6bae739d20a2a674c482e4fa6b72008d10e535ff89cf6eb68",
+    "changed": [
+      "nexus/contracts/work.py",
+      "nexus/core/app.py",
+      "nexus/core/cognitive/chat_work.py",
+      "nexus/core/cognitive/work_catalog.py",
+      "nexus/core/models/chat.py",
+      "nexus/core/plugins/schedule.py",
+      "nexus/core/plugins/service.py",
+      "nexus/web/app/api.js",
+      "nexus/web/app/main.js",
+      "nexus/web/app/render.js",
+      "nexus-0.1.0.dist-info/RECORD",
+      "nexus/core/cognitive/chat_feedback.py",
+      "nexus/core/cognitive/node_routing.py"
+    ],
+    "added": [
+      "nexus/contracts/ui_extensions.py",
+      "nexus/core/plugins/ui_extensions.py",
+      "nexus/core/plugins/ui_extension_http.py",
+      "nexus/core/storage/migrations/037_ui_extension_evolution.sql",
+      "nexus/web/app/extension-sandbox.html",
+      "nexus/web/app/extension-runtime.js",
+      "nexus/web/app/ui-extensions.js",
+      "nexus/web/app/gesture-input.js",
+      "nexus/web/app/gesture-worker.js",
+      "nexus/web/app/vendor/mediapipe/hand_landmarker.task",
+      "nexus/web/app/vendor/mediapipe/LICENSE",
+      "nexus/web/app/vendor/mediapipe/vision_bundle.mjs",
+      "nexus/web/app/vendor/mediapipe/wasm/vision_wasm_internal.js",
+      "nexus/web/app/vendor/mediapipe/wasm/vision_wasm_internal.wasm",
+      "nexus/web/app/vendor/mediapipe/wasm/vision_wasm_nosimd_internal.js",
+      "nexus/web/app/vendor/mediapipe/wasm/vision_wasm_nosimd_internal.wasm"
+    ],
+    "resources": 286,
+    "scope": "P90 only; excludes P88 and unrelated workspace frontend changes",
+    "node_sha256": "735c7d1c6956567edcf00792cf55d1bcadf58fe52206deb9b4c45455b5e8b847",
+    "voice_sha256": "5c13916a66bd1dafbc02c5ce6aec4996cdd93436511b8a44d38906919dbb6879",
+    "windows_setup": {
+      "name": "NEXUS_0.1.11_x64-setup.exe",
+      "bytes": 116418607,
+      "sha256": "8dade8e2350574693203693f3d3d180830a151568546a606061376e15c4a3046"
+    },
+    "windows_exe_sha256": "13c2cc7cd6c530bef2ec6c4945c95563ad524a721c6fc6c78c1cd941db23fbc7"
+  },
+  "real_model_calls": 0,
+  "production_deployed": false,
+  "installed_client_replaced": false,
+  "human_camera_test": false,
+  "user_accepted": false,
+  "limitations": [
+    "Scripted model responses, not a live model generation evaluation",
+    "Virtual camera and official test image, not a human gesture usability test",
+    "Fixed candidate tested on Windows; Linux and production rollout not run",
+    "Full M9 Core/Node source self-deployment is outside this visualization extension runtime"
+  ]
+}

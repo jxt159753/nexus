@@ -237,7 +237,7 @@ class PluginService:
             if args.get('access_root') is not None and grant['permission_mode'] != 'full':
                 raise AccessDenied('HOST_ACCESS_REQUIRES_FULL')
             checked(tool.input_schema,args['input'])
-            if (args['plugin_id'],args['tool']) in {('builtin.files','read_image'),('builtin.browser','browser_screenshot')} and not self.chat.config.chat_images_enabled:
+            if (args['plugin_id'],args['tool']) in {('builtin.files','read_image'),('builtin.browser','browser_screenshot'),('builtin.android_emulator','observe')} and not self.chat.config.chat_images_enabled:
                 raise AccessDenied('MODEL_IMAGES_DISABLED')
             if not await self.permission(conn,fresh,grant,args['plugin_id'],tool): return
             mcp_binding=None

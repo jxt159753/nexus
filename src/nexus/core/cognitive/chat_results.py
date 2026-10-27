@@ -93,7 +93,7 @@ async def preview(chat, conn, row, conversation, fields) -> dict:
                 {"role": "assistant", "content": row["response_text"] or None, "tool_calls": [native]},
                 {"role": "tool", "tool_call_id": native["id"], "content": canonical(data)}]
     # Never silently change the originally consented conversation context.
-    if not pressure(chat.config, messages, final_result=True)["fits"]:
+    if not pressure(chat.config, messages, final_result=True, assistant_style=json.loads(row['assistant_style_json']))["fits"]:
         raise AccessDenied("MODEL_INPUT_LIMIT")
     return {**binding, "available_fields": sorted(result), "fields": selected, "data": data,
             "messages": messages, "conversation_revision": conversation["revision"],

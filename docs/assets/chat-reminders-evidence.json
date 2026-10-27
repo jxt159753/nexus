@@ -1,0 +1,142 @@
+{
+  "scope": "P97 会话创建定时提醒与任务完成通知修复",
+  "release": "/opt/nexus/releases/chat-reminders-20261025-c819e035",
+  "wheel_sha256": "c819e0352e8ad37038471a21b376449d3753892faf83589c166960a80fb78ae4",
+  "schema": 40,
+  "runtime_resources_verified": 300,
+  "single_active_core": true,
+  "paused": false,
+  "history_tables_preserved": 52,
+  "backup": "/var/backups/nexus/before-chat-reminders-20261025T125634Z",
+  "backup_sha256": "7af651c7461a3381cb696462c44d2170871dbc634b196351e7d4c430d88b5634",
+  "permissions_preserved": true,
+  "changed_resources": [
+    "nexus/core/cognitive/node_routing.py",
+    "nexus/core/cognitive/work_catalog.py",
+    "nexus/core/models/chat.py"
+  ],
+  "client_upgrade_required": false,
+  "tests": {
+    "fixed_windows_before_final_wording": 40,
+    "linux_before_final_wording": {
+      "passed": 107,
+      "skipped": 5
+    },
+    "final_linux_targeted": 23,
+    "final_workspace_routing": 9,
+    "final_discovery_assertion": 2,
+    "note": "批次重叠，不相加；最终改动为模型工具说明"
+  },
+  "real_model_calls": {
+    "failed-timer": {
+      "calls": 2,
+      "unknown_cost_calls": 0
+    },
+    "timer": {
+      "calls": 4,
+      "unknown_cost_calls": 0
+    },
+    "completion": {
+      "calls": 5,
+      "unknown_cost_calls": 0
+    }
+  },
+  "user_confirmation": {
+    "both_notifications_received": true,
+    "phone": "红魔 NX789J",
+    "state": "锁屏或 App 在后台",
+    "source": "用户在本会话的明确回复"
+  },
+  "cases": [
+    {
+      "kind": "timer",
+      "turn_id": "93dba557-9947-4a3a-95a2-a01ce1c44018",
+      "conversation_id": "831d0c14-29da-42c7-8df5-5c49237e5668",
+      "status": "completed",
+      "steps": [
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "verification": "plugin_registry_snapshot"
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "notification_targets",
+          "status": "succeeded",
+          "task_id": null,
+          "verification": "core_record_snapshot"
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "schedule_create",
+          "status": "succeeded",
+          "task_id": null,
+          "verification": "core_record_snapshot"
+        }
+      ],
+      "reminder_id": "383eb3d0-0c2a-4662-8b66-a6435972f2e0",
+      "created_at": "2026-10-25T12:58:07.452272+00:00",
+      "posted_at": "2026-10-25T12:58:13.213117+00:00",
+      "target": "NX789J",
+      "target_count": 1
+    },
+    {
+      "kind": "completion",
+      "turn_id": "50b19e5a-999e-48c1-8770-60038565a4d0",
+      "conversation_id": "8ea04b7e-2657-418c-8d72-0cccb241694b",
+      "status": "completed",
+      "steps": [
+        {
+          "intent": "get_system_info",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": "1cb44408-93ca-4884-856d-ca5207f22b0b",
+          "verification": "node_report_schema_checked"
+        },
+        {
+          "intent": "plugin_inspect",
+          "tool": null,
+          "status": "succeeded",
+          "task_id": null,
+          "verification": "plugin_registry_snapshot"
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "notification_targets",
+          "status": "succeeded",
+          "task_id": null,
+          "verification": "core_record_snapshot"
+        },
+        {
+          "intent": "plugin_execute",
+          "tool": "notify",
+          "status": "succeeded",
+          "task_id": null,
+          "verification": "core_record_snapshot"
+        }
+      ],
+      "reminder_id": "09bd8836-e949-454d-bfeb-8f52b0e261df",
+      "created_at": "2026-10-25T12:57:32.417654+00:00",
+      "posted_at": "2026-10-25T12:57:33.153024+00:00",
+      "target": "NX789J",
+      "target_count": 1
+    }
+  ],
+  "limitations": [
+    "本轮只确认这两条通知的锁屏或后台接收，不等同于所有厂商省电状态的长期浸泡验证。"
+  ],
+  "initial_failure_and_repair": [
+    "首次发布检查将 reminder_clients.last_seen_at 正常心跳更新误判为历史变化，自动回退；核对仅此列变化后修正检查，再次发布成功。",
+    "首次真实模型测试错误调用 builtin.schedule/list_tools，未创建提醒；明确原生 plugin_inspect 函数名后，同样普通中文请求成功。"
+  ],
+  "server_cleanup": {
+    "temporary_server_materials_removed": true,
+    "runtime_backups_retained": true
+  },
+  "local_server_archive": {
+    "sha256": "5649e3675000d0f196e2537f83e404c92e95df1cf91dd4bf0b6ca3d9bfa95521",
+    "bytes": 95227318
+  }
+}
