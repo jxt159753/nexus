@@ -62,6 +62,7 @@ class NodeConfig(StrictContract):
     roots: dict[Literal["workspace"], Path] = Field(default_factory=dict, max_length=1)
     max_result_bytes: StrictInt = Field(default=MAX_RESULT_BYTES, ge=128, le=MAX_RESULT_BYTES)
     execution_timeout_seconds: StrictInt = Field(default=10, ge=1, le=10)
+    mcp_execution_timeout_seconds: StrictInt = Field(default=60, ge=1, le=60)
     max_receipts: StrictInt = Field(default=10000, ge=1, le=10000)
 
     def plugin_digest(self):

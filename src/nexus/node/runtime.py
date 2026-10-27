@@ -158,7 +158,10 @@ class NodeRuntime:
         remaining = (command.expires_at - self._now()).total_seconds()
         if remaining <= 0:
             raise ProtocolError(ErrorCode.TOOL_TIMEOUT, "Command has expired")
-        deadline = time.monotonic() + min(remaining, command.execution_timeout_seconds, self.config.execution_timeout_seconds)
+        local_timeout = (self.config.mcp_execution_timeout_seconds
+            if command.tool == "plugin.call" and command.arguments.plugin_id == "builtin.mcp"
+            else self.config.execution_timeout_seconds)
+        deadline = time.monotonic() + min(remaining, command.execution_timeout_seconds, local_timeout)
         receipt = self.receipts.accept(command, self.boot_id)
         if on_phase is not None:
             on_phase("command.accepted")

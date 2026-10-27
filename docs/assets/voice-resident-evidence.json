@@ -1,0 +1,87 @@
+{
+  "date": "2026-10-25",
+  "scope": "Windows resident voice wake, settings opt-out and native renewal",
+  "version": "0.1.20",
+  "user_feedback": "User confirmed earlier wake testing normal; requested default resident wake and a setting to disable it.",
+  "behavior": {
+    "default_on_after_app_login": true,
+    "setting_persists_off_across_app_restart": true,
+    "clear_display_preferences_preserves_off": true,
+    "setting_off_stops_microphone": true,
+    "normal_restart_enabled": true,
+    "native_renewal_with_page_javascript_disabled": true,
+    "hidden_window_test": false,
+    "windows_os_autostart_added": false,
+    "proactive_audio_default": false
+  },
+  "checks": {
+    "rust": {
+      "passed": 7
+    },
+    "edge": {
+      "passed": 2,
+      "audio": "simulated",
+      "viewports": [
+        1280,
+        390
+      ]
+    },
+    "linux_voice": {
+      "passed": 24,
+      "skipped": 1,
+      "skip": "Windows-specific environment"
+    },
+    "real_device": {
+      "native_standby": true,
+      "stop_media_stopped": true,
+      "off_app_restart": true,
+      "normal_start_restored_on": true,
+      "renewal_reuses_conversation": true,
+      "renewal_source": "Explicitly stop an idle Core voice session; observe new native standby while WebView JS is disabled. No 30-minute wall-clock soak.",
+      "model_calls_delta": 0,
+      "audio_provider_calls": 0,
+      "temporary_debug_port_closed": true
+    }
+  },
+  "deployment": {
+    "release": "/opt/nexus/releases/voice-resident-20261025-3a31c4f4",
+    "wheel_sha256": "3a31c4f4fd849f3734f0dd2de362c8af05feb8931eb61399ea0589442ad83a11",
+    "baseline_sha256": "66437f19b6c6f045f47c48361cefc81cc8bf9133717389a13aafdb20b1179b9b",
+    "schema": 39,
+    "resources": 297,
+    "changed_resources": [
+      "nexus/web/app/main.js",
+      "nexus/web/app/render.js",
+      "nexus/web/app/voice.js"
+    ],
+    "historical_tables_preserved": 46,
+    "backup": "/var/backups/nexus/before-voice-resident-20261025T101220Z",
+    "backup_sha256": "be13ad1d0b0309b998f74be6c9ef17b9501e9ac112ff00e85a4559f19dd0ce33",
+    "config_sha256": "7b850a6082144841ca4a664dfc6deee474452526e464cdeb4a3cd31b929aa2ce",
+    "single_active_core": true,
+    "paused": false,
+    "installer": {
+      "filename": "NEXUS_0.1.20_x64-setup.exe",
+      "bytes": 116459673,
+      "sha256": "cc767cd673b0e1a8c2882b1e9f4c198fe2ea4276f092fb9a08efc60fc07b63ae"
+    },
+    "installed_hashes": {
+      "nexus-windows.exe": "9708b23f02508347ae0461f5ef50a9337b981b43894f835a05a9915362146eeb",
+      "binaries/nexus-node.exe": "6f8c63e80273ba92b880df72468c838c8a3f64a3fe939dc32c14da15a768a116",
+      "binaries/nexus-voice.exe": "5c13916a66bd1dafbc02c5ce6aec4996cdd93436511b8a44d38906919dbb6879"
+    },
+    "node_config_and_13_tables_preserved": true,
+    "model_calls": 343,
+    "server_temporary_materials_archived_and_removed": true
+  },
+  "limitations": [
+    "Long-duration soak and acoustic false-wake rate not measured in this change.",
+    "Earlier user wake confirmation is recorded separately from automated/native verification.",
+    "Native renewal verified with page JavaScript disabled; the attempted direct window-hide call was not allowed. Existing tray behavior remains unchanged."
+  ],
+  "corrected_checks": [
+    "Initial browser stubs lacked current native login methods; updated stubs and both browser cases passed.",
+    "Initial validation bundle excluded the pytest import package; restored it and Linux checks passed.",
+    "First packaging attempt could not access the NSIS cache in the sandbox; authorized build completed."
+  ]
+}

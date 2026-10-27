@@ -78,7 +78,8 @@ async def validate_task(conn, step_id, role, owner_id, node_id, request, now):
         return
     if request.intent == 'execute_plugin' and proposal['intent'] == 'plugin_execute' and role == 'execute':
         if (request.arguments.plugin_id != arguments['plugin_id'] or request.arguments.tool != arguments['tool']
-                or request.arguments.input != arguments['input'] or str(request.arguments.invocation_id) != str(step_id)
+                or request.arguments.input != arguments['input'] or request.arguments.access_root != arguments.get('access_root')
+                or str(request.arguments.invocation_id) != str(step_id)
                 or str(request.arguments.context_id) != (await one(conn,'SELECT conversation_id FROM chat_turns WHERE turn_id=?',(step['turn_id'],)))[0]):
             raise AccessDenied('POLICY_DENIED')
         return
@@ -89,9 +90,9 @@ async def validate_task(conn, step_id, role, owner_id, node_id, request, now):
     actual = request.arguments.model_dump(mode="json")
     if any(actual.get(key) != value for key,value in arguments.items()) or project[0] != (str(request.project_id) if request.project_id else None):
         raise AccessDenied("POLICY_DENIED")
-    if request.intent in {"write_file","edit_file"} and (not grant["auto_files"] and step["permission_decision"] != "approve" or str(request.arguments.preview_task_id) != step["preview_task_id"]):
+    if request.intent in {"write_file","edit_file"} and (not grant["auto_files"] and step["permission_decision"] != "approve" and grant["permission_mode"] != "full" or str(request.arguments.preview_task_id) != step["preview_task_id"]):
         raise AccessDenied("WORK_CONFIRMATION_REQUIRED")
-    if request.intent == "run_command" and grant["profile"] != "standard" and step["permission_decision"] != "approve":
+    if request.intent == "run_command" and grant["profile"] != "standard" and step["permission_decision"] != "approve" and grant["permission_mode"] != "full":
         raise AccessDenied("WORK_CONFIRMATION_REQUIRED")
 
 
@@ -251,7 +252,8 @@ class WorkService:
         for index,(proposal,native) in enumerate(checked,1):
             proposal, routed = await node_routing.bind_step(conn,row,proposal,now)
             await conn.execute("INSERT INTO chat_work_steps(step_id,turn_id,step_index,proposal_json,native_json,status,created_at,routed_grant_id) VALUES(?,?,?,?,?,'pending',?,?)",(str(uuid4()),row["turn_id"],count+index,canonical(proposal),canonical(native),timestamp(now),routed))
-        messages.append({"role":"assistant","content":reply.content or None,"tool_calls":[native for _,native in checked]})
+        # Routine commentary stays in the journal, not every subsequent model input.
+        messages.append({"role":"assistant","content":reply.content if reply.public_progress else None,"tool_calls":[native for _,native in checked]})
         await conn.execute("UPDATE chat_turns SET work_status='waiting',work_messages_json=? WHERE turn_id=?",(canonical(messages),row["turn_id"]))
 
     async def rejected(self,conn,row,reply,now):
@@ -265,7 +267,7 @@ class WorkService:
         old_ids={call["id"] for message in messages for call in message.get("tool_calls",[])}
         if len(set(identifiers)) != len(identifiers) or old_ids.intersection(identifiers):
             raise AccessDenied("MODEL_RESPONSE_INVALID")
-        messages.append({"role":"assistant","content":reply.content or None,"tool_calls":list(reply.rejected_calls)})
+        messages.append({"role":"assistant","content":None,"tool_calls":list(reply.rejected_calls)})
         for index,native in enumerate(reply.rejected_calls):
             evidence={"status":"failed","phase":"arguments","execution_outcome":"not_started","batch_executed":False,
                       "error_code":"INVALID_TOOL_ARGUMENTS","errors":[item for item in reply.validation_errors if item["index"]==index],
@@ -416,6 +418,9 @@ class WorkService:
             from nexus.core.cognitive.work_creation import create_skill
             await create_skill(self.chat, step, principal, node_id)
             return
+        if intent in {'inspect_ui_extension','submit_ui_extension'}:
+            await self.chat.plugins.ui_extensions.work_step(step, principal, node_id, proposal)
+            return
         if intent in {'plugin_inspect','plugin_execute','plugin_install'}:
             await self.chat.plugins.work_step(step,principal,node_id,proposal)
             return
@@ -493,7 +498,7 @@ class WorkService:
                         await conn.execute("UPDATE chat_work_steps SET status='permission',request_text=? WHERE step_id=?",(f"本轮需要操作已配置目标 {proposal['arguments']['target_id']}，仅允许该目标的固定动作，不含其他程序或页面范围。回复“同意”授权本轮该目标，回复“不同意”停止。",step["step_id"]))
                         await conn.execute("UPDATE chat_turns SET work_status='permission',revision=revision+1 WHERE turn_id=?",(step["turn_id"],))
                         return
-            if intent == "run_command" and grant["profile"] != "standard" and not fresh["permission_decision"]:
+            if intent == "run_command" and grant["profile"] != "standard" and not fresh["permission_decision"] and grant["permission_mode"] != "full":
                 async with self.database.transaction() as conn:
                     await permissions.allowed_step(conn,step["step_id"],utc_now())
                     await conn.execute("UPDATE chat_work_steps SET status='permission',request_text=? WHERE step_id=?",(f"需要执行已配置的固定命令 {proposal['arguments']['command_id']}。回复“同意”执行，回复“不同意”停止。",step["step_id"]))

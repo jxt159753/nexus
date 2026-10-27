@@ -54,6 +54,7 @@ class PluginHTTP:
         self.router.add_api_route('',self.page,methods=['GET'])
         self.router.add_api_route('',self.install,methods=['POST'])
         self.router.add_api_route('/github',self.github,methods=['POST'])
+        self.router.add_api_route('/automation',self.automation,methods=['GET'])
         self.router.add_api_route('/conversations/{conversation_id}',self.conversation_state,methods=['GET'])
         self.router.add_api_route('/conversations/{conversation_id}/plan',self.plan,methods=['PUT'])
         self.router.add_api_route('/conversations/{conversation_id}/schedules/{record_id}',self.control_schedule,methods=['PATCH','DELETE'])
@@ -69,7 +70,9 @@ class PluginHTTP:
         async with self.service.database.transaction(write=False) as conn:
             await self.service.chat.owner(conn,principal)
             rows=await conn.execute_fetchall('SELECT * FROM plugin_versions WHERE owner_id=? ORDER BY rowid DESC LIMIT 256',(str(principal.identity_id),))
-            return {'enabled':self.service.config.enabled,'plugins':[public_version(row) for row in rows]}
+            from nexus.core.plugins.ui_extension_management import catalog
+            ui_plugins = await catalog(self.service.ui_extensions, conn, principal)
+            return {'enabled':self.service.config.enabled,'plugins':[public_version(row) for row in rows], 'ui_plugins': ui_plugins}
 
     async def detail(self,version_id:UUID,request:Request):
         principal=await self.guards.owner_http(request)
@@ -115,8 +118,18 @@ class PluginHTTP:
             goals=await conn.execute_fetchall('SELECT * FROM plugin_goals WHERE conversation_id=? ORDER BY rowid DESC LIMIT 20',(str(conversation_id),))
             schedules=await conn.execute_fetchall('SELECT * FROM plugin_schedules WHERE conversation_id=? AND deleted=0 ORDER BY rowid DESC LIMIT 100',(str(conversation_id),))
             events=await conn.execute_fetchall('SELECT e.*,s.title,s.prompt FROM plugin_schedule_events e JOIN plugin_schedules s USING(schedule_id) WHERE s.conversation_id=? ORDER BY e.rowid DESC LIMIT 100',(str(conversation_id),))
-            return {'plan_mode':bool(conversation['plan_mode']),'revision':conversation['revision'],'todos':json.loads(todos['value_json']) if todos else [],'todo_revision':todos['revision'] if todos else 0,'goals':[dict(row) for row in goals],
-                    'schedules':[dict(row) for row in schedules],'events':[dict(row) for row in events]}
+            from nexus.core.plugins.schedule import public
+            return {'plan_mode':bool(conversation['plan_mode']),'revision':conversation['revision'],'todos':json.loads(todos['value_json']) if todos else [],'todo_revision':todos['revision'] if todos else 0,'goals':[dict(row) | ({'expires_at':None,'max_rounds':None} if row['run_until_stopped'] else {}) for row in goals],
+                    'schedules':[public(row) for row in schedules],'events':[dict(row) for row in events]}
+
+    async def automation(self,request:Request):
+        principal=await self.guards.owner_http(request)
+        from nexus.core.plugins.schedule import public
+        async with self.service.database.transaction(write=False) as conn:
+            await self.service.chat.owner(conn,principal)
+            schedules=await conn.execute_fetchall('SELECT * FROM plugin_schedules WHERE owner_id=? AND deleted=0 ORDER BY rowid DESC LIMIT 100',(str(principal.identity_id),))
+            goals=await conn.execute_fetchall('SELECT * FROM plugin_goals WHERE owner_id=? ORDER BY rowid DESC LIMIT 100',(str(principal.identity_id),))
+            return {'schedules':[public(row) for row in schedules], 'goals':[dict(row) | ({'expires_at':None,'max_rounds':None} if row['run_until_stopped'] else {}) for row in goals]}
 
     async def plan(self,conversation_id:UUID,request:Request):
         from nexus.core.storage.tasks import Conflict
@@ -177,7 +190,7 @@ class PluginHTTP:
                 row=await one(conn,'SELECT * FROM plugin_goals WHERE goal_id=? AND conversation_id=? AND owner_id=?',(str(record_id),str(conversation_id),str(principal.identity_id)))
                 if row is None: raise LookupError('goal not found')
                 if set(value.changes)!={'status'} or value.changes['status'] not in {'paused','active'}: raise ValueError('goal control requires active/paused status')
-                if row['status']=='complete' or row['expires_at']<=timestamp(now) or (self.service.chat.config.call_limits_enabled and row['rounds']>=row['max_rounds']): raise Conflict('goal has ended')
+                if row['status']=='complete' or not row['run_until_stopped'] and (row['expires_at']<=timestamp(now) or self.service.chat.config.call_limits_enabled and row['rounds']>=row['max_rounds']): raise Conflict('goal has ended')
                 await conn.execute('UPDATE plugin_goals SET status=? WHERE goal_id=?',(value.changes['status'],str(record_id)))
                 resume=value.changes['status']=='active'
                 result={'goal_id':str(record_id),'status':value.changes['status']}

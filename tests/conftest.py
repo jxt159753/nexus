@@ -1,6 +1,7 @@
 import asyncio
 import secrets
 from dataclasses import dataclass
+from datetime import timedelta
 from uuid import UUID, uuid4
 
 import pytest
@@ -10,6 +11,18 @@ from nexus.core.security.service import SecurityService
 from nexus.core.security.types import NodeScope, Principal
 from nexus.core.storage.database import Database
 from nexus.core.storage.tasks import TaskRepository
+
+
+@pytest.fixture(autouse=True)
+def synthetic_model_pricing(monkeypatch):
+    """Mock-provider tests use a fresh quote; explicit expiry cases stay explicit."""
+    from nexus.core.models.config import ModelConfig
+    from nexus.core.storage.database import utc_now
+    original = ModelConfig.__init__
+    def initialize(self, **values):
+        values.setdefault("price_valid_until", utc_now().date() + timedelta(days=1))
+        original(self, **values)
+    monkeypatch.setattr(ModelConfig, "__init__", initialize)
 
 
 @dataclass

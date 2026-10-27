@@ -1,3 +1,4 @@
+import { openReminderCenter } from "./reminders.js";
 "use strict";
 
 import {
@@ -28,6 +29,7 @@ import {
   renameConversation,
   resetState,
   sendPayload,
+  selectConversation,
   setPref,
   setUnauthorizedHandler,
   state,
@@ -55,7 +57,8 @@ import {
 } from "./render.js";
 
 import { initVisualization } from "./visualization.js";
-import { initVoice, stopVoice } from "./voice.js";
+import { initUIExtensions } from "./ui-extensions.js";
+import { initVoice, stopVoice, renderVoiceSettings } from "./voice.js";
 import {
   closePluginPage,
   openConversationPermission,
@@ -82,13 +85,59 @@ const $ = (id) => document.getElementById(id);
 const native = window.__NEXUS_NATIVE__ || null;
 const CORE_URL_KEY = "nexus.coreUrl";
 let pollTimer = null;
+let activityTimer = null;
+let activityRefreshing = false;
 let deviceTimer = null;
 let deviceLoading = false;
 let lastSignature = "";
-let lastSnapshotAt = 0;
 let refreshing = false;
 let booting = true;
 let visualization = null;
+let uiExtensions = null;
+const conversationDrafts = new Map();
+const consumedNavigation = new Set();
+let switchingConversation = false;
+
+function saveConversationDraft() {
+  conversationDrafts.set(state.conversation?.conversation_id || "", [$("chat-text").value, $("dock-text").value]);
+}
+
+async function openConversationSource(id, turnId = null) {
+  if (switchingConversation) return;
+  switchingConversation = true;
+  try {
+    if (id !== state.conversation?.conversation_id) {
+      if (draftAttachments().length) throw new Error("当前有未发送附件，请先发送或移除，再打开来源会话。文字草稿会保留。");
+      saveConversationDraft();
+      await stopVoice();
+      const selected = await selectConversation(id);
+      if (!selected) return;
+      leaveConversation();
+      const draft = conversationDrafts.get(id) || ["", ""];
+      [$("chat-text"), $("dock-text")].forEach((input, index) => { input.value = draft[index]; input.style.height = ""; });
+    }
+    if (turnId && !state.turns.has(turnId)) {
+      const value = await api(`/api/v1/chat/turns/${turnId}`);
+      const turn = value.turn || value;
+      if (turn.conversation_id === id) {
+        state.turns.set(turn.turn_id, turn);
+        state.turnOrder = [...state.turns.values()].sort((a,b) => a.cursor - b.cursor);
+      }
+    }
+    await syncConversationPermission();
+    openChat();
+    if (turnId) scrollToTurn(turnId);
+  } finally { switchingConversation = false; }
+}
+
+async function followConversationNavigation() {
+  const turn = state.turnOrder.find(item => item.request_id === state.lastSent?.request_id && item.presentation?.phase === "completed" && item.presentation?.navigation);
+  const navigation = turn?.presentation.navigation;
+  if (!navigation || consumedNavigation.has(navigation.step_id) || switchingConversation) return;
+  consumedNavigation.add(navigation.step_id);
+  try { await openConversationSource(navigation.conversation_id); }
+  catch (error) { notify(errorText(error), true); }
+}
 let nodeAutoStarted = false;
 
 function normalizeCoreUrl(value) {
@@ -140,12 +189,17 @@ function updateConnection() {
 }
 
 function showLogin(message = "") {
+  conversationDrafts.clear(); consumedNavigation.clear();
   clearTimeout(pollTimer);
   pollTimer = null;
+  clearTimeout(activityTimer);
+  activityTimer = null;
   clearTimeout(deviceTimer);
   resetState();
   resetAttachments();
+  uiExtensions?.stop();
   visualization?.visible(false);
+  uiExtensions?.sync();
   $("shell").hidden = true;
   $("login").hidden = false;
   $("login-form").reset();
@@ -208,11 +262,15 @@ function syncVisualization(visible = state.view === "home") {
     nodes: state.nodes,
     tasks,
     activeTurn: state.activeTurn,
+    activeTurns: state.activity?.turns,
+    nodesFresh: state.nodesFresh,
+    activityFresh: state.activityFresh,
     nodeId: state.lastSent?.client_node_id || "",
     messageKey: state.lastSent?.request_id || "",
     paused: !!state.control?.paused,
   });
   visualization.visible(!!visible);
+  uiExtensions?.sync();
 }
 
 function enterApp() {
@@ -307,13 +365,10 @@ async function refresh(force = false) {
     await ensureAttachments().catch((error) => {
       if (error instanceof ApiError && error.status === 401) throw error;
     });
-    if (Date.now() - lastSnapshotAt > 4000) {
-      await loadSnapshot();
-      lastSnapshotAt = Date.now();
-      await ensurePendingDetails();
-    }
+    await ensurePendingDetails();
     updateConnection();
     syncViews(force);
+    await followConversationNavigation();
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) return;
     setConnection("连接中断，正在重试…", "offline");
@@ -352,8 +407,26 @@ async function syncDevices() {
   }
 }
 
+async function syncActivity() {
+  if (!state.ready || document.hidden || activityRefreshing) return;
+  clearTimeout(activityTimer);
+  activityRefreshing = true;
+  try {
+    await loadSnapshot();
+  } catch (error) {
+    state.activityFresh = false;
+  } finally {
+    activityRefreshing = false;
+    if (state.ready) {
+      syncVisualization();
+      activityTimer = setTimeout(syncActivity, 2000);
+    }
+  }
+}
+
 function startPolling() {
   syncDevices();
+  syncActivity();
   clearTimeout(pollTimer);
   const tick = async () => {
     if (!state.ready) {
@@ -396,6 +469,7 @@ function openChat() {
   $("chat-view").hidden = false;
   $("chat-view").classList.remove("drawer-open");
   visualization?.visible(false);
+  uiExtensions?.sync();
   renderChat(true);
   lastSignature = state.signature;
 }
@@ -567,6 +641,7 @@ function openConsentSheet(prepared, view, text) {
   const list = el("ul");
   list.append(el("li", "", state.prefs.context ? "本轮输入和所选上下文" : "本轮输入"));
   list.append(el("li", "", "实际工具结果，可能包含读取到的文件文本、目录条目或命令输出摘要"));
+  list.append(el("li", "", "按你的问题查到的本人其他会话摘录、项目待办与任务状态"));
   if (imageAvailable) list.append(el("li", "", "配置工作区内图片的有界快照"));
   body.append(list);
 
@@ -916,6 +991,7 @@ function bindEvents() {
     if ($("settings").hidden) openSettings(); else closeSettings();
   });
   $("settings-close").addEventListener("click", closeSettings);
+  $("notifications-button").addEventListener("click", () => openReminderCenter(openConversationSource));
   $("plugins-button").addEventListener("click", () => {
     if ($("plugin-view").hidden) openPlugins("permissions"); else closePluginPage();
   });
@@ -932,9 +1008,11 @@ function bindEvents() {
   $("dock-stop").addEventListener("click", stopActive);
   $("chat-stop").addEventListener("click", stopActive);
   $("new-conversation").addEventListener("click", () => runAction(async () => {
+    saveConversationDraft();
     leaveConversation();
     const projectId = state.prefs.projectId || state.conversation?.project_id || null;
     await createConversation(projectId);
+    clearComposer("chat"); clearComposer("dock");
     await loadHistory(state.conversation.conversation_id);
     await syncConversationPermission();
     await ensureAttachments();
@@ -943,9 +1021,11 @@ function bindEvents() {
     notify("已新建会话");
   }));
   $("dock-new").addEventListener("click", () => runAction(async () => {
+    saveConversationDraft();
     leaveConversation();
     const projectId = state.prefs.projectId || state.conversation?.project_id || null;
     await createConversation(projectId);
+    clearComposer("chat"); clearComposer("dock");
     await loadHistory(state.conversation.conversation_id);
     await syncConversationPermission();
     await ensureAttachments();
@@ -1001,9 +1081,9 @@ function bindEvents() {
     }
   });
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden && state.ready) { syncDevices(); refresh(true); }
+    if (!document.hidden && state.ready) { syncDevices(); syncActivity(); refresh(true); }
   });
-  window.addEventListener("online", () => { if (state.ready) { syncDevices(); refresh(true); } });
+  window.addEventListener("online", () => { if (state.ready) { syncDevices(); syncActivity(); refresh(true); } });
   window.addEventListener("focus", () => { if (state.ready) syncDevices(); });
   initAttachmentComposer();
 }
@@ -1021,6 +1101,8 @@ async function stopActive() {
 }
 
 bindUI({
+  renderVoiceSettings,
+  openConversationSource,
   renameDevice,
   openChat,
   closeChat,
@@ -1050,9 +1132,11 @@ bindAttachmentUI({
   refreshComposerState,
 });
 
+["chat-text", "dock-text"].forEach(id => $(id).addEventListener("input", saveConversationDraft));
 state.ready = false;
 bindEvents();
-initVoice({ refresh, openChat });
+initVoice({ refresh, openChat, renderSettings });
+uiExtensions = initUIExtensions(() => visualization);
 setUnauthorizedHandler(() => {
   if (!booting) showLogin("会话已过期，请重新登录");
 });

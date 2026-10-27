@@ -849,3 +849,8 @@ dialog.image-dialog::backdrop{background:rgba(0,0,0,.86)}
   .plugin-toolbar{align-items:stretch}
   .plugin-toolbar select{min-width:0;width:100%}
 }
+
+.reminder-center { min-width: 0; overflow-wrap: anywhere; }
+.reminder-center .autonomy-row { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.reminder-center .autonomy-row button { margin: 4px 8px 4px 0; }
+.reminder-center input { max-width: 100%; box-sizing: border-box; }

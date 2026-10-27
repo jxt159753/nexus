@@ -62,6 +62,41 @@ pub struct ApiResponse {
     body: String,
 }
 
+// A snapshot is used only for native wake preparation/cleanup. Credentials
+// never cross the WebView or get stored in wake preferences.
+pub(crate) struct VoiceConnection {
+    client: reqwest::Client,
+    base: String,
+    cookie: String,
+    csrf: String,
+    pub owner_id: uuid::Uuid,
+}
+
+impl VoiceConnection {
+    pub async fn new(state: &BridgeState, expected: &str) -> Result<Self, String> {
+        let base = state.authenticated_origin()?;
+        if base != expected { return Err("AUTH_REQUIRED".into()); }
+        let cookie = state.cookie.lock().map_err(|_| "会话不可用")?.clone().ok_or("AUTH_REQUIRED")?;
+        let mut value = Self { client: state.client.clone(), base, cookie, csrf: String::new(), owner_id: uuid::Uuid::nil() };
+        let info = value.request("GET", "/api/v1/session", None).await?;
+        value.csrf = info["csrf_token"].as_str().ok_or("AUTH_REQUIRED")?.into();
+        value.owner_id = info["owner_id"].as_str().and_then(|s| uuid::Uuid::parse_str(s).ok()).ok_or("AUTH_REQUIRED")?;
+        Ok(value)
+    }
+
+    pub async fn request(&self, method: &str, path: &str, body: Option<serde_json::Value>) -> Result<serde_json::Value, String> {
+        let (response, _) = exchange(&self.client, reqwest::Method::from_bytes(method.as_bytes()).map_err(|_| "请求无效")?,
+            &format!("{}{path}", self.base), Some(self.cookie.clone()), body.map(|v| v.to_string()),
+            Some(HashMap::from([("x-csrf-token".into(), self.csrf.clone())])),
+            MAX_API_BODY, MAX_API_RESPONSE, Arc::new(AtomicBool::new(false)), "Core 请求超时").await?;
+        let value: serde_json::Value = serde_json::from_str(&response.body).map_err(|_| "Core 响应无效")?;
+        if !(200..300).contains(&response.status) {
+            return Err(value["detail"].as_str().map(str::to_owned).unwrap_or_else(|| format!("HTTP_{}", response.status)));
+        }
+        Ok(value)
+    }
+}
+
 fn validate_core_url(value: &str) -> Result<String, String> {
     let url = Url::parse(value.trim()).map_err(|_| "Core 地址格式无效".to_string())?;
     if !url.username().is_empty() || url.password().is_some() || url.query().is_some() || url.fragment().is_some() {
@@ -294,7 +329,7 @@ fn core_url(state: &BridgeState) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn set_core_url(state: State<'_, BridgeState>, url: String) -> Result<(), String> {
+pub fn set_core_url(app: tauri::AppHandle, state: State<'_, BridgeState>, url: String) -> Result<(), String> {
     let base = validate_core_url(&url)?;
     let mut current = state.core_url.lock().map_err(|_| "Core 状态不可用")?;
     if current.as_deref() == Some(base.as_str()) {
@@ -302,6 +337,10 @@ pub fn set_core_url(state: State<'_, BridgeState>, url: String) -> Result<(), St
     }
     *current = Some(base);
     *state.cookie.lock().map_err(|_| "会话状态不可用")? = None;
+    drop(current);
+    use tauri::Manager;
+    app.state::<crate::wake::WakeManager>().disable();
+    app.state::<crate::voice::VoiceManager>().stop();
     Ok(())
 }
 
@@ -329,6 +368,7 @@ pub fn remember_session(state: State<'_, BridgeState>) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn api_request(
+    app: tauri::AppHandle,
     state: State<'_, BridgeState>,
     method: String,
     path: String,
@@ -339,6 +379,11 @@ pub async fn api_request(
     let base = core_url(&state)?;
     let cookie = state.cookie.lock().map_err(|_| "会话状态不可用")?.clone();
     let method = reqwest::Method::from_bytes(method.as_bytes()).map_err(|_| "请求方法无效".to_string())?;
+    if method == reqwest::Method::DELETE && path == "/api/v1/session" {
+        use tauri::Manager;
+        app.state::<crate::wake::WakeManager>().disable();
+        app.state::<crate::voice::VoiceManager>().stop();
+    }
     let (response, cookie) = exchange(
         &state.client,
         method.clone(),

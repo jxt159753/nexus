@@ -40,7 +40,7 @@ class ExecutionRepository:
             rows = await conn.execute_fetchall("SELECT task_id FROM tasks WHERE node_id=? AND status IN ('ready','awaiting_approval','recovering') AND cancel_requested=0 AND expires_at>? AND (current_attempt_id IS NULL OR EXISTS(SELECT 1 FROM task_attempts a WHERE a.attempt_id=tasks.current_attempt_id AND a.phase='completed' AND a.execution_stopped=1)) ORDER BY rowid LIMIT 100", (str(node_id), timestamp(utc_now())))
             return [UUID(row[0]) for row in rows]
 
-    async def dispatch(self, task_id: UUID, node: Principal, scope: NodeScope, session_id: UUID, boot_id: UUID, timeout: int) -> CommandExecute | None:
+    async def dispatch(self, task_id: UUID, node: Principal, scope: NodeScope, session_id: UUID, boot_id: UUID, timeout: int, *, mcp_timeout: int = 10) -> CommandExecute | None:
         now = utc_now()
         async with self.database.transaction() as conn:
             task = await load_task(conn, task_id)
@@ -61,6 +61,8 @@ class ExecutionRepository:
             grant_id, attempt_id = uuid4(), uuid4()
             expires = min(task.expires_at, authorization.expires_at or task.expires_at)
             value = task.action.model_dump(mode="json")
+            if task.action.tool == "plugin.call" and task.action.arguments.plugin_id == "builtin.mcp":
+                timeout = mcp_timeout
             value.update(session_id=str(session_id), task_id=str(task_id), attempt_id=str(attempt_id),
                          grant_id=str(grant_id), command_digest="0" * 64,
                          expires_at=timestamp(expires), execution_timeout_seconds=timeout)
@@ -160,7 +162,7 @@ class ExecutionRepository:
                 except ValueError:
                     error = create_error(ErrorCode.RESULT_INVALID, "Tool evidence failed validation")
             succeeded = output is not None
-            if not succeeded and not task.cancel_requested and error is not None and error.code in {ErrorCode.TOOL_TIMEOUT, ErrorCode.BUSY}:
+            if not succeeded and not task.cancel_requested and task.action.tool not in MUTATING_TOOLS and error is not None and error.code in {ErrorCode.TOOL_TIMEOUT, ErrorCode.BUSY}:
                 await self._ended(conn, task, row, now, outcome="known", retry=True)
                 return
             await conn.execute("UPDATE tasks SET result_json=?, error_json=?, verification=?, execution_outcome='known' WHERE task_id=?", (

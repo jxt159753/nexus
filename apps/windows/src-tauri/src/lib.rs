@@ -2,6 +2,7 @@ mod auth;
 mod bridge;
 mod node;
 mod voice;
+mod wake;
 
 use std::time::Duration;
 
@@ -80,6 +81,7 @@ pub fn run() {
         .manage(BridgeState::new())
         .manage(NodeManager::new())
         .manage(voice::VoiceManager::new())
+        .manage(wake::WakeManager::default())
         .invoke_handler(tauri::generate_handler![
             bridge::set_core_url,
             bridge::load_session,
@@ -102,7 +104,8 @@ pub fn run() {
             voice::voice_devices,
             voice::voice_start,
             voice::voice_stop,
-            voice::voice_interrupt
+            voice::voice_interrupt,
+            wake::voice_wake
         ])
         .on_window_event(|window, event| {
             if matches!(window.label(), "main" | "splash") {
@@ -120,6 +123,7 @@ pub fn run() {
         })
         .setup(|app| {
             create_tray(app)?;
+            wake::start(app.handle());
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("app.html".into()))
                 .title("NEXUS")
                 .inner_size(1280.0, 720.0)
@@ -158,6 +162,7 @@ pub fn run() {
         .expect("NEXUS Windows shell")
         .run(|app, event| {
             if matches!(event, tauri::RunEvent::Exit) {
+                app.state::<wake::WakeManager>().disable();
                 app.state::<voice::VoiceManager>().stop();
                 app.state::<NodeManager>().stop();
             }

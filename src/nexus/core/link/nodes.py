@@ -63,12 +63,7 @@ class NodeLink:
         policy = self.config.nodes.get(principal.identity_id)
         if hello.node_id != principal.identity_id or policy is None:
             raise AccessDenied()
-        advertised = frozenset(f"{item.tool}@{item.tool_version}" for item in hello.tools)
-        trusted = NodeScope(principal.identity_id, advertised, frozenset(hello.roots),
-                            policy.tools, policy.roots, policy.resource_version,
-                            {key: value for key, value in hello.command_digests.items() if policy.command_digests.get(key) == value},
-                            {key: value for key, value in hello.interaction_digests.items() if policy.interaction_digests.get(key) == value},
-                            hello.plugin_digest if hello.plugin_digest==policy.plugin_digest else None)
+        trusted = self.trusted_scope(hello, policy)
         connection = NodeConnection(ws, principal, hello, trusted)
         await self._scope(connection)
         # Never make the connection visible if its durable audit cannot commit.
@@ -77,6 +72,15 @@ class NodeLink:
             old = self.connections.get(principal.identity_id)
             self.connections[principal.identity_id] = connection
         return connection, old
+
+    @staticmethod
+    def trusted_scope(hello, policy):
+        advertised = frozenset(f"{item.tool}@{item.tool_version}" for item in hello.tools)
+        return NodeScope(hello.node_id, advertised, frozenset(hello.roots),
+                            policy.tools, policy.roots, policy.resource_version,
+                            {key: value for key, value in hello.command_digests.items() if policy.command_digests.get(key) == value},
+                            {key: value for key, value in hello.interaction_digests.items() if policy.interaction_digests.get(key) == value},
+                            hello.plugin_digest if hello.plugin_digest==policy.plugin_digest else None)
 
     @staticmethod
     async def _close(ws: WebSocket, code: int, reason: str) -> None:

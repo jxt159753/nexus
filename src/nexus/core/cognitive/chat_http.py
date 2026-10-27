@@ -99,7 +99,11 @@ class ChatHTTP:
 
     async def submit(self, conversation_id: UUID, request: Request):
         principal = await self.guards.owner_http(request)
-        return {"turn": await self.service.submit(principal, conversation_id, await body(request, ChatSubmission, max_bytes=16384))}
+        value = await body(request, ChatSubmission, max_bytes=16384)
+        if value.device_client_id:
+            async with self.service.database.transaction(write=False) as conn:
+                await self.service.devices.verify(conn, principal, value.device_client_id, request.headers.get("X-Nexus-Device-Proof"))
+        return {"turn": await self.service.submit(principal, conversation_id, value, verified_client_id=value.device_client_id)}
 
     async def get(self, turn_id: UUID, request: Request):
         return {"turn": await self.service.get(await self.guards.owner_http(request), turn_id)}

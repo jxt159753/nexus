@@ -64,7 +64,8 @@ def test_failed_web_read_continues_to_alternative_and_llm_without_losing_cost(wo
         assert accounted_cost(calls) == sum(c["cost_microunits"] or 0 for c in calls) + 750
         assert done["presentation"]["final_text"] == done["response_text"]
         assert "部分操作未完成" in done["presentation"]["label"]
-        assert not done["presentation"]["collapse_process"]
+        assert done["presentation"]["collapse_process"]
+        assert done["presentation"]["final_text"] and done["work_steps"]
 
     asyncio.run(run())
 

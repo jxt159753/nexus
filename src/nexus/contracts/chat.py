@@ -99,6 +99,7 @@ class ChatSubmission(StrictContract):
     workspace_work: StrictBool = False
     all_nodes: StrictBool = False
     client_node_id: UUID | None = None
+    device_client_id: UUID | None = None
     enqueue: StrictBool = False
     reference_turn_ids: list[UUID] = Field(default_factory=list, max_length=3)
     references_digest: StrictStr | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
@@ -185,9 +186,11 @@ class ChatProgressText(StrictContract):
     id: StrictStr
     text: StrictStr = Field(max_length=1200)
     truncated: StrictBool = False
+    substantive: StrictBool = False
 
 
 from nexus.contracts.file_transfer import ChatFile
+from nexus.contracts.conversation_routes import ConversationLink, ConversationNavigation
 
 
 class ChatPresentation(StrictContract):
@@ -204,3 +207,5 @@ class ChatPresentation(StrictContract):
     final_text: StrictStr | None = None
     collapse_process: StrictBool = False
     files: list[ChatFile] = Field(default_factory=list, max_length=8)
+    conversations: list[ConversationLink] = Field(default_factory=list, max_length=10)
+    navigation: ConversationNavigation | None = None

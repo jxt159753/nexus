@@ -45,6 +45,8 @@ export const TOOL_LABELS = {
   plugin_execute: "原生插件",
   plugin_inspect: "插件目录",
   plugin_install: "自写插件",
+  inspect_ui_extension: "检查界面插件",
+  submit_ui_extension: "开发与验证界面插件",
 };
 
 const PREFS_KEY = "nexus.chat.prefs.v1";
@@ -56,6 +58,8 @@ export const state = {
   view: "home",
   nodes: [],
   nodesFresh: false,
+  activity: null,
+  activityFresh: false,
   projects: [],
   usage: null,
   control: { paused: false, revision: 0 },
@@ -193,6 +197,8 @@ export function resetState() {
   state.ready = false;
   state.nodes = [];
   state.nodesFresh = false;
+  state.activity = null;
+  state.activityFresh = false;
   state.projects = [];
   state.usage = null;
   state.control = { paused: false, revision: 0 };
@@ -233,7 +239,9 @@ export async function loadCore() {
   state.control = control;
   state.conversations = conversations.conversations || [];
   state.tasks.clear();
-  for (const task of snapshot.tasks || []) state.tasks.set(task.task_id, { task });
+  for (const task of [...(snapshot.tasks || []), ...(snapshot.active_tasks || [])]) state.tasks.set(task.task_id, { task });
+  state.activity = snapshot.activity || null;
+  state.activityFresh = true;
   state.nodesFresh = true;
   const conversation = pickConversation();
   state.ready = true;
@@ -290,8 +298,11 @@ export async function createConversation(projectId = null) {
   return value.conversation;
 }
 
+let selectionEpoch = 0;
 export async function selectConversation(conversationId) {
+  const epoch = ++selectionEpoch;
   const value = await api(`/api/v1/chat/conversations/${conversationId}/turns`);
+  if (epoch !== selectionEpoch) return null;
   state.turns.clear();
   state.turnOrder = [];
   state.taskFetchAt.clear();
@@ -313,9 +324,11 @@ export async function selectConversation(conversationId) {
 
 export async function loadHistory(conversationId = state.conversation?.conversation_id, before = null) {
   if (!conversationId) return null;
+  const epoch = selectionEpoch;
   const query = before ? `?before=${before}` : "";
   const value = await api(`/api/v1/chat/conversations/${conversationId}/turns${query}`);
-  if (!before || state.conversation?.conversation_id !== conversationId) {
+  if (epoch !== selectionEpoch || state.conversation?.conversation_id !== conversationId) return null;
+  if (!before) {
     state.turns.clear();
     state.turnOrder = [];
   }
@@ -367,6 +380,8 @@ function turnSignature() {
         turn.presentation.live_text,
         turn.presentation.final_text,
         turn.presentation.collapse_process,
+        turn.presentation.conversations,
+        turn.presentation.navigation,
         (turn.presentation.process || []).map((item) => [item.id, item.text, item.truncated]),
       ] : null,
     ]),
@@ -396,13 +411,24 @@ export async function syncTasksForTurns() {
 
 export async function loadSnapshot() {
   const value = await api("/api/v1/client/snapshot");
-  for (const task of value.tasks || []) {
+  const current = new Map([...(value.tasks || []), ...(value.active_tasks || [])].map(task => [task.task_id, task]));
+  // Older active tasks can finish outside the latest history page. Read their
+  // terminal evidence before retiring their visual marker.
+  const ended = [...state.tasks.values()].map(value => value.task || value)
+    .filter(task => !TASK_TERMINAL.has(task.status) && !current.has(task.task_id));
+  await Promise.all(ended.map(async task => {
+    const detail = await api(`/api/v1/tasks/${task.task_id}`);
+    current.set(task.task_id, detail.task);
+  }));
+  for (const task of current.values()) {
     const cached = state.tasks.get(task.task_id);
-    if (!cached?.task || cached.task.revision !== task.revision) {
+    if (!cached?.task || cached.task.revision <= task.revision) {
       state.tasks.set(task.task_id, { ...(cached || {}), task });
     }
   }
   state.control = value.control || state.control;
+  state.activity = value.activity || null;
+  state.activityFresh = true;
   return value;
 }
 

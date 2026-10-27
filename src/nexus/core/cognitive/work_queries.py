@@ -9,7 +9,7 @@ from nexus.core.security.types import AccessDenied
 from nexus.core.storage.database import one, timestamp
 from nexus.core.storage.tasks import TERMINAL, load_task
 
-NAMES = frozenset({"get_current_time", "job_list", "job_output"})
+NAMES = frozenset({"conversation_route", "get_current_time", "job_list", "job_output"})
 
 # Cover tasks created by legacy actions, work operations and fixed Skills.
 TASK_IDS = """
@@ -24,6 +24,9 @@ UNION SELECT s.task_id FROM skill_run_steps s JOIN chat_work_steps w ON w.skill_
 
 
 async def query(conn, step, grant, intent, arguments, now):
+    if intent == 'conversation_route':
+        from nexus.core.cognitive.conversation_routes import query as route
+        return await route(conn, step, grant, arguments, now)
     turn = await one(conn, "SELECT conversation_id,created_at FROM chat_turns WHERE turn_id=? AND owner_id=?",
                      (step["turn_id"], grant["owner_id"]))
     if intent == "get_current_time":

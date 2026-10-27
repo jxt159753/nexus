@@ -1,0 +1,141 @@
+{
+  "task": "P103",
+  "date": "2026-10-26",
+  "status": "deployed; technical checks passed; user acceptance pending",
+  "behavior": {
+    "speak": [
+      "final result",
+      "actual confirmation question",
+      "important failure",
+      "sparse substantive progress"
+    ],
+    "omit": [
+      "tool-call preamble",
+      "routine waiting status",
+      "tool counts"
+    ],
+    "progress": {
+      "minimum_wait_seconds": 20,
+      "minimum_interval_seconds": 30,
+      "max_characters": 240,
+      "requires_completed_marked_exchange": true,
+      "requires_successful_tool_evidence": true,
+      "deduplicate": true
+    },
+    "tool_free_and_summary_streaming_retained": true,
+    "tool_enabled_reply_waits_for_final_confirmation": true,
+    "long_silent_text_source_does_not_trigger_receive_idle_failure": true,
+    "overall_tts_and_finish_timeout_retained": true,
+    "cancel_covers_chat_linking_and_silent_wait": true,
+    "ordinary_commentary_removed_from_subsequent_work_context": true,
+    "original_journal_tool_arguments_and_results_retained": true,
+    "extra_classifier_or_summary_model_calls": 0
+  },
+  "validation": {
+    "linux_fixed_candidate": {
+      "passed": 166,
+      "skipped": 1,
+      "seconds": 184.35,
+      "skip_reason": "Windows-only platform check"
+    },
+    "tests": [
+      "progress marker across stream chunks and title/memory metadata",
+      "actual provider SSE through local HTTP transport",
+      "real temporary database and original journal",
+      "tool preamble/count suppression",
+      "progress timing/evidence/deduplication",
+      "confirmation and failure speech",
+      "cancellation while linking or waiting",
+      "local WebSocket idle-versus-finish timeout",
+      "existing chat, automatic memory and voice lifecycle"
+    ],
+    "initial_failures_resolved": [
+      "expired synthetic test pricing; production configuration unchanged",
+      "cancellation before polling",
+      "receive idle timeout while text source pending",
+      "test expectations updated to preserve deployed failure-process collapse"
+    ],
+    "human_microphone_test_performed": false,
+    "paid_service_test_performed": false,
+    "additional_model_asr_tts_calls": 0,
+    "real_world_latency_and_provider_billing_not_measured": true
+  },
+  "synthetic_token_estimate": {
+    "before": {
+      "bytes": 10617,
+      "estimated_tokens": 2606,
+      "prompt_only_estimated_tokens": 1922,
+      "tool_pairs": 8
+    },
+    "after": {
+      "bytes": 9780,
+      "estimated_tokens": 2419,
+      "prompt_only_estimated_tokens": 1915,
+      "tool_pairs": 8
+    },
+    "estimated_input_tokens_saved": 187,
+    "bytes_saved": 837,
+    "scope": "Synthetic eight-round request; includes changed prompt. Estimate, not provider bill or production saving."
+  },
+  "deployment": {
+    "release": "voice-output-20261026-834aa32d",
+    "baseline": "prompt-20261026-a92856fa",
+    "preserves": [
+      "P100 unified prompt",
+      "P102 collapsed process",
+      "schema040 deployed capabilities"
+    ],
+    "excludes_unpublished": [
+      "P101 personality settings",
+      "P88"
+    ],
+    "wheel_sha256": "834aa32da1c6f45f9989f2e86fa26301f94c7d75383480fcba611bbe3284a3bb",
+    "schema": 40,
+    "runtime_resources_checked": 300,
+    "changed_files": [
+      "nexus/contracts/chat.py",
+      "nexus/core/cognitive/chat_feedback.py",
+      "nexus/core/cognitive/chat_presentation.py",
+      "nexus/core/cognitive/chat_work.py",
+      "nexus/core/models/chat.py",
+      "nexus/core/models/chat_format.py",
+      "nexus/core/models/providers.py",
+      "nexus/core/voice/bailian.py",
+      "nexus/core/voice/chat_bridge.py"
+    ],
+    "config_unchanged": true,
+    "database_integrity_checked": true,
+    "historical_records_preserved": true,
+    "backup_database_sha256": "b32bdff3c7d9fda15120622f688b3f604541c2a3195819a0fbf3b924c5ba0ffc",
+    "rollback_reads_current_schema": true,
+    "single_core": true,
+    "paused": false,
+    "model_call_records": 456,
+    "preexisting_unknown_cost_calls": 6,
+    "online_nodes": 2,
+    "active_voice_sessions_after_reconnect": 1,
+    "cross_client_snapshot_equal": true,
+    "csrf_checked": true,
+    "client_rebuild_required": false,
+    "transient_control_mismatch": "Read-only recheck confirmed unpaused; did not force control state.",
+    "archive": {
+      "sha256": "85cfdb8e67dc63ba3002b0bf523fe3ed3818ce038ffa698c47fffb068a398854",
+      "bytes": 183005952
+    },
+    "cleanup": {
+      "temporary_server_materials_removed": true,
+      "unused_candidates_removed": [
+        "/opt/nexus/releases/voice-output-20261026-d577cc3b",
+        "/opt/nexus/releases/voice-output-20261026-f0f149b6"
+      ],
+      "runtime_backups_retained": true
+    }
+  },
+  "github": {
+    "pull_request": "https://github.com/jxt159753/nexus/pull/3",
+    "branch": "codex/resident-voice-wake",
+    "draft": true,
+    "merge_requested": false,
+    "isolated_index": true
+  }
+}

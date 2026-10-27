@@ -115,7 +115,7 @@ class PluginRuntime:
     def __init__(self,config):
         self.config=config
         self.policy=config.plugins
-        self.root=config.roots.get('workspace')
+        self.workspace_root=config.roots.get('workspace')
         self.lock=threading.RLock()
         self.processes={}
         self.closed=False
@@ -145,6 +145,10 @@ class PluginRuntime:
             raise
         finally:
             connection.close()
+
+    @property
+    def root(self):
+        return getattr(self.invocation, "access_root", None) or self.workspace_root
 
     def cwd(self,context):
         with self.db() as conn:
@@ -231,6 +235,8 @@ class PluginRuntime:
                 return PluginNodeResult.model_validate_json(old[1])
             if conn.execute('SELECT count(*) FROM calls').fetchone()[0]>=10000: raise ValueError('plugin call journal full')
             conn.execute('INSERT INTO calls VALUES(?,?,NULL)',(str(args.invocation_id),identity))
+        from nexus.node.config import local_directory
+        self.invocation.access_root = local_directory(Path(args.access_root)) if args.access_root is not None else None
         self.invocation.capabilities=args.capability_digests
         self.invocation.max_subcalls=args.max_subcalls
         self.invocation.identifier=str(args.invocation_id)
@@ -238,6 +244,7 @@ class PluginRuntime:
         try:
             data=self.call(args.plugin_id,args.tool,args.input,str(args.context_id),deadline,cancel,release)
         finally:
+            self.invocation.access_root=None
             self.invocation.capabilities={}
             self.invocation.identifier=None
             self.invocation.mcp_binding=None

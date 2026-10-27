@@ -27,6 +27,7 @@
     voiceDevices: () => invoke("voice_devices"),
     voiceStart: (config) => invoke("voice_start", { config }),
     voiceStop: () => invoke("voice_stop"),
+    voiceWake: (config) => invoke("voice_wake", { config }),
     voiceInterrupt: () => invoke("voice_interrupt"),
     onVoice: (listener) => tauri.event.listen("nexus-voice", (event) => listener(event.payload)),
   };
